@@ -1,0 +1,102 @@
+
+	
+	#includeonce("w.hhf")
+	#includeonce("hide\hidelib.hhf")
+	#includeonce("stdlib.hhf")
+	#includeonce("hide\dbgwin.hhf")
+	#includeonce( "w32\shell32.hhf" )
+	#includeonce("hide\aeslib.hhf" )
+
+	?@nodisplay :=true;
+	?@nostackalign := true;
+
+
+const
+	#include( "res\rsrc.hhf" )
+	RECENT_MENU_START	:= 9000;
+	RECENT_MENU_END		:= 9019;	// 10 items in recent menu
+	IDC_SBAR			:= 9020;
+	statusht_c			:= 21;		// height of status bar
+
+	STATUS_PARTS		:= 3;
+	POS_LINES			:=170;
+	POS_INS				:=POS_LINES+35;
+	POS_READONLY		:=POS_INS+18;
+	
+type
+	// Message and dispatch table related definitions:
+		  
+	MsgProc_t:	procedure( hwnd:dword; wParam:dword; lParam:dword );
+	
+	MsgProcPtr_t:
+		record
+			MessageValue	:dword;
+			MessageHndlr	:MsgProc_t;			
+		endrecord;
+
+	wnd_settings:
+		record
+			xPos	:uns32;	// window x position
+			yPos	:uns32; // window y position
+			width	:uns32; // window width
+			height	:uns32; // window height
+			state	:dword; // is window stateimized?
+							// 0 = normal, 1 = stateimized, 2 = minimized
+			
+		endrecord;
+
+	PrnPos_t:
+		record
+			margins		:w.RECT;
+			pagesize	:w.POINT;
+		endrecord;
+
+	colorMode:
+		record
+			textColor	:w.COLORREF;
+			backColor	:w.COLORREF;
+		endrecord;
+		
+	findMode:
+		record
+			down		:boolean;
+			wholeword	:boolean;
+			matchcase	:boolean;
+			matchpattern:boolean;
+		endrecord;
+
+const
+	
+	// EDITREG.opts
+	CLEAR		:=@{0};
+	WRAP		:=@{1};
+	AUTO		:=@{2};
+	PEG			:=@{3};
+	READ		:=@{4};
+	RECENTNEW	:=@{5};
+	OPEN_RECENT	:=@{6};
+	REMEMBER_POS:=@{7}; //remember open file position
+
+	preserve_c	:boolean := false;
+	restore_c	:boolean := true;
+
+	color_white :w.COLORREF := $00FF_FFFF;
+	color_black :w.COLORREF := $0000_0000;
+
+static
+	logfont			:w.LOGFONT;		@external;
+	hred			:dword;			@external;
+	hinst			:dword;			@external;
+	hwnd			:dword;			@external;
+	psd				:w.PAGESETUPDLG;	@external;
+	ppos			:PrnPos_t;		@external;
+	pd				:w.PRINTDLG;	@external;
+	prnInches		:boolean;		@external;
+	AppName			:string;		@external;
+
+proc
+	loadFile :procedure( filename:string ); @external;
+	PrintDoc :procedure;		@external;
+	GetPrnCaps:procedure;	@external;
+	updateRecentLog :procedure; @external;
+	updateMenu :procedure; @external;	

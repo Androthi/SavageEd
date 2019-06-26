@@ -6,14 +6,14 @@ Open the hpr file in HIDE to build.
 
 The editor uses windows richedit DLL.
 
-Features:
+## Features:
 
--pattern matching search replace using characters '*' for match zero or more and '?' for match one.
+- pattern matching search replace using characters '*' for match zero or more and '?' for match one.
 
--forward or reverse logging
+- forward or reverse logging
 
--font, text colour and backgroudn colour selection
+- font, text colour and backgroudn colour selection
 
--uses local ini file to save options and window position settings. does not alter the windows registry, has no installer.
+- uses local ini file to save options and window position settings. does not alter the windows registry, has no installer.
 
--AES encryption
+- AES encryption

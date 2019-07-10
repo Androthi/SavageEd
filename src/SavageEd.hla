@@ -27,7 +27,7 @@ endtype;
 	
 readonly
 
-	version			:string := "SavageEd v0.3.0";
+	version			:string := "SavageEd v0.3.1";
 		
 	// this is the main configuration file name
 	config_file		:string := "SavageEd.ini";
@@ -1863,6 +1863,7 @@ proc
 				
 				try
 					conv.strTou32( return, 0 );
+					dec(eax);
 					w.SendMessage( hred, w.EM_LINEINDEX, eax, 0 );
 					w.SendMessage( hred, w.EM_SETSEL, eax, eax );
 					w.SendMessage( hred, w.EM_SCROLLCARET, 0, 0 );
@@ -2193,12 +2194,31 @@ _windowok:
 	arg.c();
 	if( eax > 1 ) then
 		
+		// get an argument, see if it is a file that exists,
+		// if so, open it.
+		
 		arg.v( 1 );
 		w.GetLongPathName( eax, &buffer, @size(buffer) -1 );
-		str.cpyz( &buffer, hide.strbuf );
-		loadFile( hide.strbuf );
-		jmp skipOpenRecent;
-		
+		if (eax) then
+			
+			// file path copied, try to open it.
+			
+			str.cpyz( &buffer, hide.strbuf );
+			loadFile( hide.strbuf );
+			if (eax) then
+				jmp skipOpenRecent;
+			endif;
+		else
+			// there is no file, create a new document with name passed on command line
+			filesys.gwd( filepath );
+			str.cat ("\", filepath);
+			arg.v(1);
+			str.catz (eax, filepath); 
+			//str.cpyz( &buffer, filepath );
+			dbg.put("filepath :", filepath);
+			setupWindowTitle();
+			jmp skipOpenRecent;
+		endif;
 	endif;
 	
 	if( config.readBool( s_settings, s_openrecent ) ) then
@@ -2244,4 +2264,3 @@ _windowok:
 _exit:
 
 end SavageEd;
-

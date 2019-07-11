@@ -1,10 +1,5 @@
 SavageEd Documentation
 
-*note this program is currently in beta testing
-
-*note to SavageEd users, some of the familiar features form SavageEd
- have a different behavior in SavageEd.
-
 Requirements and further notes:
 	-This program may or may not be distributed with documents
 	and source.  The only required file is "SavageEd.exe"
@@ -206,5 +201,5 @@ use the menu Option "Clear Recent On Exit"
 
 Kudos and Curses to:
 
-sevag.krikorian@gmail.com
-http://sevag.krikorian.gooblepages.com
+androth.pro@gmail.com
+https://sites.google.com/view/androth/home/high-level-assembly

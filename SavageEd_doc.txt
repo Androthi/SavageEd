@@ -1,3 +1,4 @@
+
 SavageEd Documentation
 
 Requirements and further notes:
@@ -14,6 +15,10 @@ Requirements and further notes:
 	This file will store all the user selected settings and options.
 
 Change Log
+7/11/2019 11:37:11 PM
+	0.4.0	- added "Remember Position" menu item
+				works with "Open Most Recent" and remembers
+				the last posiiton in that document.
 7/10/2019 7:55:19 PM
 	0.3.1	- fixed goto command
 			  fixed opening files from command line
@@ -120,7 +125,7 @@ Options > Read Only
 Goes into readonly mode, no changes can be made to documents.
 Save and SaveAs still function.
 
-Options > Recent Files 
+Options > Recent File Options
 	>> Open In New Window
 		Opens Recent files in new window.
  
@@ -129,6 +134,9 @@ Options > Recent Files
 	 
 	>> Open Most Recent
 		Opens the most recently accessed document when SavageEd starts.
+		
+	>> Remember Position
+		Used with Open Most Recent, restors last cursor position
 
 Options > Set Tabs...
 	Opens a dialog, enter a new number for tab spacing in number of characters
@@ -136,7 +144,10 @@ Options > Set Tabs...
 	value, expect crazy results.
 	Default tab spacing is 4 characters.
 
-Options > Encrypt...
+Options > Auto Tab
+	Automatically tabs the cursor to the previous line tab.
+
+Options > *Encrypt...
 Options > Decrypt...
 
 SavageEd offers an AES [Advanced Encryption Standard] encryption for documents.
@@ -148,8 +159,8 @@ To encrypt, enter a password up to 32 characters long
 	to recover an encrypted file without the correct password.
 	Encrypted files will be saved with the name of the current document and an ".enc"
 	extension.
-	SavageEd or kAES.exe is required to decrypt the file.  kAES.exe can be found on
-	my site (see link below).
+	SavageEd or kAES.exe is required to decrypt the file.  At this time,
+	kAES.exe is only available with the HIDE distribution, in the bin folder.
 	
 To decrypt, load an encrypted file (one that has an ".enc" extension) and select decrypt...
 	Enter the correct password.

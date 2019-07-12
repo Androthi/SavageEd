@@ -9,6 +9,7 @@ useunits=true
 useback=false
 findscope=00000001
 findflags=00000001
+mainfile=src\SavageEd.hla
 
 [HPR Jobs]
 SavageEd

@@ -23,6 +23,7 @@ const
 	POS_INS				:=POS_LINES+35;
 	POS_READONLY		:=POS_INS+18;
 	
+	
 type
 	// Message and dispatch table related definitions:
 		  
@@ -65,23 +66,54 @@ type
 			matchpattern:boolean;
 		endrecord;
 
+	menu_items :enum {
+		IDM_NEW,
+		IDM_OPEN,
+		IDM_INST,
+		IDM_SAVE,
+		IDM_SAVEAS,
+		IDM_RECENT,  
+		IDM_PAGESETUP,
+		IDM_PRINT,
+		IDM_QUIT,
+		IDM_UNDO,
+		IDM_REDO,
+		IDM_CUT, 
+		IDM_COPY,
+		IDM_PASTE,    
+		IDM_SELECTALL, 
+		IDM_FIND,
+		IDM_FINDNEXT, 
+		IDM_FINDPREV,
+		IDM_REPLACE,
+		IDM_EDIT_GOTO,
+		IDM_TIME,
+		IDM_FONT,
+		IDM_BACKGROUND, 
+		IDM_AUTO,
+		IDM_WRAP,
+		IDM_PEG,       
+		IDM_READONLY,
+		IDM_SETTAB,
+		IDM_AUTOTAB,
+		IDM_RECENTNEW,
+		IDM_CLEAREXIT,
+		IDM_OPENRECENT,
+		IDM_REMEMBERPOS,
+		IDM_OPTIONS_ENCRYPTAES,
+		IDM_OPTIONS_DECRYPTAES,
+		IDM_VIEW_STATUS,
+		IDM_ABOUT,
+		IDM_DOCUMENTS
+	};
+
 const
 	
-	// EDITREG.opts
-	CLEAR		:=@{0};
-	WRAP		:=@{1};
-	AUTO		:=@{2};
-	PEG			:=@{3};
-	READ		:=@{4};
-	RECENTNEW	:=@{5};
-	OPEN_RECENT	:=@{6};
-	REMEMBER_POS:=@{7}; //remember open file position
-
-	preserve_c	:boolean := false;
-	restore_c	:boolean := true;
 
 	color_white :w.COLORREF := $00FF_FFFF;
 	color_black :w.COLORREF := $0000_0000;
+	
+	szLINEBUFFER	:= 3000;
 
 static
 	logfont			:w.LOGFONT;		@external;

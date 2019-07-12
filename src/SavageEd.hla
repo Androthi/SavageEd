@@ -1,5 +1,6 @@
 program SavageEd;
 
+
 	#includeonce( "hide\hidelib.hhf" )
 	#include( "src\SavageEd.hhf" )
 	
@@ -24,10 +25,14 @@ type
 				endunion;
 			endrecord;
 endtype;
+
+proc
+	Subclass_EditProc :procedure( lparam:dword; wparam:dword; msg:uns32; hwin:dword ); @forward;
+
 	
 readonly
 
-	version			:string := "SavageEd v0.3.1";
+	version			:string := "SavageEd v0.4.0";
 		
 	// this is the main configuration file name
 	config_file		:string := "SavageEd.ini";
@@ -52,8 +57,10 @@ readonly
 	s_text		:string := "Text";
 	s_custcolors:string := "Custom Colors";
 	s_openrecent:string := "Open Recent";
+	s_rememberpos :string := "Remember Position";
 	s_wrap		:string := "Word Wrap";
 	s_autosave	:string := "Auto Save";
+	s_autotab	:string := "Auto Tab";
 	s_topwindow	:string := "Top Window";
 	s_status	:string := "status";
 	s_clearexit	:string := "Clear On Exit";
@@ -89,7 +96,8 @@ readonly
 storage
 	logfont			:w.LOGFONT;
 	hred			:dword;			// RichEd window handle
-	hinst		:dword;
+	default_hred	:dword;			// to contain original since we will be subclassing
+	hinst			:dword;
 	hsubmenu		:dword;	
 	hwnd			:dword;			// Handle to our window.
 	hmenu			:dword;
@@ -97,7 +105,6 @@ storage
 	hredDLL			:dword;			// RichEd DLL handle
 	hstatus			:dword;			// status bar handle
 
-	haccel			:dword;			// accelerator handle
 	hfont			:dword;			// fond handle
 	hFind			:dword;			// find dialog handle
 	hFindEdt		:dword;			// handle for find edit control
@@ -105,7 +112,7 @@ storage
 	frflags			:dword;
 	hfile			:dword;			// file handle
 	lpcbData		:dword;
-	buffer			:byte[w.MAX_PATH];
+	buffer			:byte[szLINEBUFFER];
 	findbuf			:byte[300];
 	replacebuf		:byte[300];
 	ft				:w.FINDTEXTEX;
@@ -147,7 +154,6 @@ readonly
 	
 	message_table	:MsgProcPtr_t; @nostorage;
 		MsgProcPtr_t	
-			MsgProcPtr_t:[ w.WM_NOTIFY,		&Msg_Notify		],
 			MsgProcPtr_t:[ w.WM_COMMAND,	&Msg_Command	],
 			MsgProcPtr_t:[ w.WM_DESTROY,	&Msg_Destroy	],
 			MsgProcPtr_t:[ w.WM_CLOSE,		&Msg_Close		],
@@ -156,7 +162,6 @@ readonly
 			MsgProcPtr_t:[ w.WM_CONTEXTMENU,&Msg_Context	],
 			MsgProcPtr_t:[ w.WM_SETFOCUS,	&Msg_SetFocus	],
 			MsgProcPtr_t:[ w.WM_DROPFILES,  &openDroppedFile],
-//	MsgProcPtr_t:[ w.WM_KEYDOWN,	&Msg_ProcessKey	],
 			
 			// add more messages here
 			MsgProcPtr_t:[ 0, NULL ];	// This marks the end of the list.
@@ -165,7 +170,6 @@ readonly
 	command_table	:MsgProcPtr_t; @nostorage;
 		MsgProcPtr_t
 			MsgProcPtr_t:[ IDM_QUIT,	&Cmd_File_Quit	],
-
 			// add more commands here
 			MsgProcPtr_t:[ 0,				NULL			];
 		
@@ -1040,6 +1044,106 @@ proc
 		ret();
 	end Find;
 
+	AddMenus :procedure;
+		storage
+			file_menu :dword;
+			edit_menu :dword;
+			options_menu :dword;
+			view_menu :dword;
+			help_menu :dword;
+			s_recent_menu :dword;
+			
+	begin AddMenus;
+		
+		// create all the menu handles here
+		mov( w.CreateMenu(), file_menu);
+		mov( w.CreateMenu(), edit_menu);
+		mov( w.CreateMenu(), options_menu);
+		mov( w.CreateMenu(), view_menu);
+		mov( w.CreateMenu(), help_menu);
+		mov( w.CreatePopupMenu(), s_recent_menu );
+		
+		//
+		//	File Menu
+		//
+		
+		w.AppendMenu( file_menu, w.MF_STRING, IDM_NEW, "&New	Ctrl+N");
+		w.AppendMenu( file_menu, w.MF_STRING, IDM_OPEN, "&Open	Ctrl+O");
+		w.AppendMenu( file_menu, w.MF_STRING, IDM_INST, "New &Window	Shift+Ctrl+N");
+		w.AppendMenu( file_menu, w.MF_SEPARATOR, NULL, NULL);
+		w.AppendMenu( file_menu, w.MF_STRING, IDM_SAVE, "&Save	Ctrl+S");
+		w.AppendMenu( file_menu, w.MF_STRING, IDM_SAVEAS, "Save &As	Shift+Ctrl+S");
+		w.AppendMenu( file_menu, w.MF_SEPARATOR, NULL, NULL);
+		w.AppendMenu( file_menu, w.MF_STRING, IDM_RECENT, "Recent Files");
+		w.AppendMenu( file_menu, w.MF_SEPARATOR, NULL, NULL);
+		w.AppendMenu( file_menu, w.MF_STRING, IDM_PAGESETUP, "Page Setup");
+		w.AppendMenu( file_menu, w.MF_STRING, IDM_PRINT, "Print	Ctrl+P");
+		w.AppendMenu( file_menu, w.MF_SEPARATOR, NULL, NULL);
+		w.AppendMenu( file_menu, w.MF_STRING, IDM_QUIT, "&Quit	ESC");
+		w.AppendMenu( hmenu, w.MF_POPUP, file_menu, "&File");
+
+		//
+		//	Edit Menu
+		//
+	
+		w.AppendMenu( edit_menu, w.MF_STRING, IDM_UNDO, "&Undo	Ctrl+Z");
+		w.AppendMenu( edit_menu, w.MF_STRING, IDM_REDO, "&Redo	Ctrl+Y");
+		w.AppendMenu( edit_menu, w.MF_SEPARATOR, NULL, NULL);
+		w.AppendMenu( edit_menu, w.MF_STRING, IDM_CUT, "&Cut	Ctrl+X");
+		w.AppendMenu( edit_menu, w.MF_STRING, IDM_COPY, "C&opy	Ctrl+C");
+		w.AppendMenu( edit_menu, w.MF_STRING, IDM_PASTE, "&Paste	Ctrl+V");
+		w.AppendMenu( edit_menu, w.MF_STRING, IDM_SELECTALL, "Select &All	Ctrl+A");
+		w.AppendMenu( edit_menu, w.MF_SEPARATOR, NULL, NULL);
+		w.AppendMenu( edit_menu, w.MF_STRING, IDM_FIND, "&Find / Replace	Ctrl+F");
+		w.AppendMenu( edit_menu, w.MF_STRING, IDM_FINDNEXT, "Find &Next	F3");
+		w.AppendMenu( edit_menu, w.MF_STRING, IDM_FINDPREV, "Find &Previous	Ctrl+F3");
+		w.AppendMenu( edit_menu, w.MF_STRING, IDM_EDIT_GOTO, "&Goto Line	Ctrl+G");
+		w.AppendMenu( edit_menu, w.MF_SEPARATOR, NULL, NULL);
+		w.AppendMenu( edit_menu, w.MF_STRING, IDM_TIME, "&Insert Date/Time	F5");
+		w.AppendMenu( hmenu, w.MF_POPUP, edit_menu, "&Edit");
+
+		//
+		//	Options Menu
+		//
+
+		w.AppendMenu( options_menu, w.MF_STRING, IDM_FONT, "&Font...");
+		w.AppendMenu( options_menu, w.MF_STRING, IDM_BACKGROUND, "&Background Color...");
+		w.AppendMenu( options_menu, w.MF_SEPARATOR, NULL, NULL);
+		w.AppendMenu( options_menu, w.MF_STRING, IDM_AUTO, "&Autosave	F2");
+		w.AppendMenu( options_menu, w.MF_STRING, IDM_READONLY, "&Read Only	F6");
+		w.AppendMenu( options_menu, w.MF_STRING, IDM_SETTAB, "&Set Tabs...");
+		w.AppendMenu( options_menu, w.MF_STRING, IDM_AUTOTAB, "Auto &Tab");
+		w.AppendMenu( options_menu, w.MF_STRING | w.MF_POPUP, s_recent_menu, "Recent File Options");
+			w.AppendMenu( s_recent_menu, w.MF_STRING, IDM_RECENTNEW, "Open in New Window");
+			w.AppendMenu( s_recent_menu, w.MF_STRING, IDM_CLEAREXIT, "Clear History on Exit");
+			w.AppendMenu( s_recent_menu, w.MF_STRING, IDM_OPENRECENT, "Open Most Recent");
+			w.AppendMenu( s_recent_menu, w.MF_STRING, IDM_REMEMBERPOS, "Remember Position");
+		w.AppendMenu( options_menu, w.MF_SEPARATOR, NULL, NULL);
+		w.AppendMenu( options_menu, w.MF_STRING, IDM_OPTIONS_ENCRYPTAES, "AES &Encrypt");
+		w.AppendMenu( options_menu, w.MF_STRING | w.MF_DISABLED, IDM_OPTIONS_DECRYPTAES, "AES &Decrypt");
+		w.AppendMenu( hmenu, w.MF_POPUP, options_menu, "&Options");
+
+		//
+		//	View Menu
+		//
+
+		w.AppendMenu( view_menu, w.MF_STRING, IDM_PEG, "&Stay on Top	Ctrl+T");
+		w.AppendMenu( view_menu, w.MF_STRING, IDM_WRAP, "&Word Wrap	F4");
+		w.AppendMenu( view_menu, w.MF_STRING, IDM_VIEW_STATUS, "&Status Bar");
+		w.AppendMenu( hmenu, w.MF_POPUP, view_menu, "&View");
+
+		//
+		//	Help Menu
+		//
+
+		w.AppendMenu( help_menu, w.MF_STRING, IDM_ABOUT, "&About...");
+		w.AppendMenu( help_menu, w.MF_STRING, IDM_DOCUMENTS, "&Documents");
+		w.AppendMenu( hmenu, w.MF_POPUP, help_menu, "&Help");
+
+		w.SetMenu(hwnd, hmenu);
+
+	end AddMenus;
+
 	Proc_Input :procedure( lParam:dword; wParam:dword; uMsg:uns32; hWin:dword );
 	begin Proc_Input;
 		pushabi;
@@ -1367,9 +1471,7 @@ proc
 		move (ppos.pagesize.x, psd.ptPaperSize.x);
 		move (ppos.pagesize.y, psd.ptPaperSize.y);	
 		
-		w.LoadAccelerators( hinst, val ID_ACCEL );
-		mov( eax, haccel );
-
+		
 		
 		or( 1, eax );
 		done:
@@ -1423,47 +1525,17 @@ proc
 		
 	end updateStatus;
 
-
-	Msg_Notify :procedure( hwin:dword; wparam:dword; lparam:dword );
-	begin Msg_Notify;
-		//dbg.put("notify");
-		pushabi;
-		
-		mov( lparam, edx );
-		mov( (type w.NMHDR[EDX]).code, eax );
-		//dbg.put("eax = ", eax );
-		if( eax = w.EN_SELCHANGE ) then
-			
-			updateStatus( hred );
-			
-		elseif( eax = w.EN_MSGFILTER ) then
-			
-			mov( (type w.MSGFILTER[EDX]).msg, eax );
-			
-			if( eax = w.WM_KEYUP ) then
-				
-				mov( (type w.MSGFILTER[EDX]).wParam, eax );
-				if( eax = $C1520001 ) then  // don't know the constant for this :(
-					// vk_insert was pressed
-					xor( 1, ins_ovr );
-					updateStatus( hred );
-				endif;
-				
-				
-			endif;
-		endif;
-		
-		popabi;
-	end Msg_Notify;
-
-
 	Msg_Create :procedure( hwin:dword; wparam:dword; lparam:dword );
 	begin Msg_Create;
 		
 		mov(hwin, eax);
 		mov(eax, hwnd);
-		w.GetMenu( hwnd );
-		mov( eax, hmenu );
+		w.CreateMenu();
+		mov(eax, hmenu);
+		w.SetMenu(hwnd, hmenu);
+		//w.GetMenu( hwnd );
+		//mov( eax, hmenu );
+		AddMenus();
 		w.GetSubMenu( hmenu, 1 );
 		mov( eax, hcontextmenu );
 		w.DragAcceptFiles( hwnd, true );
@@ -1516,6 +1588,10 @@ proc
 			w.CheckMenuItem( hmenu, IDM_AUTO, w.MF_BYCOMMAND | w.MF_CHECKED);
 		endif;
 		
+		if( config.readBool( s_settings, s_autotab ) ) then
+			w.CheckMenuItem( hmenu, IDM_AUTOTAB, w.MF_BYCOMMAND | w.MF_CHECKED);
+		endif;
+		
 		if( config.readBool( s_settings, s_topwindow )) then
 
 			w.CheckMenuItem( hmenu, IDM_PEG, w.MF_BYCOMMAND | w.MF_CHECKED );
@@ -1541,6 +1617,10 @@ proc
 			
 		endif;
 		
+		if( config.readBool( s_settings, s_rememberpos ) ) then
+			w.CheckMenuItem( hmenu, IDM_REMEMBERPOS, w.MF_BYCOMMAND | w.MF_CHECKED );
+		endif;
+		
 		if( config.readBool( s_window, s_status ) ) then
 			
 			w.CheckMenuItem( hmenu, IDM_VIEW_STATUS, w.MF_BYCOMMAND | w.MF_CHECKED );
@@ -1551,6 +1631,12 @@ proc
 		w.EnableMenuItem( hmenu, IDM_OPTIONS_DECRYPTAES, w.MF_BYCOMMAND | w.MF_GRAYED );
 		
 		setupWindowTitle();
+		
+		// subclass the edit control
+		w.GetWindowLong(hred, w.GWL_WNDPROC);
+		mov( eax, default_hred );
+		dbg.put ("defulat_hred :", default_hred);
+		w.SetWindowLong(hred, w.GWL_WNDPROC, &Subclass_EditProc);
 		
 	end Msg_Create;
 
@@ -1618,7 +1704,6 @@ proc
 	
 	 	getConfirm();
 		if (!eax) then
-			
 		 	w.SendMessage(hwin, w.WM_DESTROY, 0, 0 );
 		 	
 		endif;
@@ -1635,6 +1720,9 @@ proc
 	begin Msg_Destroy;
 	
 		dbg.put("destroy");
+		// get information to save current position
+		w.SendMessage (hred, w.EM_EXGETSEL, 0, &chrg);
+		
 		w.GetWindowPlacement( hwin, wndpos );
 		w.GetWindowRect( hwin, rect );
 		mov( rect.left, settings.xPos );
@@ -1645,18 +1733,7 @@ proc
 		mov( rect.bottom, eax );
 		sub( rect.top, eax );
 		mov( eax, settings.height );
-		
-		//mov( wndpos.rcNormalPosition.right, eax );
-		//sub( wndpos.rcNormalPosition.left, eax );
-		//mov( eax, settings.width );
-		//mov( wndpos.rcNormalPosition.bottom, eax );
-		//sub( wndpos.rcNormalPosition.top, eax );
-		//mov( eax, settings.height );
-		//push( wndpos.rcNormalPosition.left );
-		//pop( settings.xPos );
-		//push( wndpos.rcNormalPosition.top );
-		//pop( settings.yPos );
-		
+				
 		if(  wndpos.showCmd = w.SW_SHOWMINIMIZED ) then
 			
 			mov( 2, settings.state );
@@ -1679,6 +1756,9 @@ proc
 		
 		config.writeBin( s_text, s_find, &findOpts, @size( findOpts ) );
 		
+		config.writeUns( s_settings, "cpMin", chrg.cpMin );
+		config.writeUns( s_settings, "cpMax", chrg.cpMax );
+		
 		if( config.readBool( s_settings, s_clearexit ) ) then
 			
 			dbg.put("deleting recent");
@@ -1696,37 +1776,6 @@ proc
 	 	w.PostQuitMessage( NULL );
 			
 	end Msg_Destroy;
-
-//	Msg_ProcessKey :procedure( hwind:dword; wparam:dword; lparam:dword);
-//	
-//		static
-//			kbstate	:byte[$100];	//holds the state of keys pressed down
-//			
-//	
-//	begin Msg_ProcessKey;
-//		
-//		// quick solution is to hard code these keys
-//		
-//		w.GetKeyboardState( &kbstate);	//read state of keys pressed down
-//		mov( wparam, eax );
-//		switch( eax );
-//		
-//			case( w.VK_F )
-//				if( flagSet( $80, kbstate[w.VK_CONTROL] ) ) then
-//					w.SendMessage(hred, w.LB_GETCARETINDEX, 0, 0);
-//					inc( eax );
-//					w.SendMessage(hred, w.LB_SETCARETINDEX, eax, 0);
-//					w.SendMessage( hred, w.EM_SCROLLCARET, 0, 0 );	
-//					
-//				endif;
-//				
-//			default
-//				
-//		endswitch;
-//
-//		
-//	end Msg_ProcessKey;
-
 
 	Msg_Command :procedure( hwin:dword; wparam:dword; lparam:dword );
 	begin Msg_Command;
@@ -1910,6 +1959,22 @@ proc
 			
 			config.writeBool( s_settings, s_autosave, al );
 			
+		elseif( eax = IDM_AUTOTAB ) then
+			
+			if( config.readBool( s_settings, s_autotab ) ) then
+			
+				w.CheckMenuItem( hmenu, IDM_AUTOTAB, w.MF_BYCOMMAND | w.MF_UNCHECKED );
+				mov( false, eax );
+				
+			else
+				
+				w.CheckMenuItem( hmenu, IDM_AUTOTAB, w.MF_BYCOMMAND | w.MF_CHECKED );
+				mov( true, eax );
+				
+			endif;
+			
+			config.writeBool( s_settings, s_autotab, al );
+						
 		elseif (eax = IDM_WRAP) then
 
 			if( config.readBool( s_settings, s_wrap ) ) then
@@ -1991,6 +2056,20 @@ proc
 			endif;
 			config.writeBool( s_settings, s_openrecent, al );
 			
+		elseif( eax = IDM_REMEMBERPOS ) then
+		
+			if( config.readBool( s_settings, s_rememberpos ) ) then
+
+				w.CheckMenuItem( hmenu, IDM_REMEMBERPOS, w.MF_BYCOMMAND | w.MF_UNCHECKED );
+				mov( false, eax );
+				
+			else
+				
+				w.CheckMenuItem(hmenu, IDM_REMEMBERPOS, w.MF_BYCOMMAND | w.MF_CHECKED);
+				mov( true, eax );
+				
+			endif;
+			config.writeBool( s_settings, s_rememberpos, al );
 			
 		elseif (eax = IDM_PEG) then
 
@@ -2097,6 +2176,194 @@ proc
 		endif;
 
 	end Msg_Command;
+
+	ScancodeToAscii: procedure (scancode:dword);
+	
+		// 		covert scan code to ascii
+		// 		result of ascii code in register BL
+	
+		var 
+			KeyState:byte[256];
+			CharBuf:byte;
+		
+	begin	ScancodeToAscii;
+			
+		USE(eax);
+			w.GetKeyboardState(KeyState);	
+			lea(eax, KeyState);
+			lea(edx, CharBuf);
+			w.ToAscii(scancode, scancode, [eax], [edx], 0);
+			mov(CharBuf, dl);
+		ENDUSE;
+		
+	end ScancodeToAscii;
+
+
+	// this procedure subclasses the riched control
+	// to process keyboard activity.
+	Subclass_EditProc :procedure( lparam:dword; wparam:dword; msg:uns32; hwin:dword );
+
+		static
+			ctrl_down	:boolean := false;
+			alt_down	:boolean := false;
+			shift_down	:boolean := false;
+			
+
+	begin Subclass_EditProc;
+		
+		mov( msg, eax );
+		switch( eax );
+			
+			case( w.WM_KEYUP )
+				
+				mov( wparam, eax );
+				switch( eax );
+						
+					case( w.VK_SHIFT )
+						mov( false, shift_down );
+						
+					case( w.VK_CONTROL )	
+						mov( false, ctrl_down );
+						
+					case( w.VK_MENU )
+						mov( false, alt_down );
+						
+					case( w.VK_INSERT )
+						xor( 1, ins_ovr );
+						updateStatus( hred );
+						
+					case( w.VK_RETURN )
+						// return key was processed
+						// handle auto-tab here?
+						if( config.readBool( s_settings, s_autotab ) ) then
+
+							w.SendMessage( hred, w.EM_LINEFROMCHAR, -1, 0);
+							dec( eax );
+							//dbg.separator;
+							//dbg.put(" reading line :", (type uns32 eax));
+							mov( szLINEBUFFER-1, (type word buffer[0]));
+							w.SendMessage( hred, w.EM_GETLINE, eax, &buffer );
+							//dbg.put("length of buffer :", (type uns32 eax));
+							//dbg.putz(&buffer);
+							if( eax ) then
+								xor( ecx, ecx );
+								while( eax ) do
+									mov( buffer[ecx], dl );
+									//dbg.put(" read buffer : ", dl );
+									if( dl == $09 ) then
+										inc( ecx );
+									else
+										break;
+									endif;
+									dec( eax );
+								endwhile;
+								
+								// if we are here, then ecx contains number of tabs
+								//dbg.put("we have ecx :", ecx );
+								str.cpy("", strbuf );
+								if( ecx ) then
+									while( ecx ) do
+										str.cat( "	", strbuf);
+										dec( ecx );
+									endwhile;
+									w.SendMessage( hred, w.EM_GETSEL, &chrg.cpMin, &chrg.cpMax);
+									w.SendMessage( hred, w.EM_REPLACESEL,true, strbuf );
+									w.SendMessage( hred, w.EM_SCROLLCARET,0,0);
+								endif;
+							endif;
+						endif;
+					default
+				endswitch;
+			
+			case( w.WM_KEYDOWN )
+				
+				// key down state, see if any control keys
+				// are pressed
+				
+				mov( wparam, eax );
+				switch( eax );
+					
+					case( w.VK_SHIFT )
+						mov( true, shift_down );
+						
+					case( w.VK_CONTROL )	
+						mov( true, ctrl_down );
+						
+					case( w.VK_MENU )
+						mov( true, alt_down );
+						
+					case( w.VK_N )
+						if( ctrl_down ) then
+							Msg_Command( hwnd, IDM_NEW, 0 );
+						endif;
+					
+					case( w.VK_F )
+						if( ctrl_down ) then
+							Msg_Command( hwnd, IDM_FIND,0 );
+						endif;
+
+					case( w.VK_G )
+						if( ctrl_down ) then
+							Msg_Command( hwnd, IDM_EDIT_GOTO,0 );
+						endif;
+						
+					case( w.VK_O )
+						if( ctrl_down ) then
+							Msg_Command( hwnd, IDM_OPEN,0 );
+						endif;					
+					case( w.VK_P )
+						if( ctrl_down ) then
+							Msg_Command( hwnd, IDM_PRINT,0 );
+						endif;
+				
+					case( w.VK_S )
+						if( ctrl_down && shift_down ) then
+							Msg_Command( hwnd, IDM_SAVEAS,0 );
+						elseif( ctrl_down ) then
+							Msg_Command( hwnd, IDM_SAVE,0 );
+						endif;
+
+					case( w.VK_T )
+						if( ctrl_down ) then
+							Msg_Command( hwnd, IDM_PEG,0 );
+						endif;
+					
+					case( w.VK_F2 )
+						Msg_Command( hwnd, IDM_AUTO,0 );
+						
+					case( w.VK_F3 )
+						if( ctrl_down ) then
+							Msg_Command( hwnd, IDM_FINDPREV,0 );
+						else
+							Msg_Command( hwnd, IDM_FINDNEXT,0 );
+						endif;
+						
+					case( w.VK_F4 )
+						Msg_Command( hwnd, IDM_WRAP,0 );
+						
+					case( w.VK_F5 )
+						Msg_Command( hwnd, IDM_TIME,0 );
+						
+					case( w.VK_F6 )
+						Msg_Command( hwnd, IDM_READONLY,0 );
+
+					case( w.VK_ESCAPE )
+						w.SendMessage(hwnd,w.WM_CLOSE,0,0 );
+						xor( eax, eax );
+						exit Subclass_EditProc;
+						
+					default
+				endswitch;
+		
+			default
+
+
+		endswitch;
+		
+		// return the default window proc.
+		w.CallWindowProc(default_hred, hwin, msg, wparam, lparam);
+		done:
+	end Subclass_EditProc;
 	
 	WndProc :procedure( lparam:dword; wparam:dword; umsg:uns32; hwin:dword );
 		// main window message handler
@@ -2128,7 +2395,6 @@ proc
 
 
 begin SavageEd;
-	//dbg.cls;
 	dbg.put("SavageEd");
 
 	initWindow();
@@ -2144,11 +2410,13 @@ begin SavageEd;
 	mov( NULL, wc.cbWndExtra );
 	mov( hinst, wc.hInstance );
 	mov( w.COLOR_BTNFACE+1, wc.hbrBackground );
-	mov( IDR_MENU, wc.lpszMenuName );
+	//mov( IDR_MENU, wc.lpszMenuName );
 	mov( ClassName, wc.lpszClassName );
 	
+		
 	dbg.put("hinst = ", hinst );
-	w.LoadIcon( hinst, val ID_JAKAL );
+	//w.LoadImage( NULL, "res\jakal.ico", w.IMAGE_ICON, 0,0, w.LR_LOADFROMFILE| w.LR_DEFAULTSIZE| w.LR_SHARED );
+	w.LoadIcon(hinst, val ID_JAKAL);
 	mov( eax, wc.hIcon );
 	mov( eax, wc.hIconSm );
 	w.LoadCursor( NULL, val w.IDC_ARROW );
@@ -2231,6 +2499,17 @@ _windowok:
 				config.deleteItem( s_recent, 0 );
 				updateMenu();
 			endif;
+			
+			if( config.readBool( s_settings, s_rememberpos )) then
+				config.readUns( s_settings, "cpMin");
+				mov( eax, chrg.cpMin );
+				config.readUns( s_settings, "cpMax");
+				mov( eax, chrg.cpMax );
+				dbg.put("min:max = ", chrg.cpMin, " : ", chrg.cpMax );
+				w.SendMessage( hred, w.EM_EXSETSEL, 0, &chrg );
+				w.SendMessage( hred,w.EM_SCROLLCARET,0,0 );
+			endif;
+			
 		endif;
 		
 	endif;
@@ -2252,10 +2531,8 @@ _windowok:
 			continueif( eax );
 			w.IsDialogMessage( hAbout, msg );
 			continueif( eax );
-			if( !w.TranslateAccelerator( hwnd, haccel, msg )) then
-				w.TranslateMessage( msg );
-				w.DispatchMessage( msg );
-			endif;
+			w.TranslateMessage( msg );
+			w.DispatchMessage( msg );
 			
 	ENDFOR;
 	

@@ -32,7 +32,7 @@ proc
 	
 readonly
 
-	version			:string := "SavageEd v0.4.0";
+	version			:string := "SavageEd v0.4.1";
 		
 	// this is the main configuration file name
 	config_file		:string := "SavageEd.ini";
@@ -60,7 +60,7 @@ readonly
 	s_rememberpos :string := "Remember Position";
 	s_wrap		:string := "Word Wrap";
 	s_autosave	:string := "Auto Save";
-	s_autotab	:string := "Auto Tab";
+	s_autoindent:string := "Auto Indent";
 	s_topwindow	:string := "Top Window";
 	s_status	:string := "status";
 	s_clearexit	:string := "Clear On Exit";
@@ -105,7 +105,7 @@ storage
 	hredDLL			:dword;			// RichEd DLL handle
 	hstatus			:dword;			// status bar handle
 
-	hfont			:dword;			// fond handle
+	hfont			:dword;			// font handle
 	hFind			:dword;			// find dialog handle
 	hFindEdt		:dword;			// handle for find edit control
 	hAbout			:dword;			// About dialog handle
@@ -523,6 +523,9 @@ proc
 			
 		elseif (uMsg = w.WM_COMMAND) then
 			 if (wParam = w.IDOK || wParam= w.IDCANCEL) then
+				
+				// consume key up command
+				w.GetMessage(msg,NULL,0,0);
 			 	w.SendMessage(hDlg, w.WM_CLOSE,NULL,NULL);
 			 endif;
 		elseif (uMsg = w.WM_CLOSE) then
@@ -1112,7 +1115,7 @@ proc
 		w.AppendMenu( options_menu, w.MF_STRING, IDM_AUTO, "&Autosave	F2");
 		w.AppendMenu( options_menu, w.MF_STRING, IDM_READONLY, "&Read Only	F6");
 		w.AppendMenu( options_menu, w.MF_STRING, IDM_SETTAB, "&Set Tabs...");
-		w.AppendMenu( options_menu, w.MF_STRING, IDM_AUTOTAB, "Auto &Tab");
+		w.AppendMenu( options_menu, w.MF_STRING, IDM_AUTOINDENT, "Auto &Tab");
 		w.AppendMenu( options_menu, w.MF_STRING | w.MF_POPUP, s_recent_menu, "Recent File Options");
 			w.AppendMenu( s_recent_menu, w.MF_STRING, IDM_RECENTNEW, "Open in New Window");
 			w.AppendMenu( s_recent_menu, w.MF_STRING, IDM_CLEAREXIT, "Clear History on Exit");
@@ -1147,6 +1150,8 @@ proc
 	Proc_Input :procedure( lParam:dword; wParam:dword; uMsg:uns32; hWin:dword );
 	begin Proc_Input;
 		pushabi;
+		
+		//dbg.put(" input proc hwin = ", hWin);
 		mov( uMsg, eax );
 		
 		if( eax = w.WM_COMMAND ) then
@@ -1162,6 +1167,11 @@ proc
 					w.GetDlgItemTextA( hWin, IDC_EDT_INPUT, buffer, @size(buffer) );
 					str.a_cpyz( &buffer );
 					mov( eax, return );
+					
+					// consume the key up message,
+					// we don't want VK_RETURN going to parent
+					// window key up command.
+					w.GetMessage(msg,NULL,0,0);
 					w.SendMessage( hWin, w.WM_DESTROY, 0, 0 );
 					
 				elseif( eax = w.IDCANCEL ) then
@@ -1588,8 +1598,8 @@ proc
 			w.CheckMenuItem( hmenu, IDM_AUTO, w.MF_BYCOMMAND | w.MF_CHECKED);
 		endif;
 		
-		if( config.readBool( s_settings, s_autotab ) ) then
-			w.CheckMenuItem( hmenu, IDM_AUTOTAB, w.MF_BYCOMMAND | w.MF_CHECKED);
+		if( config.readBool( s_settings, s_autoindent ) ) then
+			w.CheckMenuItem( hmenu, IDM_AUTOINDENT, w.MF_BYCOMMAND | w.MF_CHECKED);
 		endif;
 		
 		if( config.readBool( s_settings, s_topwindow )) then
@@ -1959,21 +1969,21 @@ proc
 			
 			config.writeBool( s_settings, s_autosave, al );
 			
-		elseif( eax = IDM_AUTOTAB ) then
+		elseif( eax = IDM_AUTOINDENT ) then
 			
-			if( config.readBool( s_settings, s_autotab ) ) then
+			if( config.readBool( s_settings, s_autoindent ) ) then
 			
-				w.CheckMenuItem( hmenu, IDM_AUTOTAB, w.MF_BYCOMMAND | w.MF_UNCHECKED );
+				w.CheckMenuItem( hmenu, IDM_AUTOINDENT, w.MF_BYCOMMAND | w.MF_UNCHECKED );
 				mov( false, eax );
 				
 			else
 				
-				w.CheckMenuItem( hmenu, IDM_AUTOTAB, w.MF_BYCOMMAND | w.MF_CHECKED );
+				w.CheckMenuItem( hmenu, IDM_AUTOINDENT, w.MF_BYCOMMAND | w.MF_CHECKED );
 				mov( true, eax );
 				
 			endif;
 			
-			config.writeBool( s_settings, s_autotab, al );
+			config.writeBool( s_settings, s_autoindent, al );
 						
 		elseif (eax = IDM_WRAP) then
 
@@ -2211,6 +2221,8 @@ proc
 
 	begin Subclass_EditProc;
 		
+		//dbg.put("subclass: wparam : ", wparam, "     lparam :", lparam );
+		
 		mov( msg, eax );
 		switch( eax );
 			
@@ -2235,7 +2247,14 @@ proc
 					case( w.VK_RETURN )
 						// return key was processed
 						// handle auto-tab here?
-						if( config.readBool( s_settings, s_autotab ) ) then
+						// we need to make sure that the return
+						// key is not pressed from a dialogue
+						
+						dbg.put("VK_RETURN");
+						if( wparam == -1 ) then
+							jmp done;
+						endif;
+						if( config.readBool( s_settings, s_autoindent ) ) then
 
 							w.SendMessage( hred, w.EM_LINEFROMCHAR, -1, 0);
 							dec( eax );

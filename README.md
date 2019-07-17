@@ -6,6 +6,10 @@ Open the hpr file in HIDE to build.
 
 The editor uses windows richedit DLL.
 
+Binaries are available at
+https://sites.google.com/view/androth/home/high-level-assembly
+
+
 ## Features:
 
 - pattern matching search replace using characters '*' for match zero or more and '?' for match one.
@@ -17,3 +21,4 @@ The editor uses windows richedit DLL.
 - uses local ini file to save options and window position settings. does not alter the windows registry, has no installer.
 
 - AES encryption
+

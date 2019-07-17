@@ -144,8 +144,8 @@ Options > Set Tabs...
 	value, expect crazy results.
 	Default tab spacing is 4 characters.
 
-Options > Auto Tab
-	Automatically tabs the cursor to the previous line tab.
+Options > Auto Indent
+	Automatically indents the cursor to the previous line tab.
 
 Options > *Encrypt...
 Options > Decrypt...

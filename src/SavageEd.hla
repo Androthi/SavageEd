@@ -1115,7 +1115,7 @@ proc
 		w.AppendMenu( options_menu, w.MF_STRING, IDM_AUTO, "&Autosave	F2");
 		w.AppendMenu( options_menu, w.MF_STRING, IDM_READONLY, "&Read Only	F6");
 		w.AppendMenu( options_menu, w.MF_STRING, IDM_SETTAB, "&Set Tabs...");
-		w.AppendMenu( options_menu, w.MF_STRING, IDM_AUTOINDENT, "Auto &Tab");
+		w.AppendMenu( options_menu, w.MF_STRING, IDM_AUTOINDENT, "Auto &Indent");
 		w.AppendMenu( options_menu, w.MF_STRING | w.MF_POPUP, s_recent_menu, "Recent File Options");
 			w.AppendMenu( s_recent_menu, w.MF_STRING, IDM_RECENTNEW, "Open in New Window");
 			w.AppendMenu( s_recent_menu, w.MF_STRING, IDM_CLEAREXIT, "Clear History on Exit");

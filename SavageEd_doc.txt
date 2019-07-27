@@ -19,6 +19,7 @@ Change Log
 	0.4.0	- added "Remember Position" menu item
 				works with "Open Most Recent" and remembers
 				the last posiiton in that document.
+	0.4.1	- fixted status bar update
 7/10/2019 7:55:19 PM
 	0.3.1	- fixed goto command
 			  fixed opening files from command line

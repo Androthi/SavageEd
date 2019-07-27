@@ -2242,7 +2242,6 @@ proc
 						
 					case( w.VK_INSERT )
 						xor( 1, ins_ovr );
-						updateStatus( hred );
 						
 					case( w.VK_RETURN )
 						// return key was processed
@@ -2293,6 +2292,7 @@ proc
 						endif;
 					default
 				endswitch;
+				updateStatus( hred );
 			
 			case( w.WM_KEYDOWN )
 				
@@ -2382,6 +2382,7 @@ proc
 		// return the default window proc.
 		w.CallWindowProc(default_hred, hwin, msg, wparam, lparam);
 		done:
+
 	end Subclass_EditProc;
 	
 	WndProc :procedure( lparam:dword; wparam:dword; umsg:uns32; hwin:dword );

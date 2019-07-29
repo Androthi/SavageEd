@@ -1608,21 +1608,7 @@ proc
 				w.WS_VSCROLL | w.WS_VISIBLE,
 				edstyle );
 					
-					 
-		if( config.readBool( s_settings, s_wrap )) then
-			
-			w.CheckMenuItem( hmenu, IDM_WRAP, w.MF_BYCOMMAND | w.MF_CHECKED );
-			
-		endif;
-		
-		if( config.readBool( s_settings, s_readonly )) then
-			
-			w.CheckMenuItem( hmenu, IDM_READONLY, w.MF_BYCOMMAND | w.MF_CHECKED );
-			or( w.ES_READONLY, edstyle );
-			w.SendMessage( hstatus, w.SB_SETTEXT, 2, s_r );
-		endif;
-		
-		
+				
 		// create edit window
 		w.CreateWindowEx( w.WS_EX_CLIENTEDGE, s_resedClass, NULL,
 					edstyle, 0, 0, 0, 0, hwnd, hcontextmenu, hinst, NULL );
@@ -1634,6 +1620,22 @@ proc
 		setFormat();
 		
 		w.SetFocus( hred );
+		
+		if( config.readBool( s_settings, s_wrap )) then
+			
+			w.CheckMenuItem( hmenu, IDM_WRAP, w.MF_BYCOMMAND | w.MF_CHECKED );
+			w.SendMessage( hred, w.EM_SETTARGETDEVICE, NULL, 0 );
+		else
+			w.SendMessage( hred, w.EM_SETTARGETDEVICE, NULL, 1 );			
+		endif;
+		
+		if( config.readBool( s_settings, s_readonly )) then
+			
+			w.CheckMenuItem( hmenu, IDM_READONLY, w.MF_BYCOMMAND | w.MF_CHECKED );
+			or( w.ES_READONLY, edstyle );
+			w.SendMessage( hstatus, w.SB_SETTEXT, 2, s_r );
+		endif;
+		
 		
 		// update menu
 		dbg.put("updatemenu");
@@ -2463,13 +2465,12 @@ proc
 
 
 begin SavageEd;
-	dbg.put("SavageEd");
 
 	initWindow();
 	cmp( eax, 0 );
 	je _exit;
 
-	
+	// how do we want to display the window?
 	if( settings.state = 0 ) then
 		w.ShowWindow( hwnd, w.SW_SHOWNORMAL );
 	elseif( settings.state = 1 ) then
@@ -2478,6 +2479,9 @@ begin SavageEd;
 		w.ShowWindow( hwnd, w.SW_MINIMIZE );
 	endif;
 	w.UpdateWindow( hwnd );
+	
+	// check for a filename passed as an argument and try to open that file.
+	// if file doesn't exist, start new document with that filename.
 	
 	arg.c();
 	if( eax > 1 ) then
@@ -2497,6 +2501,7 @@ begin SavageEd;
 				jmp skipOpenRecent;
 			endif;
 		else
+			
 			// there is no file, create a new document with name passed on command line
 			filesys.gwd( filepath );
 			str.cat ("\", filepath);
@@ -2509,16 +2514,26 @@ begin SavageEd;
 		endif;
 	endif;
 	
+	
+	// no file requested as an argument,
+	// check config to see if we want to open the most recent document
+	
 	if( config.readBool( s_settings, s_openrecent ) ) then
+		
+		// we want to open the most recent file. do we have a recent file to open?
 		
 		if( config.isSectionDefined( s_recent )) then
 			
 			config.readItem( s_recent, 0, hide.strbuf );
 			loadFile( hide.strbuf );
 			if( ! eax ) then
+				
+				// the file we want to open doesn't exit anymore. remove it from our list.
 				config.deleteItem( s_recent, 0 );
 				updateMenu();
 			endif;
+			
+			// do we want to move the cursor to the position it was when the file was closed?
 			
 			if( config.readBool( s_settings, s_rememberpos )) then
 				config.readUns( s_settings, "cpMin");
@@ -2535,14 +2550,7 @@ begin SavageEd;
 	endif;
 	
 	skipOpenRecent:
-	// if word wrap option is selected,
-	// after all open stuff, change status
-	if( config.readBool( s_settings, s_wrap ) ) then
-		w.SendMessage( hred, w.EM_SETTARGETDEVICE, NULL, 0 );
-	else
-		w.SendMessage( hred, w.EM_SETTARGETDEVICE, NULL, 50000 );
-	endif;
-
+	
 	
 	FOREVER
 			w.GetMessage(msg,NULL,0,0);

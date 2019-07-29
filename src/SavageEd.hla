@@ -28,11 +28,12 @@ endtype;
 
 proc
 	Subclass_EditProc :procedure( lparam:dword; wparam:dword; msg:uns32; hwin:dword ); @forward;
-
+	updateStatus :procedure( hwin:dword ); @forward;
+	WndProc :procedure( lparam:dword; wparam:dword; umsg:uns32; hwin:dword ); @forward;
 	
 readonly
 
-	version			:string := "SavageEd v0.4.1";
+	version			:string := "SavageEd v0.4.2";
 		
 	// this is the main configuration file name
 	config_file		:string := "SavageEd.ini";
@@ -41,7 +42,7 @@ readonly
 	// under which to save window settings
 	s_window 	:string := "Window";
 	
-	ClassName	:string:="SavageED3Class";		// you may substitude your own name for "MAINCLASS"
+	ClassName	:string:="SavageEDClass";		// you may substitude your own name for "MAINCLASS"
 	AppName		:string:="SavageEd";			// you may substitude your own name for "TEMPAPP"
 	
 	RichEditDLL		:string :="riched20.dll";
@@ -849,8 +850,7 @@ proc
 			checkLog();
 			updateRecentLog();
 			setFormat();
-			setupWindowTitle();
-		
+			setupWindowTitle();		
 			or( 1, eax );
 			
 		anyexception
@@ -884,7 +884,7 @@ proc
 				loadFile( hide.strbuf );
 			endif;
 		w.SetFocus(hred);
-		
+		updateStatus(hwnd);
 		ret();
 	end fileOpen;
 
@@ -1399,12 +1399,20 @@ proc
 		popabi;
 	end Proc_FindDlg;	
 
+
+
+
 	initWindow	:procedure { @noframe };
 	
 		// look for file config_file, if exists,
 		// read settings from it.
 		// expand this as more settings are added
 		// other pre-window creation initialization goes here
+		// register and create window.
+		
+		// returns:
+		// 	success = true in eax
+		//	failure = false in eax 
 		
 	begin initWindow;
 		
@@ -1414,9 +1422,10 @@ proc
 		w.LoadLibrary( RichEditDLL );
 		if (eax = NULL ) then
 			Error( s_missingDLL );
-			mov(w.ERROR_FILE_NOT_FOUND,eax);
-			jmp done;
+			xor(eax,eax);
+			ret();
 	    endif;
+	    
 		mov	(eax,hredDLL);
 		
 		w.InitCommonControls();
@@ -1480,11 +1489,49 @@ proc
 		move (ppos.margins.bottom, psd.rtMargin.bottom);
 		move (ppos.pagesize.x, psd.ptPaperSize.x);
 		move (ppos.pagesize.y, psd.ptPaperSize.y);	
+			
+		// main window created here
+		// describe and register the window class
+		mov( @size(w.WNDCLASSEX), wc.cbSize );
+		mov( w.CS_HREDRAW | w.CS_VREDRAW, wc.style );
+		mov( &WndProc, wc.lpfnWndProc );
+		mov( NULL, wc.cbClsExtra );
+		mov( NULL, wc.cbWndExtra );
+		mov( hinst, wc.hInstance );
+		mov( w.COLOR_BTNFACE+1, wc.hbrBackground );
+		mov( ClassName, wc.lpszClassName );
 		
+		w.LoadIcon(hinst, val ID_JAKAL);
+		mov( eax, wc.hIcon );
+		mov( eax, wc.hIconSm );
+		w.LoadCursor( NULL, val w.IDC_ARROW );
+		mov( eax,wc.hCursor );
 		
-		
-		or( 1, eax );
-		done:
+		// register the window class
+		if ( ! w.RegisterClassEx( wc )) then
+			Error( "Unable to register Window Class");
+			ret();
+		endif;
+			
+		// create the window
+		w.CreateWindowEx(
+				NULL,					// dwExStyle
+				ClassName,				// lpClassName
+				AppName,				// lpWindowName
+				w.WS_OVERLAPPEDWINDOW,	// dwStyle
+				settings.xPos,			// x
+				settings.yPos,			// y
+				settings.width,			// nWidth
+				settings.height,		// nHeight
+				NULL,					// hWndParent
+				NULL,					// hMenu
+				hinst,					// hInstance
+				NULL );					// lpParam
+				
+		if( ! eax ) then
+			Error( "Unable to create window");
+		endif;
+
 		ret();
 	end initWindow;
 
@@ -1647,6 +1694,7 @@ proc
 		mov( eax, default_hred );
 		dbg.put ("defulat_hred :", default_hred);
 		w.SetWindowLong(hred, w.GWL_WNDPROC, &Subclass_EditProc);
+		updateStatus(hwnd);
 		
 	end Msg_Create;
 
@@ -2421,54 +2469,6 @@ begin SavageEd;
 	cmp( eax, 0 );
 	je _exit;
 
-	// main window created here
-	// describe and register the window class
-	mov( @size(w.WNDCLASSEX), wc.cbSize );
-	mov( w.CS_HREDRAW | w.CS_VREDRAW, wc.style );
-	mov( &WndProc, wc.lpfnWndProc );
-	mov( NULL, wc.cbClsExtra );
-	mov( NULL, wc.cbWndExtra );
-	mov( hinst, wc.hInstance );
-	mov( w.COLOR_BTNFACE+1, wc.hbrBackground );
-	//mov( IDR_MENU, wc.lpszMenuName );
-	mov( ClassName, wc.lpszClassName );
-	
-		
-	dbg.put("hinst = ", hinst );
-	//w.LoadImage( NULL, "res\jakal.ico", w.IMAGE_ICON, 0,0, w.LR_LOADFROMFILE| w.LR_DEFAULTSIZE| w.LR_SHARED );
-	w.LoadIcon(hinst, val ID_JAKAL);
-	mov( eax, wc.hIcon );
-	mov( eax, wc.hIconSm );
-	w.LoadCursor( NULL, val w.IDC_ARROW );
-	mov( eax,wc.hCursor );
-	w.RegisterClassEx( wc );
-	or(eax,eax);
-	jnz _registerok;
-	Error( "Unable to register SavageEd3Class");
-	exit SavageEd;
-	
-_registerok:
-		
-	w.CreateWindowEx(
-			NULL,					// dwExStyle
-			ClassName,				// lpClassName
-			AppName,				// lpWindowName
-			w.WS_OVERLAPPEDWINDOW,	// dwStyle
-			settings.xPos,			// x
-			settings.yPos,			// y
-			settings.width,			// nWidth
-			settings.height,		// nHeight
-			NULL,					// hWndParent
-			NULL,					// hMenu
-			hinst,					// hInstance
-			NULL );					// lpParam
-			
-	cmp(eax,0);
-	jne _windowok;
-	Error( "Unable to create window");
-	exit SavageEd;
-	
-_windowok:
 	
 	if( settings.state = 0 ) then
 		w.ShowWindow( hwnd, w.SW_SHOWNORMAL );

@@ -33,7 +33,7 @@ proc
 
 readonly
 
-	version			:string := "SavageEd v0.4.3";
+	version			:string := "SavageEd v0.5.0";
 		
 	// this is the main configuration file name
 	config_file		:string := "SavageEd.ini";

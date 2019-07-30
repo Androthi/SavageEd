@@ -23,8 +23,8 @@ src
 console=false
 output=SavageEd.exe
 type=modular
-main=SavageEd_doc.txt
-debug=true
+main=CHANGE_LOG.md
+debug=false
 
 [SavageEd.link]
 -heap:0xF4240,0xF4240
@@ -42,6 +42,8 @@ SavageEd.hhf,src,include
 SavageEd.hla,src,hlaprogram
 SavageEd.rc,res,resource
 SavageEd_doc.txt,,misc
+README.md,,misc
+CHANGE_LOG.md,,misc
 
 [SavageEd.extlinked]
 kernel32.lib

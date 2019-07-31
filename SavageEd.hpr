@@ -36,8 +36,6 @@ debug=false
 -machine:ix86
 
 [SavageEd.files]
-rsrc.hhf,res,include
-SavageEd.hhf,src,include
 SavageEd.hla,src,hlaprogram
 SavageEd.rc,res,resource
 SavageEd_doc.txt,,misc

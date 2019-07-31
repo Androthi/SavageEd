@@ -37,7 +37,12 @@ const
 	POS_LINES			:=170;
 	POS_INS				:=POS_LINES+35;
 	POS_READONLY		:=POS_INS+18;
+
+
+	color_white :w.COLORREF := $00FF_FFFF;
+	color_black :w.COLORREF := $0000_0000;
 	
+	szLINEBUFFER	:= 3000;	
 	
 type
 	// Message and dispatch table related definitions:
@@ -56,15 +61,7 @@ type
 			yPos	:uns32; // window y position
 			width	:uns32; // window width
 			height	:uns32; // window height
-			state	:dword; // is window stateimized?
-							// 0 = normal, 1 = stateimized, 2 = minimized
 			
-		endrecord;
-
-	PrnPos_t:
-		record
-			margins		:w.RECT;
-			pagesize	:w.POINT;
 		endrecord;
 
 	colorMode:
@@ -121,29 +118,6 @@ type
 		IDM_DOCUMENTS
 	};
 
-
-
-const
-	
-
-	color_white :w.COLORREF := $00FF_FFFF;
-	color_black :w.COLORREF := $0000_0000;
-	
-	szLINEBUFFER	:= 3000;
-
-static
-	logfont			:w.LOGFONT;		@external;
-	hred			:dword;			@external;
-	hinst			:dword;			@external;
-	hwnd			:dword;			@external;
-	AppName			:string;		@external;
-
-proc
-	loadFile :procedure( filename:string ); @external;
-	updateRecentLog :procedure; @external;
-	updateMenu :procedure; @external;	
-
-
 type
 			rect_t:
 			record
@@ -167,9 +141,15 @@ type
 endtype;
 
 proc
+	
+	// forward declarations
+	
 	updateStatus :procedure( hwin:dword ); @forward;
 	WndProc :procedure( lparam:dword; wparam:dword; umsg:uns32; hwin:dword ); @forward;
 	Msg_Command :procedure( hwin:dword; wparam:dword; lparam:dword ); @forward;
+	loadFile :procedure( filename:string ); @forward;
+	updateRecentLog :procedure; @forward;
+
 
 readonly
 
@@ -781,8 +761,6 @@ proc
 		dbg.put("width ", settings.width);
 		config.writeUns( s_window, "width", settings.width);
 		config.writeUns( s_window, "height", settings.height);
-		config.writeUns( s_window, "state", 0 );
-		
 		
 		getConfigPath( s );
 		config.writeFileName( s );
@@ -1589,8 +1567,6 @@ proc
 			mov( eax, settings.width );
 			config.readUns( s_window, "height" );
 			mov( eax, settings.height );
-			config.readUns( s_window, "state" );
-			mov( eax, settings.state );
 			
 			config.readBin( s_text, s_font, &logfont, @size( logfont ) );
 			config.readBin( s_text, s_colors, &colors, @size( colors ) );
@@ -1612,7 +1588,6 @@ proc
 			mov( 10, settings.yPos );
 			mov( 640, settings.width );
 			mov( 400, settings.height );
-			mov( 0, settings.state );
 			
 		endif;		
 
@@ -1662,14 +1637,7 @@ proc
 			ret();
 		endif;
 		
-		// how do we want to display the window?
-		if( settings.state = 0 ) then
-			w.ShowWindow( hwnd, w.SW_SHOWNORMAL );
-		elseif( settings.state = 1 ) then
-			w.ShowWindow( hwnd, w.SW_MAXIMIZE );
-		elseif( settings.state = 2 ) then
-			w.ShowWindow( hwnd, w.SW_MINIMIZE );
-		endif;
+		w.ShowWindow( hwnd, w.SW_SHOWNORMAL );
 		w.UpdateWindow( hwnd );
 
 		ret();
@@ -2004,27 +1972,11 @@ proc
 		mov( rect.bottom, eax );
 		sub( rect.top, eax );
 		mov( eax, settings.height );
-				
-		if(  wndpos.showCmd = w.SW_SHOWMINIMIZED ) then
-			
-			mov( 2, settings.state );
-			
-		elseif( wndpos.showCmd = w.SW_SHOWMAXIMIZED ) then
-			
-			mov( 1, settings.state );
-			
-		else
-			
-			mov( 0, settings.state );
-			
-		endif;
 		
 		config.writeUns( s_window, "xPos", settings.xPos );
 		config.writeUns( s_window, "yPos", settings.yPos );
 		config.writeUns( s_window, "width", settings.width );
 		config.writeUns( s_window, "height", settings.height );
-		config.writeUns( s_window, "state", settings.state );
-		
 		config.writeBin( s_text, s_find, &findOpts, @size( findOpts ) );
 		
 		config.writeUns( s_settings, "cpMin", chrg.cpMin );

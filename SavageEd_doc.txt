@@ -180,12 +180,6 @@ The status bar shows the following information:
 3rd section:
 	readonly mode 			'R'
 
-
-Printing
-A simple printing interface is provided for convenience.  If a line is
-too long to fit on a page, it is broken off directly and continued on 
-the next line.
-
 Recent Documents
 A list of up to 20 recently opened files are stored in File > Recent menu.
 The most recently accessed file will be at the top of the menu.

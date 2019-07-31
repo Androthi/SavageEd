@@ -2,7 +2,7 @@
 [HPR Settings]
 tab=4
 backups=0
-options=00000840
+options=00000040
 Project Version=10
 usetemp=false
 useunits=true
@@ -36,7 +36,6 @@ debug=false
 -machine:ix86
 
 [SavageEd.files]
-print.hla,src,hlaunit
 rsrc.hhf,res,include
 SavageEd.hhf,src,include
 SavageEd.hla,src,hlaprogram
@@ -55,3 +54,9 @@ comdlg32.lib
 gdi32.lib
 shell32.lib
 aeslib.lib
+
+
+[Notes]
+<text>
+-add encryption before release </text>
+

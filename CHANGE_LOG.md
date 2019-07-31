@@ -1,5 +1,10 @@
 # Change Log
 
+## 7/31/2019
+	0.5.0	- removing printing capability.
+			  it was always more of a hack and there are better programs
+			  for printing.
+
 ## 7/30/2019
 	0.4.3	- refactored some code
 			  fixed minor keyboard input bugs

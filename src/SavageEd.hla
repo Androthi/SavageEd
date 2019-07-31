@@ -51,7 +51,6 @@ readonly
 	s_recent	:string := "Recent Files";
 	s_settings	:string := "Settings";
 	s_tabs		:string := "Tabs";
-	s_printer	:string := "Printer";
 	s_font		:string := "Font";
 	s_find		:string := "Find";
 	s_colors	:string := "Colors";
@@ -142,7 +141,6 @@ storage
 static
 	Align(4);
 	fr			:dword := 1;
-	ppos		:PrnPos_t := PrnPos_t:[ w.RECT:[1000,1000,1000,1000], w.POINT:[21000,29700]];
 	colors		:colorMode := colorMode:[ color_black, color_white ];
 	findOpts	:findMode := findMode:[ true, false, false, false ];
 	filepath	:str.strvar( w.MAX_PATH );	// store full file path
@@ -1085,9 +1083,6 @@ proc
 		w.AppendMenu( file_menu, w.MF_SEPARATOR, NULL, NULL);
 		w.AppendMenu( file_menu, w.MF_STRING, IDM_RECENT, "Recent Files");
 		w.AppendMenu( file_menu, w.MF_SEPARATOR, NULL, NULL);
-		w.AppendMenu( file_menu, w.MF_STRING, IDM_PAGESETUP, "Page Setup");
-		w.AppendMenu( file_menu, w.MF_STRING, IDM_PRINT, "Print	Ctrl+P");
-		w.AppendMenu( file_menu, w.MF_SEPARATOR, NULL, NULL);
 		w.AppendMenu( file_menu, w.MF_STRING, IDM_QUIT, "&Quit	ESC");
 		w.AppendMenu( hmenu, w.MF_POPUP, file_menu, "&File");
 
@@ -1457,7 +1452,6 @@ proc
 			config.readUns( s_window, "state" );
 			mov( eax, settings.state );
 			
-			config.readBin( s_settings, s_printer, &ppos, @size( ppos ) );
 			config.readBin( s_text, s_font, &logfont, @size( logfont ) );
 			config.readBin( s_text, s_colors, &colors, @size( colors ) );
 			config.readBin( s_text, s_custcolors, &customColors, @size( customColors ) );
@@ -1484,14 +1478,7 @@ proc
 
 		w.CreateFontIndirect( &logfont );
 		mov( eax, hfont );
-
-		move (ppos.margins.left, psd.rtMargin.left);
-		move (ppos.margins.top, psd.rtMargin.top);
-		move (ppos.margins.right, psd.rtMargin.right);
-		move (ppos.margins.bottom, psd.rtMargin.bottom);
-		move (ppos.pagesize.x, psd.ptPaperSize.x);
-		move (ppos.pagesize.y, psd.ptPaperSize.y);	
-			
+		
 		// main window created here
 		// describe and register the window class
 		mov( @size(w.WNDCLASSEX), wc.cbSize );
@@ -2003,9 +1990,6 @@ proc
 							Msg_Command( hwnd, IDM_OPEN,0 );
 						endif;					
 					case( w.VK_P )
-						if( ctrl_down ) then
-							Msg_Command( hwnd, IDM_PRINT,0 );
-						endif;
 				
 					case( w.VK_S )
 						if( ctrl_down && shift_down ) then
@@ -2138,32 +2122,6 @@ proc
 		
 			SaveAs();
 			w.SetFocus(hred);
-			
-		elseif (eax = IDM_PAGESETUP) then
-			
-			GetPrnCaps();
-			mov(hwnd, psd.hwndOwner);
-			mov(hinst, psd.hInstance);
-			mov (@size (w.PAGESETUPDLG), psd.lStructSize);
-			mov (w.PSD_MARGINS, psd.flags);
-			if (prnInches) then
-				or ( w.PSD_INTHOUSANDTHSOFINCHES, psd.flags);
-			else
-				or ( w.PSD_INHUNDREDTHSOFMILLIMETERS, psd.flags);
-			endif;
-	
-			if (w._PageSetupDlg(&psd)) then
-				move (psd.rtMargin.left, ppos.margins.left);
-				move (psd.rtMargin.top, ppos.margins.top);
-				move (psd.rtMargin.right, ppos.margins.right);
-				move (psd.rtMargin.bottom, ppos.margins.bottom);
-				move (psd.ptPaperSize.x, ppos.pagesize.x);
-				move (psd.ptPaperSize.y, ppos.pagesize.y);
-			endif;
-			
-		elseif (eax = IDM_PRINT) then
-			
-			call PrintDoc;
 			
 	   	elseif (eax = IDM_CUT) then
 		

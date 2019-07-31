@@ -74,7 +74,6 @@ type
 		IDM_SAVEAS,
 		IDM_RECENT,  
 		IDM_PAGESETUP,
-		IDM_PRINT,
 		IDM_QUIT,
 		IDM_UNDO,
 		IDM_REDO,
@@ -120,15 +119,10 @@ static
 	hred			:dword;			@external;
 	hinst			:dword;			@external;
 	hwnd			:dword;			@external;
-	psd				:w.PAGESETUPDLG;	@external;
-	ppos			:PrnPos_t;		@external;
-	pd				:w.PRINTDLG;	@external;
-	prnInches		:boolean;		@external;
 	AppName			:string;		@external;
 
 proc
 	loadFile :procedure( filename:string ); @external;
-	PrintDoc :procedure;		@external;
-	GetPrnCaps:procedure;	@external;
+	GetPrnCaps:procedure;	@external; //> remove?
 	updateRecentLog :procedure; @external;
 	updateMenu :procedure; @external;	

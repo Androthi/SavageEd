@@ -11,6 +11,10 @@ program SavageEd;
 
 	?@nodisplay :=true;
 	?@nostackalign := true;
+
+readonly
+
+	version			:string := "SavageEd v0.5.1";
 	
 /*				notes
 
@@ -181,8 +185,6 @@ proc
 
 readonly
 
-	version			:string := "SavageEd v0.5.1";
-		
 	// this is the main configuration file name
 	config_file		:string := "SavageEd.ini";
 	
@@ -232,9 +234,9 @@ readonly
 	s_encext	:string := ".enc";
 	s_enc		:string := "enc";
 	
-	s_document		:string := "SavageEd_doc.txt";	
+	s_document		:string := "SavageEd.md";	
 	s_missingDLL	:string := "Could not open Msftedit.dll";
-	s_missingDocs	:string := "Missing Documents: SavageEd_doc.txt";
+	s_missingDocs	:string := "Missing Documents: SavageEd.md";
 	s_nosave		:string := "Could Not Save File";
 	s_noopen		:string := "Unable to open file";
 	s_notemp		:string := "Unable to create temporary file";

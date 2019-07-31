@@ -15,6 +15,17 @@ program SavageEd;
 readonly
 
 	version			:string := "SavageEd v0.5.1";
+
+proc
+	
+	// forward declarations
+	
+	updateStatus :procedure; @forward;
+	WndProc :procedure( lparam:dword; wparam:dword; umsg:uns32; hwin:dword ); @forward;
+	Msg_Command :procedure( hwin:dword; wparam:dword; lparam:dword ); @forward;
+	loadFile :procedure( filename:string ); @forward;
+	updateRecentLog :procedure; @forward;
+	getInfo :procedure; @forward;
 	
 /*				notes
 
@@ -33,39 +44,6 @@ readonly
 	w.PostMessage( hred, w.WM_KEYDOWN, w.VK_UP, 0);
 
 */
-	
-const
-	ID_JAKAL				:= 1000;
-	ID_FINDDLG              := 2000;
-	IDC_FINDTEXT            := 2001;
-	IDC_REPLACETEXT         := 2002;
-	IDC_BTN_REPLACE         := 2007;
-	IDC_BTN_REPLACEALL      := 2008;
-	IDC_CHK_MATCHCASE       := 2003;
-	IDC_CHK_WHOLEWORD       := 2004;
-	IDC_RBN_UP              := 2006;
-	IDC_RBN_DOWN            := 2005;
-	IDC_CHK_PATTERN         := 2009;
-	ID_ABOUT                := 6000;
-	ID_ABOUTGRP             := 1001;
-	ID_INPUT                := 3000;
-	IDC_EDT_INPUT           := 3001;
-
-	RECENT_MENU_START	:= 9000;
-	RECENT_MENU_END		:= 9019;	// 10 items in recent menu
-	IDC_SBAR			:= 9020;
-	statusht_c			:= 21;		// height of status bar
-
-	STATUS_PARTS		:= 3;
-	POS_LINES			:=170;
-	POS_INS				:=POS_LINES+35;
-	POS_READONLY		:=POS_INS+18;
-
-
-	color_white :w.COLORREF := $00FF_FFFF;
-	color_black :w.COLORREF := $0000_0000;
-	
-	szLINEBUFFER	:= 3000;	
 	
 type
 	// Message and dispatch table related definitions:
@@ -96,11 +74,24 @@ type
 	
 	EditInfo:
 		record
+			
+			// text and background colors
 			textColor	:w.COLORREF;
 			backColor	:w.COLORREF;
+			
+			// selection
 			cursor		:w.CHARRANGE;
+			
+			// column of cursor
 			charIndex	:uns32;
+			
+			// line info of cursor, has number, index and length
 			line		:LineInfo;
+			
+			// if mark is set, this contains the index
+			//> maybe won't need
+			markIndex	:uns32;
+			is_marked	:boolean;
 		endrecord;
 			
 	findMode:
@@ -172,16 +163,40 @@ type
 	endrecord;
 
 
-proc
-	
-	// forward declarations
-	
-	updateStatus :procedure; @forward;
-	WndProc :procedure( lparam:dword; wparam:dword; umsg:uns32; hwin:dword ); @forward;
-	Msg_Command :procedure( hwin:dword; wparam:dword; lparam:dword ); @forward;
-	loadFile :procedure( filename:string ); @forward;
-	updateRecentLog :procedure; @forward;
+const
+	ID_JAKAL				:= 1000;
+	ID_FINDDLG              := 2000;
+	IDC_FINDTEXT            := 2001;
+	IDC_REPLACETEXT         := 2002;
+	IDC_BTN_REPLACE         := 2007;
+	IDC_BTN_REPLACEALL      := 2008;
+	IDC_CHK_MATCHCASE       := 2003;
+	IDC_CHK_WHOLEWORD       := 2004;
+	IDC_RBN_UP              := 2006;
+	IDC_RBN_DOWN            := 2005;
+	IDC_CHK_PATTERN         := 2009;
+	ID_ABOUT                := 6000;
+	ID_ABOUTGRP             := 1001;
+	ID_INPUT                := 3000;
+	IDC_EDT_INPUT           := 3001;
 
+	RECENT_MENU_START	:= 9000;
+	RECENT_MENU_END		:= 9019;	// 10 items in recent menu
+	IDC_SBAR			:= 9020;
+	statusht_c			:= 21;		// height of status bar
+
+	STATUS_PARTS		:= 4;
+	POS_LINES			:=170;
+	POS_INS				:=POS_LINES+35;
+	POS_READONLY		:=POS_INS+18;
+	POS_MARK			:=POS_READONLY+18;
+
+
+	color_white :w.COLORREF := $00FF_FFFF;
+	color_black :w.COLORREF := $0000_0000;
+	
+	szLINEBUFFER	:= 3000;	
+	
 
 readonly
 
@@ -228,6 +243,7 @@ readonly
 	s_overwrite	:string := "OVR";
 	s_r			:string := "R";
 	s_b			:string := " ";
+	s_mark		:string := "M";
 	s_inputlinen:string := "Enter Line Number";
 	s_inputpwd	:string := "Enter a password upto 32 characters";
 	s_inputtab	:string := "Enter tab spacing in number of characters";
@@ -235,7 +251,7 @@ readonly
 	s_enc		:string := "enc";
 	
 	s_document		:string := "SavageEd.md";	
-	s_missingDLL	:string := "Could not open Msftedit.dll";
+	s_missingDLL	:string := "Could not open Riched20.dll";
 	s_missingDocs	:string := "Missing Documents: SavageEd.md";
 	s_nosave		:string := "Could Not Save File";
 	s_noopen		:string := "Unable to open file";
@@ -299,7 +315,7 @@ static
 	set_mark	:uns32 := 0;
 	findOpts	:findMode := findMode:[ true, false, false, false ];
 	filepath	:str.strvar( w.MAX_PATH );	// store full file path
-	statusParts	:int32[STATUS_PARTS]:=[POS_LINES, POS_INS, POS_READONLY];
+	statusParts	:int32[STATUS_PARTS]:=[POS_LINES, POS_INS, POS_READONLY, POS_MARK];
 	strbuf		:str.strvar( w.MAX_PATH );
 	
 readonly
@@ -1705,25 +1721,20 @@ proc
 	
 	begin updateStatus;
 		
-		w.SendMessage(hred, w.EM_EXGETSEL,0, &chrg);
-		w.SendMessage( hred, w.EM_EXLINEFROMCHAR, 0, chrg.cpMin );
-		mov( eax, line );
+		getInfo();		
+		mov( info.line.number, eax );
 		inc( eax );
 		conv.u32ToStr( eax, 20, ' ', hide.strbuf );
 		str.trim( hide.strbuf );
-		str.put( strbuf, "Ln:", hide.strbuf, "   " );
-		
-		w.SendMessage( hred, w.EM_LINEINDEX, line, 0 );
-		sub( eax, chrg.cpMin );
-		inc( chrg.cpMin );
-		conv.u32ToStr( chrg.cpMin, 20,' ', hide.strbuf );
+		str.put( strbuf, "Ln: ", hide.strbuf, "   " );
+		conv.u32ToStr( info.charIndex, 20,' ', hide.strbuf );
 		str.trim( hide.strbuf );
-		str.put2( strbuf, "Col:", hide.strbuf, "   " );
+		str.put2( strbuf, "Col: ", hide.strbuf, "   " );
 		
 		w.SendMessage( hred, w.EM_GETLINECOUNT, 0, 0 );
 		conv.u32ToStr( eax, 20,' ', hide.strbuf );
 		str.trim( hide.strbuf );
-		str.put2( strbuf, "Lns:", hide.strbuf );
+		str.put2( strbuf, "Lns: ", hide.strbuf );
 		
 		w.SendMessage( hstatus, w.SB_SETTEXT, 0, strbuf ); 
 		
@@ -1737,6 +1748,12 @@ proc
 			w.SendMessage( hstatus, w.SB_SETTEXT, 2, s_r );
 		else
 			w.SendMessage( hstatus, w.SB_SETTEXT, 2, s_b );
+		endif;
+		
+		if( info.is_marked ) then
+			w.SendMessage( hstatus, w.SB_SETTEXT, 3, s_mark );
+		else
+			w.SendMessage( hstatus, w.SB_SETTEXT, 3, s_b );
 		endif;
 		
 	end updateStatus;
@@ -2011,8 +2028,7 @@ proc
 	begin Msg_Destroy;
 	
 		dbg.put("destroy");
-		// get information to save current position
-		w.SendMessage (hred, w.EM_EXGETSEL, 0, &chrg);
+		getInfo();
 		
 		w.GetWindowPlacement( hwin, wndpos );
 		w.GetWindowRect( hwin, rect );
@@ -2031,8 +2047,8 @@ proc
 		config.writeUns( s_window, "height", settings.height );
 		config.writeBin( s_text, s_find, &findOpts, @size( findOpts ) );
 		
-		config.writeUns( s_settings, "cpMin", chrg.cpMin );
-		config.writeUns( s_settings, "cpMax", chrg.cpMax );
+		config.writeUns( s_settings, "cpMin", info.cursor.cpMin );
+		config.writeUns( s_settings, "cpMax", info.cursor.cpMax );
 		
 		if( config.readBool( s_settings, s_clearexit ) ) then
 			
@@ -2157,7 +2173,6 @@ proc
 					case( w.VK_MENU )
 						mov( true, alt_down );
 					
-						
 //bm=commands
 					// process all commands and keyboard shortcuts here
 					
@@ -2212,12 +2227,18 @@ proc
 				
 					case( w.VK_J )
 					
-						getInfo();
-						mov( info.cursor.cpMin, eax );
-						if( eax ) then
-							dec( eax );
-							w.SendMessage( hred, w.EM_SETSEL, eax, eax );
-							w.SendMessage( hred, w.EM_SCROLLCARET, 0, 0);
+						if( ctrl_down ) then
+						
+							while ( w.PeekMessage( msg, hred, w.WM_KEYFIRST, w.WM_KEYLAST, w.PM_REMOVE)) do
+							endwhile;
+
+							getInfo();
+							mov( info.cursor.cpMin, eax );
+							if( eax ) then
+								dec( eax );
+								w.SendMessage( hred, w.EM_SETSEL, eax, eax );
+								w.SendMessage( hred, w.EM_SCROLLCARET, 0, 0);
+							endif;
 						endif;
 						
 					case( w.VK_K )
@@ -2259,11 +2280,20 @@ proc
 					case( w.VK_L )
 						
 						// move cursor right
-						getInfo();
-						mov( info.cursor.cpMin, eax );
-						inc( eax );
-						w.SendMessage( hred, w.EM_SETSEL, eax, eax );
-						w.SendMessage( hred, w.EM_SCROLLCARET, 0, 0);
+						if( ctrl_down ) then
+							
+							while ( w.PeekMessage( msg, hred, w.WM_KEYFIRST, w.WM_KEYLAST, w.PM_REMOVE)) do
+							endwhile;
+
+							// control shift L makes list
+							if( !shift_down ) then
+								getInfo();
+								mov( info.cursor.cpMin, eax );
+								inc( eax );
+								w.SendMessage( hred, w.EM_SETSEL, eax, eax );
+								w.SendMessage( hred, w.EM_SCROLLCARET, 0, 0);
+							endif;
+						endif;
 						
 					case( w.VK_N )
 						if( ctrl_down ) then
@@ -2317,10 +2347,50 @@ proc
 				endswitch;
 				
 			elseif ( eax = w.WM_CHAR ) then
+
 				
 				switch( ebx );
 					
-					
+					case( w.VK_SPACE )
+						
+						if( ctrl_down ) then
+							
+							// toggle mark state
+							
+							getInfo();
+							
+							if( info.is_marked ) then
+								
+								// close mark and set selection
+								// find the start and end of the selection
+								
+								mov( info.markIndex, eax );
+								if( eax < info.cursor.cpMin ) then
+									push( info.cursor.cpMin );
+									mov( eax, info.cursor.cpMin );
+									pop( info.cursor.cpMax );
+								else
+									mov( eax, info.cursor.cpMax );
+								endif;
+								
+								w.SendMessage( hred, w.EM_EXSETSEL, 0, &info.cursor );
+								
+							else
+								
+								// start a mark
+								mov( info.cursor.cpMin, eax );
+								mov( eax, info.markIndex );
+								
+							endif;
+							
+							// toggle mark
+							xor( 1, info.is_marked );
+							
+							or( 1, eax );
+							jmp done;
+							
+						endif;
+						
 					case( w.VK_RETURN )
 						
 						if( config.readBool( s_settings, s_autoindent ) ) then
@@ -2333,7 +2403,6 @@ proc
 								xor( ecx, ecx );
 								while( eax ) do
 									mov( buffer[ecx], dl );
-									//dbg.put(" read buffer : ", dl );
 									if( dl == $09 ) then
 										inc( ecx );
 									else
@@ -2357,18 +2426,21 @@ proc
 						endif;
 						
 					default;
-						dbg.put( "default hits");
+						
+						dbg.put("default hit");
 						mov( 0, want_pos );
+						mov( false, info.is_marked );
 					
 				endswitch;
 			
 			elseif( eax = w.WM_LBUTTONDOWN ) then
 				
 				mov( 0, want_pos );
-				mov( 0, set_mark );
+
 			endif;
 				
 		endif;
+		
 		
 		// return default - control should handle key
 		xor( eax, eax );

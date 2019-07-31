@@ -11,6 +11,25 @@ program SavageEd;
 
 	?@nodisplay :=true;
 	?@nostackalign := true;
+	
+/*				notes
+
+	explore using w.RegisterHotKey( hwnd, ID, modifier, vk )
+	
+	where modifier = 
+		MOD_ALT
+		MOD_CONTROL
+		MOD_KEYUP
+		MOD_SHIFT
+		MOD_WIN
+	
+	// how to send a keyboard message
+	// note, if modifier keys are pressed, this will take that
+	// into account.	
+	w.PostMessage( hred, w.WM_KEYDOWN, w.VK_UP, 0);
+
+*/
+	
 const
 	ID_JAKAL				:= 1000;
 	ID_FINDDLG              := 2000;
@@ -274,6 +293,8 @@ static
 	fr			:dword := 1;
 	info		:EditInfo;
 	queryLine	:LineInfo;
+	want_pos	:uns32 := 0;	// want to keep cursor in this column
+	set_mark	:uns32 := 0;
 	findOpts	:findMode := findMode:[ true, false, false, false ];
 	filepath	:str.strvar( w.MAX_PATH );	// store full file path
 	statusParts	:int32[STATUS_PARTS]:=[POS_LINES, POS_INS, POS_READONLY];
@@ -302,6 +323,7 @@ readonly
 	command_table	:MsgProcPtr_t; @nostorage;
 		MsgProcPtr_t
 			MsgProcPtr_t:[ IDM_QUIT,	&Cmd_File_Quit	],
+
 			// add more commands here
 			MsgProcPtr_t:[ 0,				NULL			];
 		
@@ -698,7 +720,6 @@ proc
 		str.cpyz( &buffer, s );
 		filesys.extractPath( s, s );
 		str.put2( s, '\', config_file ); 
-		//dbg.put("config path :", s );
 
 		
 	end getConfigPath;
@@ -775,13 +796,10 @@ proc
 		dbg.put("newInstance" );
 		
 		move( str.talloc( 300 ), s );
-		dbg.put("instance f:", filename );
 		add( 20, settings.xPos );
 		config.writeUns( s_window, "xPos", settings.xPos );
 		add( 20, settings.yPos );
 		config.writeUns( s_window, "yPos", settings.yPos );
-		dbg.put("height ", settings.height);
-		dbg.put("width ", settings.width);
 		config.writeUns( s_window, "width", settings.width);
 		config.writeUns( s_window, "height", settings.height);
 		
@@ -793,7 +811,6 @@ proc
 		if( filename != NULL ) then
 			str.put2( s, ' ', filename );
 		endif;
-		dbg.put("system:", s );
 		os.bkgnd( s );
 		
 	end newInstance;
@@ -1606,7 +1623,7 @@ proc
 			config.writeUns( s_settings, s_tabs, 4 );	// default 4 chars tab stop
 			getConfigPath( hide.strbuf );
 			config.writeFileName( hide.strbuf );
-			//mov( w.CW_USEDEFAULT, eax );
+
 			// some hard coded defaults
 			mov( 10, settings.xPos );
 			mov( 10, settings.yPos );
@@ -1754,7 +1771,8 @@ proc
 					edstyle, 0, 0, 0, 0, hwnd, hcontextmenu, hinst, NULL );
 		
 		mov( eax, hred );
-		w.SendMessage( hred, w.EM_SETEVENTMASK, 0, w.ENM_SELCHANGE | w.ENM_KEYEVENTS );
+		w.SendMessage( hred, w.EM_SETEVENTMASK, 0, w.ENM_SELCHANGE | w.ENM_KEYEVENTS
+						| w.ENM_MOUSEEVENTS );
 		//dbg.put("hred = ", hred );
 		
 		setFormat();
@@ -2070,7 +2088,6 @@ proc
 
 	end getInfo;
 
-
 	Msg_Notify :procedure( hwin:dword; wparam:dword; lparam:dword );
 	
 		static
@@ -2087,7 +2104,7 @@ proc
 		mov( (type w.NMHDR[EDX]).code, eax );
 		//dbg.put("eax = ", eax );
 		if( eax = w.EN_SELCHANGE ) then
-
+			
 			updateStatus();
 			updateTitle();
 
@@ -2138,7 +2155,8 @@ proc
 					case( w.VK_MENU )
 						mov( true, alt_down );
 					
-					
+						
+//bm=commands
 					// process all commands and keyboard shortcuts here
 					
 					// custom keyboard commands
@@ -2164,14 +2182,19 @@ proc
 							// move cursor up
 							
 							getInfo();
-							
+							if( want_pos = 0 ) then
+								mov( info.charIndex, eax );
+								mov( eax, want_pos );
+							endif;
+
 							// if we are at line 0, no point in doing anything);
 							if( info.line.number > 0 ) then
 								mov( info.line.number, eax);
 								dec( eax );
 								mov( eax, queryLine.number );
 								getLineInfo( queryLine ); // info of prev. line
-								mov( info.charIndex, eax );
+								//mov( info.charIndex, eax );
+								mov( want_pos, eax );
 								if( queryLine.length >= eax ) then
 
 									add( queryLine.index, eax );
@@ -2182,10 +2205,9 @@ proc
 								endif;
 								w.SendMessage( hred, w.EM_SETSEL, eax, eax );
 								w.SendMessage( hred, w.EM_SCROLLCARET, 0, 0);
-							endif;
-							
+							endif;	
 						endif;
-						
+				
 					case( w.VK_J )
 					
 						getInfo();
@@ -2202,14 +2224,23 @@ proc
 							
 							// move cursor down
 							
+							// consume the key_up command so it won't send to wm_char
+							while ( w.PeekMessage( msg, hred, w.WM_KEYFIRST, w.WM_KEYLAST, w.PM_REMOVE)) do
+							endwhile;
+							
 							getInfo();
+							if( want_pos = 0 ) then
+								mov( info.charIndex, eax );
+								mov( eax, want_pos );
+							endif;
+							
 							mov( info.line.number, eax );
 							inc( eax );
 							mov( eax, queryLine.number );
 							getLineInfo( queryLine );
 							
-							// there is a line below, move the cursor to it.
-							mov( info.charIndex, eax );
+							//mov( info.charIndex, eax );
+							mov( want_pos, eax );
 							if( queryLine.length >= eax ) then
 								
 								add( queryLine.index, eax );
@@ -2226,7 +2257,6 @@ proc
 					case( w.VK_L )
 						
 						// move cursor right
-						
 						getInfo();
 						mov( info.cursor.cpMin, eax );
 						inc( eax );
@@ -2323,10 +2353,19 @@ proc
 								endif;
 							endif;
 						endif;
+						
 					default;
+						dbg.put( "default hits");
+						mov( 0, want_pos );
+					
 				endswitch;
-
+			
+			elseif( eax = w.WM_LBUTTONDOWN ) then
+				
+				mov( 0, want_pos );
+				mov( 0, set_mark );
 			endif;
+				
 		endif;
 		
 		// return default - control should handle key

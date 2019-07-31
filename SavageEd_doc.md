@@ -2,6 +2,7 @@
 
 SavageEd is designed to be a quick editing/note taking program.
 As such it:
+
 	- opens fast, quickly closes using the escape key
 	- has options to auto save on exit
 	- creates a random filename if the current document is untitled
@@ -60,16 +61,17 @@ To search for patterns, there are two special characters:
 	?	Match any one character
 	
 For example typing in the Find box:
-	*e
+	
+	- *e
 	  select every character from the current cursor position to the next 'e'
 	  in the document.
-	*
+	- *
 	  same effect as "select all" after current cursor position.
-	*z*
+	- *z*
 	  selects the whole document after the cursor, if there is a 'z' anywhere
-	c*e
+	- c*e
 	  find the next 'c' character and match every character until the following 'e'
-	c?t
+	- c?t
 	  find the next 'c' character, match any one character and a 't'
 	  eg: finds "cat" "cot" "cut"
 	
@@ -106,6 +108,7 @@ Goes into readonly mode, no changes can be made to documents.
 Save and SaveAs still function.
 
 ## Options > Recent File Options
+	
 	- Open In New Window
 		Opens Recent files in new window.
  
@@ -192,6 +195,7 @@ https://sites.google.com/view/androth/home/high-level-assembly
 
 
 ## Requirements and further notes:
+
 	- This program may or may not be distributed with documents and source.  The only required file is "SavageEd.exe"
 	- Reading anything beyond this point is optional.
 	- Some options may require other files to be present, but will function without them.

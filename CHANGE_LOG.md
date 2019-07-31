@@ -4,6 +4,7 @@
 	0.5.0	- removing printing capability.
 			  it was always more of a hack and there are better programs
 			- shows changed documents with a * before the title on titlebar
+	0.5.1   - added keyboard shortcuts for cursor navigation
 
 ## 7/30/2019
 	0.4.3	- refactored some code

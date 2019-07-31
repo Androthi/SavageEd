@@ -23,7 +23,7 @@ src
 console=false
 output=SavageEd.exe
 type=modular
-main=CHANGE_LOG.md
+main=SavageEd_doc.md
 debug=true
 
 [SavageEd.link]
@@ -38,9 +38,9 @@ debug=true
 [SavageEd.files]
 SavageEd.hla,src,hlaprogram
 SavageEd.rc,res,resource
-SavageEd_doc.txt,,misc
 README.md,,misc
 CHANGE_LOG.md,,misc
+SavageEd_doc.md,,misc
 
 [SavageEd.extlinked]
 kernel32.lib

@@ -64,10 +64,20 @@ type
 			
 		endrecord;
 	
+	LineInfo:
+		record
+			number	:uns32;
+			index	:uns32;
+			length	:uns32;
+		endrecord;
+	
 	EditInfo:
 		record
 			textColor	:w.COLORREF;
 			backColor	:w.COLORREF;
+			cursor		:w.CHARRANGE;
+			charIndex	:uns32;
+			line		:LineInfo;
 		endrecord;
 			
 	findMode:
@@ -152,7 +162,7 @@ proc
 
 readonly
 
-	version			:string := "SavageEd v0.5.0";
+	version			:string := "SavageEd v0.5.1";
 		
 	// this is the main configuration file name
 	config_file		:string := "SavageEd.ini";
@@ -173,7 +183,6 @@ readonly
 	s_tabs		:string := "Tabs";
 	s_font		:string := "Font";
 	s_find		:string := "Find";
-	s_colors	:string := "Colors";
 	s_text		:string := "Text";
 	s_background_color	:string := "Background Color";
 	s_text_color		:string := "Text Color";
@@ -264,6 +273,7 @@ static
 	Align(4);
 	fr			:dword := 1;
 	info		:EditInfo;
+	queryLine	:LineInfo;
 	findOpts	:findMode := findMode:[ true, false, false, false ];
 	filepath	:str.strvar( w.MAX_PATH );	// store full file path
 	statusParts	:int32[STATUS_PARTS]:=[POS_LINES, POS_INS, POS_READONLY];
@@ -813,7 +823,6 @@ proc
 			setFormat();
 			config.writeHex( s_text, s_background_color, info.backColor);
 			config.writeHex( s_text, s_text_color, info.textColor);
-			//config.writeBin( s_text, s_colors, &colors, @size( colors ) );
 			config.writeBin( s_text, s_font, &logfont, @size( logfont ) );
 			
 		endif;
@@ -1580,7 +1589,6 @@ proc
 			mov( eax, settings.height );
 			
 			config.readBin( s_text, s_font, &logfont, @size( logfont ) );
-			//config.readBin( s_text, s_colors, &colors, @size( colors ) );
 			config.readHex( s_text, s_background_color);
 			mov( eax, info.backColor );
 			config.readHex( s_text, s_text_color);
@@ -2022,6 +2030,47 @@ proc
 			
 	end Msg_Destroy;
 
+
+	getLineInfo :procedure(var line:LineInfo);
+		
+		// input expects a LineInfo structure with the
+		// .line field containing the desired line information
+		// will fill the rest of the structure.
+		// returns 0 if no line is available
+		
+	begin getLineInfo;
+		USE (EBX);
+		mov( line, ebx );
+		w.SendMessage( hred, w.EM_LINEINDEX, (type LineInfo [ebx]).number, 0 );
+		if( (type int32 eax) >= 0 ) then
+			mov( eax, (type LineInfo[ebx]).index );
+			w.SendMessage( hred, w.EM_LINELENGTH, eax, 0 );
+			mov( eax, (type LineInfo[ebx]).length );
+		else
+			xor( eax, eax );
+		endif;
+		ENDUSE;
+	end getLineInfo;
+
+	
+	getInfo: procedure;
+	
+		// collects informaiton about the edit state
+		// and stores it in the info structure
+	
+	begin getInfo;
+		
+		w.SendMessage( hred, w.EM_EXGETSEL, 0, &info.cursor);
+		w.SendMessage( hred, w.EM_EXLINEFROMCHAR, 0, info.cursor.cpMin );
+		mov( eax, info.line.number );
+		getLineInfo(info.line);
+		mov( info.cursor.cpMin, eax );
+		sub( info.line.index, eax );
+		mov( eax, info.charIndex );
+
+	end getInfo;
+
+
 	Msg_Notify :procedure( hwin:dword; wparam:dword; lparam:dword );
 	
 		static
@@ -2103,42 +2152,33 @@ proc
 						if( ctrl_down ) then
 							Msg_Command( hwnd, IDM_EDIT_GOTO,0 );
 						endif;
-
 					
 					case( w.VK_I )
+						
 						if( ctrl_down ) then
 
 							// remove default ctrl-i behavior
 							while ( w.PeekMessage( msg, hred, w.WM_KEYFIRST, w.WM_KEYLAST, w.PM_REMOVE)) do
 							endwhile;
 							
-							// ctrl-i moves cursor up 1 line
+							// move cursor up
 							
-							w.SendMessage( hred, w.EM_EXGETSEL, 0, &chrg); 
-							w.SendMessage( hred, w.EM_EXLINEFROMCHAR, 0, chrg.cpMin );
-							dbg.put( "line index ", (type uns32 eax));
+							getInfo();
+							
 							// if we are at line 0, no point in doing anything);
-							if( eax ) then
-								
-								// get the carot index from line
-								mov( eax, ebx );
-								w.SendMessage( hred, w.EM_LINEINDEX, eax, 0 );
-								sub( eax, chrg.cpMin );
-								dbg.put( "char index ", chrg.cpMin);
-								
-								// get length of previous line
-								dec( ebx );
-								w.SendMessage( hred, w.EM_LINEINDEX, ebx, 0 );
-								w.SendMessage( hred, w.EM_LINELENGTH, eax, 0 );
-								if( eax >= chrg.cpMin ) then
-									w.SendMessage( hred, w.EM_LINEINDEX, ebx, 0 );
-									add( chrg.cpMin, eax );
+							if( info.line.number > 0 ) then
+								mov( info.line.number, eax);
+								dec( eax );
+								mov( eax, queryLine.number );
+								getLineInfo( queryLine ); // info of prev. line
+								mov( info.charIndex, eax );
+								if( queryLine.length >= eax ) then
+
+									add( queryLine.index, eax );
+									
 								else
-									push( eax );
-									w.SendMessage( hred, w.EM_LINEINDEX, ebx, 0 );
-									pop( ecx );
-									add( ecx, eax );
-									dbg.put(eax);
+									mov( queryLine.length, eax );
+									add( queryLine.index, eax );
 								endif;
 								w.SendMessage( hred, w.EM_SETSEL, eax, eax );
 								w.SendMessage( hred, w.EM_SCROLLCARET, 0, 0);
@@ -2146,8 +2186,53 @@ proc
 							
 						endif;
 						
-					case( w.VK_K )
+					case( w.VK_J )
 					
+						getInfo();
+						mov( info.cursor.cpMin, eax );
+						if( eax ) then
+							dec( eax );
+							w.SendMessage( hred, w.EM_SETSEL, eax, eax );
+							w.SendMessage( hred, w.EM_SCROLLCARET, 0, 0);
+						endif;
+						
+					case( w.VK_K )
+						
+						if( ctrl_down) then
+							
+							// move cursor down
+							
+							getInfo();
+							mov( info.line.number, eax );
+							inc( eax );
+							mov( eax, queryLine.number );
+							getLineInfo( queryLine );
+							
+							// there is a line below, move the cursor to it.
+							mov( info.charIndex, eax );
+							if( queryLine.length >= eax ) then
+								
+								add( queryLine.index, eax );
+								
+							else
+								mov( queryLine.length, eax );
+								add( queryLine.index, eax );
+							endif;
+							w.SendMessage( hred, w.EM_SETSEL, eax, eax );
+							w.SendMessage( hred, w.EM_SCROLLCARET, 0, 0);
+							
+						endif;
+						
+					case( w.VK_L )
+						
+						// move cursor right
+						
+						getInfo();
+						mov( info.cursor.cpMin, eax );
+						inc( eax );
+						w.SendMessage( hred, w.EM_SETSEL, eax, eax );
+						w.SendMessage( hred, w.EM_SCROLLCARET, 0, 0);
+						
 					case( w.VK_N )
 						if( ctrl_down ) then
 							Msg_Command( hwnd, IDM_NEW, 0 );

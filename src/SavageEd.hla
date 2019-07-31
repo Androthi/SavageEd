@@ -162,8 +162,8 @@ readonly
 	// under which to save window settings
 	s_window 	:string := "Window";
 	
-	ClassName	:string:="SavageEDClass";		// you may substitude your own name for "MAINCLASS"
-	AppName		:string:="SavageEd";			// you may substitude your own name for "TEMPAPP"
+	ClassName	:string:="SavageEDClass";
+	AppName		:string:="SavageEd";
 	
 	RichEditDLL		:string :="riched20.dll";
 	
@@ -386,14 +386,30 @@ proc
 		
 	end Msg_Size;
 	
-	setupWindowTitle :procedure {@noframe};
-	begin setupWindowTitle;
+	updateTitle: procedure {@noframe};
+	begin updateTitle;
+		if (w.SendMessage(hred, w.EM_GETMODIFY,0,0)) then
+			filesys.extractFilename( filepath, hide.strbuf );
+			str.insert("*",0, hide.strbuf);
+			w.SetWindowText( hwnd, hide.strbuf );
+		endif;
+		ret();
+	end updateTitle;
+
+	
+	setWindowTitle :procedure {@noframe};
+	begin setWindowTitle;
 		
 		filesys.extractFilename( filepath, hide.strbuf );
+		if(hred) then
+			if (w.SendMessage(hred, w.EM_GETMODIFY,0,0)) then
+				str.insert("*",0, hide.strbuf);
+			endif;
+		endif;
 		w.SetWindowText( hwnd, hide.strbuf );
 		ret();
 
-	end setupWindowTitle;
+	end setWindowTitle;
 	
 	StreamInProc :procedure( var pBytesRead:dword ; NumBytes:dword ; var pbuffer:dword ; _hFile:dword );	
 	begin StreamInProc;
@@ -438,6 +454,7 @@ proc
 		endtry;
 		push( eax );
 		updateRecentLog();
+		updateTitle();
 		pop( eax );
 		done:
 	end saveFile;
@@ -487,7 +504,7 @@ proc
 
 			endif; 
 			
-			setupWindowTitle();
+			setWindowTitle();
 			xor( eax, eax );
 			
 		else
@@ -522,7 +539,7 @@ proc
 		if( ! eax  ) then
 			saveFile( filepath );
 		endif;
-		setupWindowTitle();
+		setWindowTitle();
 		
 		ret();
 	end checkSave;
@@ -966,11 +983,11 @@ proc
 				w.EnableMenuItem( hmenu, IDM_OPTIONS_ENCRYPTAES, w.MF_BYCOMMAND | w.MF_ENABLED );
 			endif;
 
-			setupWindowTitle();
+			setWindowTitle();
 			checkLog();
 			updateRecentLog();
 			setFormat();
-			setupWindowTitle();		
+			setWindowTitle();		
 			or( 1, eax );
 			
 		anyexception
@@ -1515,8 +1532,6 @@ proc
 	end Proc_FindDlg;	
 
 
-
-
 	initWindow	:procedure { @noframe };
 	
 		// look for file config_file, if exists,
@@ -1867,7 +1882,7 @@ proc
 		endif;
 		
 		skipOpenRecent:	
-		setupWindowTitle();
+		setWindowTitle();
 		updateStatus(hwnd);
 		
 		xor( eax, eax );
@@ -2016,6 +2031,7 @@ proc
 		if( eax = w.EN_SELCHANGE ) then
 
 			updateStatus( hred );
+			updateTitle();
 
 		elseif( eax = w.EN_MSGFILTER ) then
 			
@@ -2044,7 +2060,6 @@ proc
 					default
 				endswitch;
 				updateStatus( hred );
-
 
 			elseif( eax = w.WM_KEYDOWN ) then
 
@@ -2187,7 +2202,7 @@ proc
 				
 				w.SetWindowText( hred, 0 );		// clear edit window
 				str.cpy( s_untitled, filepath );
-				setupWindowTitle();
+				setWindowTitle();
 				
 			endif;
 			w.SetFocus(hred);

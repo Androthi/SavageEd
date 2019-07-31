@@ -3,7 +3,7 @@
 ## 7/31/2019
 	0.5.0	- removing printing capability.
 			  it was always more of a hack and there are better programs
-			  for printing.
+			- shows changed documents with a * before the title on titlebar
 
 ## 7/30/2019
 	0.4.3	- refactored some code

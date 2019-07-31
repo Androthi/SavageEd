@@ -63,13 +63,13 @@ type
 			height	:uns32; // window height
 			
 		endrecord;
-
-	colorMode:
+	
+	EditInfo:
 		record
 			textColor	:w.COLORREF;
 			backColor	:w.COLORREF;
 		endrecord;
-		
+			
 	findMode:
 		record
 			down		:boolean;
@@ -118,33 +118,32 @@ type
 		IDM_DOCUMENTS
 	};
 
-type
-			rect_t:
-			record
-				union
-					left	:uns32;
-					x		:uns32;
-				endunion;
-				union
-					top		:uns32;
-					y		:uns32;
-				endunion;
-				union
-					right	:uns32;
-					width	:uns32;
-				endunion;
-				union
-					bottom	:uns32;
-					height	:uns32;
-				endunion;
-			endrecord;
-endtype;
+	rect_t:
+	record
+		union
+			left	:uns32;
+			x		:uns32;
+		endunion;
+		union
+			top		:uns32;
+			y		:uns32;
+		endunion;
+		union
+			right	:uns32;
+			width	:uns32;
+		endunion;
+		union
+			bottom	:uns32;
+			height	:uns32;
+		endunion;
+	endrecord;
+
 
 proc
 	
 	// forward declarations
 	
-	updateStatus :procedure( hwin:dword ); @forward;
+	updateStatus :procedure; @forward;
 	WndProc :procedure( lparam:dword; wparam:dword; umsg:uns32; hwin:dword ); @forward;
 	Msg_Command :procedure( hwin:dword; wparam:dword; lparam:dword ); @forward;
 	loadFile :procedure( filename:string ); @forward;
@@ -166,6 +165,7 @@ readonly
 	AppName		:string:="SavageEd";
 	
 	RichEditDLL		:string :="riched20.dll";
+//>	RichEditDLL		:string :="Msftedit.dll";
 	
 	// strings and error messages
 	s_recent	:string := "Recent Files";
@@ -175,6 +175,8 @@ readonly
 	s_find		:string := "Find";
 	s_colors	:string := "Colors";
 	s_text		:string := "Text";
+	s_background_color	:string := "Background Color";
+	s_text_color		:string := "Text Color";
 	s_custcolors:string := "Custom Colors";
 	s_openrecent:string := "Open Recent";
 	s_rememberpos :string := "Remember Position";
@@ -187,6 +189,7 @@ readonly
 	s_recentnew	:string := "New Recent Window";
 	s_readonly	:string := "Read Only";
 	s_resedClass:string := "RichEdit20A";
+//>	s_resedClass:string := "RICHEDIT50W";
 	s_untitled	:string := "Untitled";
 	s_txtext	:string := ".txt";
 	s_fontname	:string := "Courier New";
@@ -194,6 +197,7 @@ readonly
 	s_insert	:string := "INS";
 	s_overwrite	:string := "OVR";
 	s_r			:string := "R";
+	s_b			:string := " ";
 	s_inputlinen:string := "Enter Line Number";
 	s_inputpwd	:string := "Enter a password upto 32 characters";
 	s_inputtab	:string := "Enter tab spacing in number of characters";
@@ -201,7 +205,7 @@ readonly
 	s_enc		:string := "enc";
 	
 	s_document		:string := "SavageEd_doc.txt";	
-	s_missingDLL	:string := "Could not open riched20.dll";
+	s_missingDLL	:string := "Could not open Msftedit.dll";
 	s_missingDocs	:string := "Missing Documents: SavageEd_doc.txt";
 	s_nosave		:string := "Could Not Save File";
 	s_noopen		:string := "Unable to open file";
@@ -210,8 +214,6 @@ readonly
 	s_savetitle		:string := "Save As: End filename with a period (.) for no extension";
 	
 	curdir			:byte := '.';	// '.' = curdir
-
-	szsavetitle	:mzstr ("Save As: End filename with a period (.) for no extension");
 
 storage
 	logfont			:w.LOGFONT;
@@ -261,7 +263,7 @@ storage
 static
 	Align(4);
 	fr			:dword := 1;
-	colors		:colorMode := colorMode:[ color_black, color_white ];
+	info		:EditInfo;
 	findOpts	:findMode := findMode:[ true, false, false, false ];
 	filepath	:str.strvar( w.MAX_PATH );	// store full file path
 	statusParts	:int32[STATUS_PARTS]:=[POS_LINES, POS_INS, POS_READONLY];
@@ -461,7 +463,7 @@ proc
 	
 	SaveAs :procedure {@noframe};
 	begin SaveAs;
-		dbg.put("saveas");
+
 		w.RtlZeroMemory( &ofn, @size(ofn) );
 		mov( @size(ofn), ofn.lStructSize );
 		mov( hwnd, ofn.hWndOwner );
@@ -512,7 +514,6 @@ proc
 			mov(-1,eax);
 			
 		endif;
-		dbg.put("/saveas");
 		ret();
 	end SaveAs;
 
@@ -547,7 +548,6 @@ proc
 	// checks for modified file, gets confirmation from user
 	getConfirm :procedure { @noframe, @returns("EAX") };
 	begin getConfirm;
-		//dbg.put("getConfirm" );
 		w.SendMessage(hred, w.EM_GETMODIFY,0,0);
 		if (eax) then
 			
@@ -581,7 +581,6 @@ proc
 			xor( eax, eax );
 			
 		endif;
-		//dbg.put("/getConfirm");
 		ret();
 	end getConfirm;
 
@@ -612,9 +611,9 @@ proc
 		mov	(15,ecx);
 		mul (ecx);
 		mov	(eax, cf.yHeight);
-		push (colors.textColor);
+		push (info.textColor);
 		pop (cf.crTextColor);
-		w.SendMessage( hred, w.EM_SETBKGNDCOLOR, false, colors.backColor);
+		w.SendMessage( hred, w.EM_SETBKGNDCOLOR, false, info.backColor);
 		w.SendMessage( hred, w.WM_SETFONT, hfont, true );
 	
 		
@@ -693,12 +692,10 @@ proc
 
 		
 	end getConfigPath;
-
 		
 	InsertTime :procedure { @noframe };
 	begin InsertTime;
 	
-		//dbg.put ("InstertTime");
 		w.GetSystemTime(systime);
 		w.GetDateFormat(	w.LOCALE_USER_DEFAULT,
 						w.LOCALE_NOUSEROVERRIDE,
@@ -717,7 +714,6 @@ proc
 						&buffer,
 						@size(buffer));
 		w.SendMessage(hred, w.EM_REPLACESEL, true, &buffer);
-		//dbg.put ("/InstertTime");
 		ret();
 	
 	end InsertTime;
@@ -803,7 +799,7 @@ proc
 		mov( eax, cf.hWndOwner );
 		mov( &logfont, cf.lpLogFont );
 		mov( w.CF_SCREENFONTS | w.CF_EFFECTS | w.CF_INITTOLOGFONTSTRUCT, cf.Flags );
-		push( colors.textColor );
+		push( info.textColor );
 		pop( cf.rgbColors );
 		
 		w._ChooseFont(cf);
@@ -813,9 +809,11 @@ proc
 			w.CreateFontIndirect(logfont);
 			mov( eax, hfont );
 			push( cf.rgbColors );
-			pop( colors.textColor );
+			pop( info.textColor );
 			setFormat();
-			config.writeBin( s_text, s_colors, &colors, @size( colors ) );
+			config.writeHex( s_text, s_background_color, info.backColor);
+			config.writeHex( s_text, s_text_color, info.textColor);
+			//config.writeBin( s_text, s_colors, &colors, @size( colors ) );
 			config.writeBin( s_text, s_font, &logfont, @size( logfont ) );
 			
 		endif;
@@ -835,16 +833,19 @@ proc
 		pop( cc.hInstance );
 		mov( w.CC_RGBINIT, cc.Flags );
 		mov( &customColors, cc.lpCustColors);
-		push( colors.backColor );
+		push( info.backColor );
 		pop( cc.rgbResult );
 		mov( &cc, eax );
 		w._ChooseColor( &cc );
 		if( eax ) then
 			push( cc.rgbResult );
-			pop( colors.backColor );
+			pop( info.backColor );
 			setFormat();
 			config.writeBin( s_text, s_custcolors, &customColors, @size( customColors ) );
-			config.writeBin( s_text, s_colors, &colors, @size( colors ) );
+//			config.writeBin( s_text, s_colors, &colors, @size( colors ) );
+			config.writeHex( s_text, s_background_color, info.backColor);
+			config.writeHex( s_text, s_text_color, info.textColor);
+
 		endif;
 			
 		ret();
@@ -1021,7 +1022,7 @@ proc
 				loadFile( hide.strbuf );
 			endif;
 		w.SetFocus(hred);
-		updateStatus(hwnd);
+		updateStatus();
 		ret();
 	end fileOpen;
 
@@ -1051,6 +1052,8 @@ proc
 	begin findNormal;
 		
 		move( &findbuf, ft.lpstrText);
+		dbg.put("find normal : ");
+		dbg.putz( ft.lpstrText );
 		w.SendMessage( hred, w.EM_FINDTEXTEX, opts, &ft );
 		mov( eax, fres );
 		if(eax != -1) then
@@ -1100,11 +1103,9 @@ proc
 		w.SendMessage( hred, w.EM_GETTEXTRANGE, 0, &tr );
 		mov( hmem, esi );
 		str.cpyz( &findbuf, hide.strbuf );
-		dbg.put("finding:", hide.strbuf );
 		scan.pfind( hide.strbuf, findOpts.matchcase );
 		jnc retFalse;
 		
-		dbg.put("found");
 		// we found the pattern...
 		// find it's index and length.  esi = start, edi = end.
 		// edi - esi = length
@@ -1287,7 +1288,6 @@ proc
 	begin Proc_Input;
 		pushabi;
 		
-		//dbg.put(" input proc hwin = ", hWin);
 		mov( uMsg, eax );
 		
 		if( eax = w.WM_COMMAND ) then
@@ -1402,7 +1402,7 @@ proc
 						w.SendMessage(hred,w.EM_EXSETSEL,0,&ft.chrg);
 						
 					endif;
-					Find(); //(fr);
+					Find();
 					w.SetFocus(hFind);
 	
 				elseif (eax = IDC_BTN_REPLACEALL) then
@@ -1412,7 +1412,7 @@ proc
 					w.SendMessage (hred, w.EM_EXGETSEL, 0, &chrg);
 					w.LockWindowUpdate(hred);
 					w.SendMessage (hred, w.EM_SETSEL, 0, 0);
-					Find(); // ( w.FR_DOWN );
+					Find();
 					while (fres!=-1) do
 						w.SendMessage(hWin, w.WM_COMMAND, IDC_BTN_REPLACE,0);
 					endwhile;
@@ -1438,13 +1438,11 @@ proc
 					
 					w.IsDlgButtonChecked(hWin, IDC_CHK_MATCHCASE);
 					if (eax) then
-						//or(w.FR_MATCHCASE, fr);
 						mov( true, findOpts.matchcase );
 						
 					else
 						
 						mov( false, findOpts.matchcase );
-						//and(! w.FR_MATCHCASE,fr);
 						
 					endif;
 					mov	(-1, fres);
@@ -1472,7 +1470,6 @@ proc
 					w.IsDlgButtonChecked(hWin, IDC_CHK_PATTERN);
 					if (eax) then
 						
-						//or	(w.FR_WHOLEWORD, fr);
 						mov( false, findOpts.wholeword );
 						mov( true, findOpts.matchpattern );
 						w.CheckDlgButton( hWin, IDC_CHK_WHOLEWORD, w.BST_UNCHECKED );
@@ -1480,7 +1477,6 @@ proc
 						
 					else
 						
-						//and(! w.FR_WHOLEWORD,fr);
 						mov( false, findOpts.matchpattern );
 						
 					endif;
@@ -1584,7 +1580,12 @@ proc
 			mov( eax, settings.height );
 			
 			config.readBin( s_text, s_font, &logfont, @size( logfont ) );
-			config.readBin( s_text, s_colors, &colors, @size( colors ) );
+			//config.readBin( s_text, s_colors, &colors, @size( colors ) );
+			config.readHex( s_text, s_background_color);
+			mov( eax, info.backColor );
+			config.readHex( s_text, s_text_color);
+			mov( eax, info.textColor );
+
 			config.readBin( s_text, s_custcolors, &customColors, @size( customColors ) );
 			config.readBin( s_text, s_find, &findOpts, @size( findOpts ) ); 
 			
@@ -1603,6 +1604,9 @@ proc
 			mov( 10, settings.yPos );
 			mov( 640, settings.width );
 			mov( 400, settings.height );
+			
+			mov( color_white, info.backColor);
+			mov( color_black, info.textColor);
 			
 		endif;		
 
@@ -1666,34 +1670,33 @@ proc
 		
 	end Cmd_File_Quit;
 
-	updateStatus :procedure( hwin:dword );
+	updateStatus :procedure;
 	
 		var
 			line	:uns32;
 			
 	
 	begin updateStatus;
-		//dbg.put("updateStatus");
 		
 		w.SendMessage(hred, w.EM_EXGETSEL,0, &chrg);
-		w.SendMessage( hwin, w.EM_LINEFROMCHAR, chrg.cpMin, 0 );
+		w.SendMessage( hred, w.EM_EXLINEFROMCHAR, 0, chrg.cpMin );
 		mov( eax, line );
 		inc( eax );
 		conv.u32ToStr( eax, 20, ' ', hide.strbuf );
 		str.trim( hide.strbuf );
 		str.put( strbuf, "Ln:", hide.strbuf, "   " );
 		
-		w.SendMessage( hwin, w.EM_LINEINDEX, line, 0 );
+		w.SendMessage( hred, w.EM_LINEINDEX, line, 0 );
 		sub( eax, chrg.cpMin );
 		inc( chrg.cpMin );
 		conv.u32ToStr( chrg.cpMin, 20,' ', hide.strbuf );
 		str.trim( hide.strbuf );
 		str.put2( strbuf, "Col:", hide.strbuf, "   " );
 		
-		w.SendMessage( hwin, w.EM_GETLINECOUNT, 0, 0 );
+		w.SendMessage( hred, w.EM_GETLINECOUNT, 0, 0 );
 		conv.u32ToStr( eax, 20,' ', hide.strbuf );
 		str.trim( hide.strbuf );
-		str.put2( strbuf, "Lns:", hide.strbuf ); 
+		str.put2( strbuf, "Lns:", hide.strbuf );
 		
 		w.SendMessage( hstatus, w.SB_SETTEXT, 0, strbuf ); 
 		
@@ -1701,6 +1704,12 @@ proc
 			w.SendMessage( hstatus, w.SB_SETTEXT, 1, s_overwrite );
 		else
 			w.SendMessage( hstatus, w.SB_SETTEXT, 1, s_insert );
+		endif;
+		
+		if( config.readBool( s_settings, s_readonly )) then
+			w.SendMessage( hstatus, w.SB_SETTEXT, 2, s_r );
+		else
+			w.SendMessage( hstatus, w.SB_SETTEXT, 2, s_b );
 		endif;
 		
 	end updateStatus;
@@ -1760,7 +1769,6 @@ proc
 			
 			w.CheckMenuItem( hmenu, IDM_READONLY, w.MF_BYCOMMAND | w.MF_CHECKED );
 			or( w.ES_READONLY, edstyle );
-			w.SendMessage( hstatus, w.SB_SETTEXT, 2, s_r );
 		endif;
 		
 		
@@ -1875,6 +1883,7 @@ proc
 					mov( eax, chrg.cpMax );
 					w.SendMessage( hred, w.EM_EXSETSEL, 0, &chrg );
 					w.SendMessage( hred,w.EM_SCROLLCARET,0,0 );
+					updateStatus();
 				endif;
 				
 			endif;
@@ -1883,7 +1892,7 @@ proc
 		
 		skipOpenRecent:	
 		setWindowTitle();
-		updateStatus(hwnd);
+		updateStatus();
 		
 		xor( eax, eax );
 		
@@ -2030,7 +2039,7 @@ proc
 		//dbg.put("eax = ", eax );
 		if( eax = w.EN_SELCHANGE ) then
 
-			updateStatus( hred );
+			updateStatus();
 			updateTitle();
 
 		elseif( eax = w.EN_MSGFILTER ) then
@@ -2059,15 +2068,18 @@ proc
 						
 					default
 				endswitch;
-				updateStatus( hred );
+				updateStatus();
+				or( 1, eax );
+				jmp done;
 
 			elseif( eax = w.WM_KEYDOWN ) then
 
 				// key down state, see if any control keys
 				// are pressed
-
+				
+				
 				switch( ebx );
-					
+						
 					case( w.VK_SHIFT )
 						mov( true, shift_down );
 						
@@ -2076,35 +2088,85 @@ proc
 						
 					case( w.VK_MENU )
 						mov( true, alt_down );
-						
-					case( w.VK_N )
-						if( ctrl_down ) then
-							Msg_Command( hwnd, IDM_NEW, 0 );
-						endif;
+					
+					
+					// process all commands and keyboard shortcuts here
+					
+					// custom keyboard commands
 					
 					case( w.VK_F )
 						if( ctrl_down ) then
 							Msg_Command( hwnd, IDM_FIND,0 );
 						endif;
-
+					
 					case( w.VK_G )
 						if( ctrl_down ) then
 							Msg_Command( hwnd, IDM_EDIT_GOTO,0 );
 						endif;
+
+					
+					case( w.VK_I )
+						if( ctrl_down ) then
+
+							// remove default ctrl-i behavior
+							while ( w.PeekMessage( msg, hred, w.WM_KEYFIRST, w.WM_KEYLAST, w.PM_REMOVE)) do
+							endwhile;
+							
+							// ctrl-i moves cursor up 1 line
+							
+							w.SendMessage( hred, w.EM_EXGETSEL, 0, &chrg); 
+							w.SendMessage( hred, w.EM_EXLINEFROMCHAR, 0, chrg.cpMin );
+							dbg.put( "line index ", (type uns32 eax));
+							// if we are at line 0, no point in doing anything);
+							if( eax ) then
+								
+								// get the carot index from line
+								mov( eax, ebx );
+								w.SendMessage( hred, w.EM_LINEINDEX, eax, 0 );
+								sub( eax, chrg.cpMin );
+								dbg.put( "char index ", chrg.cpMin);
+								
+								// get length of previous line
+								dec( ebx );
+								w.SendMessage( hred, w.EM_LINEINDEX, ebx, 0 );
+								w.SendMessage( hred, w.EM_LINELENGTH, eax, 0 );
+								if( eax >= chrg.cpMin ) then
+									w.SendMessage( hred, w.EM_LINEINDEX, ebx, 0 );
+									add( chrg.cpMin, eax );
+								else
+									push( eax );
+									w.SendMessage( hred, w.EM_LINEINDEX, ebx, 0 );
+									pop( ecx );
+									add( ecx, eax );
+									dbg.put(eax);
+								endif;
+								w.SendMessage( hred, w.EM_SETSEL, eax, eax );
+								w.SendMessage( hred, w.EM_SCROLLCARET, 0, 0);
+							endif;
+							
+						endif;
 						
+					case( w.VK_K )
+					
+					case( w.VK_N )
+						if( ctrl_down ) then
+							Msg_Command( hwnd, IDM_NEW, 0 );
+						endif;
+					
 					case( w.VK_O )
 						if( ctrl_down ) then
 							Msg_Command( hwnd, IDM_OPEN,0 );
-						endif;					
+						endif;	
+					
 					case( w.VK_P )
-				
+					
 					case( w.VK_S )
 						if( ctrl_down && shift_down ) then
 							Msg_Command( hwnd, IDM_SAVEAS,0 );
 						elseif( ctrl_down ) then
 							Msg_Command( hwnd, IDM_SAVE,0 );
 						endif;
-
+					
 					case( w.VK_T )
 						if( ctrl_down ) then
 							Msg_Command( hwnd, IDM_PEG,0 );
@@ -2131,7 +2193,6 @@ proc
 
 					case( w.VK_ESCAPE )
 
-						//Msg_Close( hwnd, wparam, lparam );
 						w.SendMessage(hwnd,w.WM_CLOSE,0,0 );
 						or( 1, eax );
 						jmp done;
@@ -2141,18 +2202,16 @@ proc
 			elseif ( eax = w.WM_CHAR ) then
 				
 				switch( ebx );
+					
+					
 					case( w.VK_RETURN )
 						
 						if( config.readBool( s_settings, s_autoindent ) ) then
 
 							w.SendMessage( hred, w.EM_LINEFROMCHAR, -1, 0);
 							dec( eax );
-							//dbg.separator;
-							//dbg.put(" reading line :", (type uns32 eax));
 							mov( szLINEBUFFER-1, (type word buffer[0]));
 							w.SendMessage( hred, w.EM_GETLINE, eax, &buffer );
-							//dbg.put("length of buffer :", (type uns32 eax));
-							//dbg.putz(&buffer);
 							if( eax ) then
 								xor( ecx, ecx );
 								while( eax ) do
@@ -2167,7 +2226,6 @@ proc
 								endwhile;
 								
 								// if we are here, then ecx contains number of tabs
-								//dbg.put("we have ecx :", ecx );
 								str.cpy("", strbuf );
 								if( ecx ) then
 									while( ecx ) do
@@ -2189,14 +2247,18 @@ proc
 		// return default - control should handle key
 		xor( eax, eax );
 		done:
-		//popabi;
 	end Msg_Notify;
 
+	// handle menu commands
+	// perhaps use this to handle custom commands
 	Msg_Command :procedure( hwin:dword; wparam:dword; lparam:dword );
 	begin Msg_Command;
 		mov	(wparam,eax);
 		and	($0ffff,eax);
-		if (eax=IDM_NEW) then
+		
+		switch( eax );
+		case( IDM_NEW )
+			
 			getConfirm();
 			if (!eax) then	
 				
@@ -2207,7 +2269,8 @@ proc
 			endif;
 			w.SetFocus(hred);
 		
-		elseif (eax = IDM_OPEN) then
+		case( IDM_OPEN )
+		
 			getConfirm();
 			if (!eax) then
 			
@@ -2216,46 +2279,46 @@ proc
 			endif;	
 			w.SetFocus(hred);
 			
-		elseif (eax = IDM_INST) then
+		case( IDM_INST )
 			
 			newInstance( NULL );
 			
-		elseif (eax = IDM_SAVE) then
+		case( IDM_SAVE )
 		
 			checkSave();
 			w.SetFocus(hred);
 			
-		elseif (eax = IDM_SAVEAS) then
+		case( IDM_SAVEAS )
 		
 			SaveAs();
 			w.SetFocus(hred);
 			
-	   	elseif (eax = IDM_CUT) then
+	   	case( IDM_CUT )
 		
 			w.SendMessage(hred, w.WM_CUT,0,0);
 			
-		elseif (eax = IDM_COPY) then
+		case( IDM_COPY )
 		
 			w.SendMessage(hred, w.WM_COPY,0,0);
 			
-		elseif (eax = IDM_PASTE) then
+		case( IDM_PASTE )
 		
 			w.SendMessage(hred, w.WM_PASTE,0,0);
 			w.SendMessage(hred, w.EM_SETMODIFY, true,0); 	
 			
-		elseif (eax = IDM_SELECTALL) then
+		case( IDM_SELECTALL )
 			
 			selectAll();
 			
-		elseif (eax = IDM_UNDO) then
+		case( IDM_UNDO )
 		
 			w.SendMessage(hred, w.EM_UNDO,0,0);
 			
-		elseif (eax = IDM_REDO) then
+		case( IDM_REDO )
 		
 			w.SendMessage(hred, w.EM_REDO,0,0);
 			
-		elseif (eax = IDM_FIND || eax = IDM_REPLACE) then
+		case( IDM_FIND, IDM_REPLACE )
 			if (!hFind) then
 				GetSelText (&findbuf);
 				w.CreateDialogParam(hinst,val ID_FINDDLG,hwnd, &Proc_FindDlg,false);
@@ -2263,22 +2326,20 @@ proc
 				w.SetFocus(hFind);
 			endif;
 		
-		elseif (eax = IDM_FINDNEXT) then
+		case( IDM_FINDNEXT )
 			
 			mov( true, findOpts.down );
 			
 			if (! hFind) then
 				GetSelText(&findbuf);
 			endif;
-			//mov (findbuf, eax);
 			mov( findbuf[0], al );
-			//mov ([eax], al);
 			test(al,al);
 			if (@nz) then
 				Find(); //(w.FR_DOWN);
 			endif;
 			
-		elseif (eax = IDM_FINDPREV) then
+		case(IDM_FINDPREV )
 			
 			mov( false, findOpts.down );
 			
@@ -2286,13 +2347,12 @@ proc
 				GetSelText(&findbuf);
 			endif;
 			mov (findbuf[0], al);
-			//mov ([eax], al);
 			test(al,al);
 			if (@nz) then
 				Find(); //(0);
 			endif;
 			
-		elseif( eax = IDM_EDIT_GOTO ) then
+		case( IDM_EDIT_GOTO )
 			
 			w.DialogBoxParam( hinst, val ID_INPUT, hwnd, &Proc_Input, s_inputlinen );
 			if( return > 0 ) then
@@ -2318,21 +2378,21 @@ proc
 				
 			endif;
 			
-		elseif (eax = IDM_TIME) then
+		case( IDM_TIME )
 	
 			InsertTime();
 			
-		elseif (eax = IDM_FONT) then
+		case( IDM_FONT )
 		
 			selectFont();
 			w.SetFocus(hred);
 			
-		elseif (eax = IDM_BACKGROUND) then
+		case(IDM_BACKGROUND )
 	
 			selectColor();
 			w.SetFocus(hred);
 			
-		elseif (eax = IDM_AUTO) then
+		case(IDM_AUTO ) 
 			
 			if( config.readBool( s_settings, s_autosave ) ) then
 			
@@ -2348,7 +2408,7 @@ proc
 			
 			config.writeBool( s_settings, s_autosave, al );
 			
-		elseif( eax = IDM_AUTOINDENT ) then
+		case(  IDM_AUTOINDENT ) 
 			
 			if( config.readBool( s_settings, s_autoindent ) ) then
 			
@@ -2364,7 +2424,7 @@ proc
 			
 			config.writeBool( s_settings, s_autoindent, al );
 						
-		elseif (eax = IDM_WRAP) then
+		case ( IDM_WRAP) 
 
 			if( config.readBool( s_settings, s_wrap ) ) then
 
@@ -2384,25 +2444,24 @@ proc
 				w.SendMessage( hred, w.EM_SETTARGETDEVICE, NULL, 1 );
 			endif;
 			
-		elseif (eax = IDM_READONLY) then
+		case ( IDM_READONLY) 
 			
 			if( config.readBool( s_settings, s_readonly ) ) then
 
 				w.CheckMenuItem( hmenu, IDM_READONLY, w.MF_BYCOMMAND | w.MF_UNCHECKED );
-				w.SendMessage( hstatus, w.SB_SETTEXT, 2, NULL );
 				mov( false, eax );
 				
 			else
 				
 				w.CheckMenuItem(hmenu, IDM_READONLY, w.MF_BYCOMMAND | w.MF_CHECKED);
-				w.SendMessage( hstatus, w.SB_SETTEXT, 2, s_r );
 				mov( true, eax );
 				
 			endif;
 			config.writeBool( s_settings, s_readonly, al );
 			w.SendMessage( hred, w.EM_SETREADONLY, eax, 0 );
+			updateStatus();
 			
-		elseif (eax = IDM_CLEAREXIT) then
+		case ( IDM_CLEAREXIT) 
 
 			if( config.readBool( s_settings, s_clearexit ) ) then
 
@@ -2415,7 +2474,7 @@ proc
 			endif;
 			config.writeBool( s_settings, s_clearexit, al );
 			
-		elseif (eax = IDM_RECENTNEW) then
+		case ( IDM_RECENTNEW) 
 			
 			if( config.readBool( s_settings, s_recentnew ) ) then
 
@@ -2430,7 +2489,7 @@ proc
 			endif;
 			config.writeBool( s_settings, s_recentnew, al );
 			
-		elseif (eax = IDM_OPENRECENT) then
+		case ( IDM_OPENRECENT) 
 
 			if( config.readBool( s_settings, s_openrecent ) ) then
 
@@ -2445,7 +2504,7 @@ proc
 			endif;
 			config.writeBool( s_settings, s_openrecent, al );
 			
-		elseif( eax = IDM_REMEMBERPOS ) then
+		case(  IDM_REMEMBERPOS ) 
 		
 			if( config.readBool( s_settings, s_rememberpos ) ) then
 
@@ -2460,7 +2519,7 @@ proc
 			endif;
 			config.writeBool( s_settings, s_rememberpos, al );
 			
-		elseif (eax = IDM_PEG) then
+		case ( IDM_PEG) 
 
 			if( config.readBool( s_settings, s_topwindow ) ) then
 
@@ -2477,14 +2536,14 @@ proc
 			endif;
 			config.writeBool( s_settings, s_topwindow, al );
 		
-		elseif( eax = IDM_SETTAB ) then
+		case(  IDM_SETTAB ) 
 			
 			if( setTabWidth() ) then
 				config.writeUns( s_settings, s_tabs, eax );
 				setFormat();
 			endif;
 			
-		elseif( eax = IDM_OPTIONS_ENCRYPTAES ) then
+		case(  IDM_OPTIONS_ENCRYPTAES ) 
 			
 			if( ! getConfirm() ) then
 				if( getPassword( hide.strbuf ) ) then
@@ -2502,7 +2561,7 @@ proc
 				endif;
 			endif;
 			
-		elseif( eax = IDM_OPTIONS_DECRYPTAES ) then
+		case(  IDM_OPTIONS_DECRYPTAES ) 
 			
 			if( ! getConfirm() ) then
 				if( getPassword( hide.strbuf ) ) then
@@ -2520,7 +2579,7 @@ proc
 				endif;
 			endif;
 			
-		elseif( eax = IDM_VIEW_STATUS ) then
+		case(  IDM_VIEW_STATUS ) 
 			
 			if( config.readBool( s_window, s_status ) ) then
 				
@@ -2537,11 +2596,11 @@ proc
 			endif;
 			w.SendMessage( hwnd, w.WM_SIZE, 0, 0 );
 			
-		elseif (eax = IDM_ABOUT) then
+		case ( IDM_ABOUT) 
 		
 			w.CreateDialogParam(hinst,val ID_ABOUT,hwnd,&AboutDlgProc,0);
 	
-		elseif (eax = IDM_DOCUMENTS) then
+		case ( IDM_DOCUMENTS) 
 			
 			if( filesys.exists( s_document ) ) then
 				newInstance( s_document );
@@ -2549,15 +2608,15 @@ proc
 				warning( s_missingDocs );
 			endif;
 
-		elseif (eax=IDM_QUIT) then
+		case( IDM_QUIT ) 
 		
 			 w.SendMessage(hwnd,w.WM_CLOSE,0,0);
 		
-		elseif (eax >= RECENT_MENU_START && eax <= RECENT_MENU_END) then
-	
-			openRecent( eax );
-	
-		endif;
+		default;
+			if( eax >= RECENT_MENU_START && eax <= RECENT_MENU_END ) then
+				openRecent( eax );
+			endif;
+		endswitch;
 		
 		xor( eax, eax );
 
@@ -2565,6 +2624,7 @@ proc
 
 	
 	WndProc :procedure( lparam:dword; wparam:dword; umsg:uns32; hwin:dword );
+	
 		// main window message handler
 	
 	begin WndProc;
@@ -2616,6 +2676,6 @@ begin SavageEd;
 
 	mov( msg.wParam, eax );
 
-_exit:
+	_exit:
 
 end SavageEd;

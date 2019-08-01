@@ -24,7 +24,14 @@ will cover only items that may differ.
 	- Ctrl-k	Moves the cursor down 1 line
 	- Ctrl-j	Moves the cursor left 1 character
 	- Ctrl-l	Moves the cursor rigtht 1 character
-	
+	- Ctrl-,	Move cursor left 1 word
+	- Ctrl-.	Move cursor right 1 word
+	- Ctrl-Shift-j	Move to beginning of line, or beginning of prev line if already there
+	- Ctrl-Shift-l	Move to end of line, or end of next line if already there
+
+	- Ctrl-d	Delete 1 char
+	- Ctrl-\	Kill line ( line is cut, goes into clipboard )
+		
 	- Ctrl-SPC	Toggles mark. Shows M on status bar when mark is set.
 				Press again to select marked text. Any other key cancels.
 

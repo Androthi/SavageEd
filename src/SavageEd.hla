@@ -14,7 +14,7 @@ program SavageEd;
 
 readonly
 
-	version			:string := "SavageEd v0.5.1";
+	version			:string := "SavageEd v0.5.3";
 
 proc
 	
@@ -89,9 +89,9 @@ type
 			line		:LineInfo;
 			
 			// if mark is set, this contains the index
-			//> maybe won't need
 			markIndex	:uns32;
 			is_marked	:boolean;
+			ins_ovr		:boolean;
 		endrecord;
 			
 	findMode:
@@ -244,6 +244,7 @@ readonly
 	s_r			:string := "R";
 	s_b			:string := " ";
 	s_mark		:string := "M";
+	s_empty		:string := "";
 	s_inputlinen:string := "Enter Line Number";
 	s_inputpwd	:string := "Enter a password upto 32 characters";
 	s_inputtab	:string := "Enter tab spacing in number of characters";
@@ -264,7 +265,6 @@ readonly
 storage
 	logfont			:w.LOGFONT;
 	hred			:dword;			// RichEd window handle
-	default_hred	:dword;			// to contain original since we will be subclassing
 	hinst			:dword;
 	hsubmenu		:dword;	
 	hwnd			:dword;			// Handle to our window.
@@ -285,7 +285,6 @@ storage
 	replacebuf		:byte[300];
 	ft				:w.FINDTEXTEX;
 	fres			:dword;
-	ins_ovr			:dword;
 	return			:string;	// returned from Proc_Input, caller must free string
 
 	edstyle		:dword;
@@ -321,7 +320,7 @@ static
 readonly
 
 	// main window message table
-	
+//bm=window_commands	
 	message_table	:MsgProcPtr_t; @nostorage;
 		MsgProcPtr_t	
 			MsgProcPtr_t:[ w.WM_COMMAND,	&Msg_Command	],
@@ -333,7 +332,7 @@ readonly
 			MsgProcPtr_t:[ w.WM_SETFOCUS,	&Msg_SetFocus	],
 			MsgProcPtr_t:[ w.WM_DROPFILES,  &openDroppedFile],
 			MsgProcPtr_t:[ w.WM_NOTIFY,		&Msg_Notify],
-			
+
 			// add more messages here
 			MsgProcPtr_t:[ 0, NULL ];	// This marks the end of the list.
 
@@ -1705,7 +1704,6 @@ proc
 		ret();
 	end initWindow;
 
-
 	Cmd_File_Quit :procedure( hwin:dword; wparam:dword; lparam:dword );
 	begin Cmd_File_Quit;
 		
@@ -1738,7 +1736,7 @@ proc
 		
 		w.SendMessage( hstatus, w.SB_SETTEXT, 0, strbuf ); 
 		
-		if( ins_ovr ) then
+		if( info.ins_ovr ) then
 			w.SendMessage( hstatus, w.SB_SETTEXT, 1, s_overwrite );
 		else
 			w.SendMessage( hstatus, w.SB_SETTEXT, 1, s_insert );
@@ -1796,11 +1794,6 @@ proc
 		
 		setFormat();
 		w.SetFocus( hred );
-		// subclass the edit control
-		w.GetWindowLong(hred, w.GWL_WNDPROC);
-		mov( eax, default_hred );
-		//w.SetWindowLong(hred, w.GWL_WNDPROC, &Subclass_EditProc);
-
 		
 		if( config.readBool( s_settings, s_wrap )) then
 			
@@ -2110,17 +2103,22 @@ proc
 	
 		static
 		ctrl_down	:boolean := false;
-		alt_down	:boolean := false;
 		shift_down	:boolean := false;
-		
+
+		// probably need to implement accelerator nonsense to make this key work
+		// using syskeydown/up works, but can't get rid of annoying bleeps and
+		// can't intercept alt key. it always gets passed to the parent window
+		// no matter what I return in eax.
+		alt_down	:boolean := false;		
 	
 	begin Msg_Notify;
-		//dbg.put("notify");
+		
 		//pushabi;
-
+		//dbg.separator;
+		
 		mov( lparam, edx );
 		mov( (type w.NMHDR[EDX]).code, eax );
-		//dbg.put("eax = ", eax );
+			
 		if( eax = w.EN_SELCHANGE ) then
 			
 			updateStatus();
@@ -2143,13 +2141,11 @@ proc
 						
 					case( w.VK_CONTROL )	
 						mov( false, ctrl_down );
-						
-					case( w.VK_MENU )
-						mov( false, alt_down );
-						
+					
 					case( w.VK_INSERT )
-						xor( 1, ins_ovr );
-						
+						xor( 1, info.ins_ovr );
+					
+					
 					default
 				endswitch;
 				updateStatus();
@@ -2161,7 +2157,6 @@ proc
 				// key down state, see if any control keys
 				// are pressed
 				
-				
 				switch( ebx );
 						
 					case( w.VK_SHIFT )
@@ -2169,14 +2164,37 @@ proc
 						
 					case( w.VK_CONTROL )	
 						mov( true, ctrl_down );
-						
-					case( w.VK_MENU )
-						mov( true, alt_down );
+					
 					
 //bm=commands
 					// process all commands and keyboard shortcuts here
 					
 					// custom keyboard commands
+					
+					case( w.VK_D )
+						if( ctrl_down ) then
+							
+							getInfo();
+							inc( info.cursor.cpMin );
+							w.SendMessage( hred, w.EM_EXSETSEL, 0, &info.cursor );
+							w.SendMessage( hred, w.EM_REPLACESEL,true, s_empty );
+
+						endif;
+						
+					case( $DC )  // VK_OEM_5 .. backslash / pipe key
+						if( ctrl_down ) then
+							
+							// cut current line
+							
+							getInfo();
+							mov( info.line.index, eax );
+							mov( eax, info.cursor.cpMin );
+							add( info.line.length, eax );
+							inc( eax ); // consume carriage return
+							mov( eax, info.cursor.cpMax );
+							w.SendMessage( hred, w.EM_EXSETSEL, 0, &info.cursor );
+							w.SendMessage(hred, w.WM_CUT,0,0);
+						endif;
 					
 					case( w.VK_F )
 						if( ctrl_down ) then
@@ -2195,7 +2213,7 @@ proc
 							// remove default ctrl-i behavior
 							while ( w.PeekMessage( msg, hred, w.WM_KEYFIRST, w.WM_KEYLAST, w.PM_REMOVE)) do
 							endwhile;
-							
+								
 							// move cursor up
 							
 							getInfo();
@@ -2224,15 +2242,34 @@ proc
 								w.SendMessage( hred, w.EM_SCROLLCARET, 0, 0);
 							endif;	
 						endif;
+						
 				
 					case( w.VK_J )
 					
 						if( ctrl_down ) then
-						
+							
+							
 							while ( w.PeekMessage( msg, hred, w.WM_KEYFIRST, w.WM_KEYLAST, w.PM_REMOVE)) do
 							endwhile;
-
+							
 							getInfo();
+							
+							// move to beginning of line
+							if( shift_down ) then
+								mov( info.line.index, eax );
+								if( info.charIndex = 0 && eax > 0 ) then
+									
+									// we're at the beginning of line, go to the beginning of prev line.
+									
+									dec (eax );
+									w.SendMessage( hred, w.EM_SETSEL, eax, eax );
+									getInfo();
+								endif;
+								w.SendMessage( hred, w.EM_SETSEL, info.line.index, info.line.index );
+								jmp done;
+							endif;
+							
+							// move cursor left 1 character
 							mov( info.cursor.cpMin, eax );
 							if( eax ) then
 								dec( eax );
@@ -2245,11 +2282,11 @@ proc
 						
 						if( ctrl_down) then
 							
-							// move cursor down
-							
 							// consume the key_up command so it won't send to wm_char
 							while ( w.PeekMessage( msg, hred, w.WM_KEYFIRST, w.WM_KEYLAST, w.PM_REMOVE)) do
 							endwhile;
+
+							// move cursor down							
 							
 							getInfo();
 							if( want_pos = 0 ) then
@@ -2279,7 +2316,25 @@ proc
 						
 					case( w.VK_L )
 						
-						// move cursor right
+						
+						// move to beginning of line
+						if( shift_down ) then
+							mov( info.line.length, eax );
+							if( info.charIndex = eax ) then
+								
+								// we're at the end of line, go to the end of next line.
+								add( info.line.index, eax );
+								inc( eax ); // go over the carriage return
+								w.SendMessage( hred, w.EM_SETSEL, eax, eax );
+								getInfo();
+							endif;
+							mov( info.line.length, eax );
+							add( info.line.index, eax );
+							w.SendMessage( hred, w.EM_SETSEL, eax, eax );
+							jmp done;
+						endif;
+						
+						// move cursor right 1 character
 						if( ctrl_down ) then
 							
 							while ( w.PeekMessage( msg, hred, w.WM_KEYFIRST, w.WM_KEYLAST, w.PM_REMOVE)) do
@@ -2337,6 +2392,20 @@ proc
 						
 					case( w.VK_F6 )
 						Msg_Command( hwnd, IDM_READONLY,0 );
+						
+					case( w.VK_COMMA )
+						
+						// same as ctrl-left
+						if( ctrl_down ) then
+							w.PostMessage( hred, w.WM_KEYDOWN, w.VK_LEFT, 0 );
+						endif;
+						
+					case( w.VK_PERIOD )
+					
+						// same as ctrl-right
+						if( ctrl_down ) then
+							w.PostMessage( hred, w.WM_KEYDOWN, w.VK_RIGHT, 0 );
+						endif;
 
 					case( w.VK_ESCAPE )
 
@@ -2427,7 +2496,6 @@ proc
 						
 					default;
 						
-						dbg.put("default hit");
 						mov( 0, want_pos );
 						mov( false, info.is_marked );
 					
@@ -2440,7 +2508,6 @@ proc
 			endif;
 				
 		endif;
-		
 		
 		// return default - control should handle key
 		xor( eax, eax );

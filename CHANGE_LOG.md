@@ -6,6 +6,8 @@
 			- shows changed documents with a * before the title on titlebar
 	0.5.1   - added keyboard shortcuts for cursor navigation on ctrl-i,j,k,l
 	0.5.2	- added mark command on ctrl-SPC
+	0.5.3	- added ctrl-d delete, ctrl-\ kill line, ctrl-shift-j move to start of line
+			  ctrl-shift-l move to end of line, ctrl-, move word left, ctrl-. move word right
 
 ## 7/30/2019
 	0.4.3	- refactored some code

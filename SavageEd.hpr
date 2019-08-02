@@ -54,7 +54,9 @@ shell32.lib
 aeslib.lib
 
 
+
 [Notes]
 <text>
--add encryption before release </text>
+Notes still work?
+</text>
 

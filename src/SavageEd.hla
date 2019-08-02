@@ -14,7 +14,7 @@ program SavageEd;
 
 readonly
 
-	version			:string := "SavageEd v0.5.3";
+	version			:string := "SavageEd v0.5.5";
 
 proc
 	
@@ -186,8 +186,8 @@ const
 	statusht_c			:= 21;		// height of status bar
 
 	STATUS_PARTS		:= 4;
-	POS_LINES			:=170;
-	POS_INS				:=POS_LINES+35;
+	POS_LINES			:=200;
+	POS_INS				:=POS_LINES+30;
 	POS_READONLY		:=POS_INS+18;
 	POS_MARK			:=POS_READONLY+18;
 
@@ -332,6 +332,7 @@ readonly
 			MsgProcPtr_t:[ w.WM_SETFOCUS,	&Msg_SetFocus	],
 			MsgProcPtr_t:[ w.WM_DROPFILES,  &openDroppedFile],
 			MsgProcPtr_t:[ w.WM_NOTIFY,		&Msg_Notify],
+			MsgProcPtr_t:[ w.WM_KEYDOWN,	&KeyDownTest	],
 
 			// add more messages here
 			MsgProcPtr_t:[ 0, NULL ];	// This marks the end of the list.
@@ -340,7 +341,7 @@ readonly
 	command_table	:MsgProcPtr_t; @nostorage;
 		MsgProcPtr_t
 			MsgProcPtr_t:[ IDM_QUIT,	&Cmd_File_Quit	],
-
+			
 			// add more commands here
 			MsgProcPtr_t:[ 0,				NULL			];
 		
@@ -1704,6 +1705,14 @@ proc
 		ret();
 	end initWindow;
 
+	KeyDownTest	:procedure( hwin:dword; wparam:dword; lparam:dword );
+	begin KeyDownTest;
+		
+		dbg.put(" key down from cmd");
+		
+	end KeyDownTest;
+
+
 	Cmd_File_Quit :procedure( hwin:dword; wparam:dword; lparam:dword );
 	begin Cmd_File_Quit;
 		
@@ -1729,10 +1738,11 @@ proc
 		str.trim( hide.strbuf );
 		str.put2( strbuf, "Col: ", hide.strbuf, "   " );
 		
+		
 		w.SendMessage( hred, w.EM_GETLINECOUNT, 0, 0 );
 		conv.u32ToStr( eax, 20,' ', hide.strbuf );
 		str.trim( hide.strbuf );
-		str.put2( strbuf, "Lns: ", hide.strbuf );
+		str.put2( strbuf, "Lns: ", hide.strbuf, "    Pos: ", (type uns32 info.cursor.cpMin ));
 		
 		w.SendMessage( hstatus, w.SB_SETTEXT, 0, strbuf ); 
 		
@@ -2073,6 +2083,7 @@ proc
 		w.SendMessage( hred, w.EM_LINEINDEX, (type LineInfo [ebx]).number, 0 );
 		if( (type int32 eax) >= 0 ) then
 			mov( eax, (type LineInfo[ebx]).index );
+
 			w.SendMessage( hred, w.EM_LINELENGTH, eax, 0 );
 			mov( eax, (type LineInfo[ebx]).length );
 		else
@@ -2156,6 +2167,8 @@ proc
 
 				// key down state, see if any control keys
 				// are pressed
+				
+				dbg.put(" key down from notify ");
 				
 				switch( ebx );
 						

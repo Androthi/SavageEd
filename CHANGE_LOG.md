@@ -8,7 +8,8 @@
 	0.5.2	- added mark command on ctrl-SPC
 	0.5.3	- added ctrl-d delete, ctrl-\ kill line, ctrl-shift-j move to start of line
 			  ctrl-shift-l move to end of line, ctrl-, move word left, ctrl-. move word right
-
+	0.5.5	- added cursor position information to display on status bar
+	
 ## 7/30/2019
 	0.4.3	- refactored some code
 			  fixed minor keyboard input bugs

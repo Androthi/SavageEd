@@ -1,5 +1,13 @@
 # SavageEd Documentation
 
+# Quick Start
+	All you need to run SavageEd is the file SavageEd.exe
+	After the first run, the program will create a settings file in
+	the parent folder called "SavageEd.ini"
+	The About->Documents menu looks for this file "SavageEd.md" in the same directory
+	but will ignore it if one can't be found.
+
+
 SavageEd is designed to be a quick editing/note taking program.
 As such it:
 

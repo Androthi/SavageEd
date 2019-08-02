@@ -2,14 +2,17 @@
 A small text editor written in Randal Hyde's high level assembly for Windows
 
 The source is set up as a HIDE project. HIDE binaries can be downloaded from https://sites.google.com/view/androth/home/high-level-assembly
+
 Open the hpr file in HIDE to build.
 
 The editor uses windows richedit DLL.
 
-Binaries are available at
+Binaries are available at:
+
 Check the releases section in Github
 
-also older versions may be available at 
+also older versions may be available at:
+
 https://sites.google.com/view/androth/home/high-level-assembly
 
 Only the source files are guaranteed to be the latest version.
@@ -28,6 +31,7 @@ Only the source files are guaranteed to be the latest version.
 
 ## Documention
 See SavageEd.md for the manual
+
 See CHANGE_LOG.md for changes between versions
 
 ## Development Goals

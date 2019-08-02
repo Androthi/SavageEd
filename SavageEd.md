@@ -191,13 +191,17 @@ the bottom.
 Shows/hides the status bar
 The status bar shows the following information:
 1st section:
-	current line number		'Ln:xx'
-	current column number	'Col:xx'
-	total number of lines	'Lines:xx'
+	current line number		'Ln: xx'
+	current column number	'Col: xx'
+	total number of lines	'Lns: xx'
+	cursor position			'Pos: xx'
 2nd section:
 	insert/overwrite mode 	'INS'/'OVR'
 3rd section:
 	readonly mode 			'R'
+4th section:
+	mark set				'M'
+		
 
 ## Recent Documents
 A list of up to 20 recently opened files are stored in File > Recent menu.

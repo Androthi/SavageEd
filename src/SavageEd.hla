@@ -14,7 +14,7 @@ program SavageEd;
 
 readonly
 
-	version			:string := "SavageEd v0.5.5";
+	version			:string := "SavageEd v0.5.6";
 
 proc
 	
@@ -27,23 +27,6 @@ proc
 	updateRecentLog :procedure; @forward;
 	getInfo :procedure; @forward;
 	
-/*				notes
-
-	explore using w.RegisterHotKey( hwnd, ID, modifier, vk )
-	
-	where modifier = 
-		MOD_ALT
-		MOD_CONTROL
-		MOD_KEYUP
-		MOD_SHIFT
-		MOD_WIN
-	
-	// how to send a keyboard message
-	// note, if modifier keys are pressed, this will take that
-	// into account.	
-	w.PostMessage( hred, w.WM_KEYDOWN, w.VK_UP, 0);
-
-*/
 	
 type
 	// Message and dispatch table related definitions:
@@ -124,7 +107,8 @@ type
 		IDM_EDIT_GOTO,
 		IDM_TIME,
 		IDM_FONT,
-		IDM_BACKGROUND, 
+		IDM_BACKGROUND,
+		IDM_FORGROUND, 
 		IDM_AUTO,
 		IDM_WRAP,
 		IDM_PEG,       
@@ -864,7 +848,8 @@ proc
 		ret();
 	end selectFont;
 	
-	selectColor :procedure { @noframe };
+	selectColor :procedure { @noframe, @returns("EAX") };
+		
 	begin selectColor;
 		dbg.put ("selectColor");
 		mov( &cc, eax );
@@ -881,17 +866,15 @@ proc
 		pop( cc.rgbResult );
 		mov( &cc, eax );
 		w._ChooseColor( &cc );
+		dbg.put("choose color :", eax );
 		if( eax ) then
 			push( cc.rgbResult );
-			pop( info.backColor );
-			setFormat();
+			pop( return );	// black color can be zero so we'll use this to return color value
 			config.writeBin( s_text, s_custcolors, &customColors, @size( customColors ) );
-//			config.writeBin( s_text, s_colors, &colors, @size( colors ) );
-			config.writeHex( s_text, s_background_color, info.backColor);
-			config.writeHex( s_text, s_text_color, info.textColor);
-
+			or( 1, eax );
 		endif;
-			
+		
+		
 		ret();
 	end selectColor;
 
@@ -1291,6 +1274,7 @@ proc
 		//
 
 		w.AppendMenu( options_menu, w.MF_STRING, IDM_FONT, "&Font...");
+		w.AppendMenu( options_menu, w.MF_STRING, IDM_FORGROUND, "&Forground Color...");
 		w.AppendMenu( options_menu, w.MF_STRING, IDM_BACKGROUND, "&Background Color...");
 		w.AppendMenu( options_menu, w.MF_SEPARATOR, NULL, NULL);
 		w.AppendMenu( options_menu, w.MF_STRING, IDM_AUTO, "&Autosave	F2");
@@ -2665,9 +2649,22 @@ proc
 			selectFont();
 			w.SetFocus(hred);
 			
-		case(IDM_BACKGROUND )
+		case( IDM_FORGROUND )
+			
+			if( selectColor() )  then
+				move( return, info.textColor );
+				config.writeHex( s_text, s_text_color, info.textColor);
+				setFormat();
+			endif; 
+			w.SetFocus(hred);
+			
+		case( IDM_BACKGROUND )
 	
-			selectColor();
+			if( selectColor() ) then
+				move( return, info.backColor );
+				config.writeHex( s_text, s_background_color, info.backColor);
+				setFormat();
+			endif;
 			w.SetFocus(hred);
 			
 		case(IDM_AUTO ) 

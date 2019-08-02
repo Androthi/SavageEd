@@ -24,7 +24,7 @@ console=false
 output=SavageEd.exe
 type=modular
 main=SavageEd.md
-debug=false
+debug=true
 
 [SavageEd.link]
 -heap:0xF4240,0xF4240
@@ -57,6 +57,6 @@ aeslib.lib
 
 [Notes]
 <text>
-Notes still work?
+	explore using w.RegisterHotKey( hwnd, ID, modifier, vk )		where modifier = 		MOD_ALT		MOD_CONTROL		MOD_KEYUP		MOD_SHIFT		MOD_WIN		// how to send a keyboard message	// note, if modifier keys are pressed, this will take that	// into account.		w.PostMessage( hred, w.WM_KEYDOWN, w.VK_UP, 0);
 </text>
 

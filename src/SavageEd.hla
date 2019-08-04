@@ -14,19 +14,8 @@ program SavageEd;
 
 readonly
 
-	version			:string := "SavageEd v0.5.6";
+	version			:string := "SavageEd v0.5.7";
 
-proc
-	
-	// forward declarations
-	
-	updateStatus :procedure; @forward;
-	WndProc :procedure( lparam:dword; wparam:dword; umsg:uns32; hwin:dword ); @forward;
-	Msg_Command :procedure( hwin:dword; wparam:dword; lparam:dword ); @forward;
-	loadFile :procedure( filename:string ); @forward;
-	updateRecentLog :procedure; @forward;
-	getInfo :procedure; @forward;
-	
 	
 type
 	// Message and dispatch table related definitions:
@@ -91,6 +80,7 @@ type
 		IDM_INST,
 		IDM_SAVE,
 		IDM_SAVEAS,
+		IDM_SAVE_SELECTION_AS,
 		IDM_RECENT,  
 		IDM_PAGESETUP,
 		IDM_QUIT,
@@ -242,7 +232,7 @@ readonly
 	s_noopen		:string := "Unable to open file";
 	s_notemp		:string := "Unable to create temporary file";
 	s_savechanges	:string := "Save changes to ";
-	s_savetitle		:string := "Save As: End filename with a period (.) for no extension";
+	s_savetitle		:string := "Save As: Extension Is Not Assumed";
 	
 	curdir			:byte := '.';	// '.' = curdir
 
@@ -280,6 +270,7 @@ storage
 		
 	editstream	:w.EDITSTREAM;
 	chrg		:w.CHARRANGE;
+	find_range	:w.TEXTRANGE;
 	tr			:w.TEXTRANGE;
 	wc			:w.WNDCLASSEX;	// Our "window class" data.
 	msg			:w.MSG;			// Windows messages go here.
@@ -293,6 +284,7 @@ static
 	Align(4);
 	fr			:dword := 1;
 	info		:EditInfo;
+	sinfo		:EditInfo;
 	queryLine	:LineInfo;
 	want_pos	:uns32 := 0;	// want to keep cursor in this column
 	set_mark	:uns32 := 0;
@@ -316,7 +308,6 @@ readonly
 			MsgProcPtr_t:[ w.WM_SETFOCUS,	&Msg_SetFocus	],
 			MsgProcPtr_t:[ w.WM_DROPFILES,  &openDroppedFile],
 			MsgProcPtr_t:[ w.WM_NOTIFY,		&Msg_Notify],
-			MsgProcPtr_t:[ w.WM_KEYDOWN,	&KeyDownTest	],
 
 			// add more messages here
 			MsgProcPtr_t:[ 0, NULL ];	// This marks the end of the list.
@@ -329,7 +320,18 @@ readonly
 			// add more commands here
 			MsgProcPtr_t:[ 0,				NULL			];
 		
-
+proc
+	
+	// forward declarations
+	
+	updateStatus :procedure; @forward;
+	WndProc :procedure( lparam:dword; wparam:dword; umsg:uns32; hwin:dword ); @forward;
+	Msg_Command :procedure( hwin:dword; wparam:dword; lparam:dword ); @forward;
+	loadFile :procedure( filename:string ); @forward;
+	updateRecentLog :procedure; @forward;
+	getInfo :procedure ( var inf:EditInfo); @forward;
+	
+	
 proc
 
 	Error :procedure( error_msg:string );
@@ -463,7 +465,7 @@ proc
 
 	end StreamOutProc;
 
-	saveFile :procedure( filename:string );
+	saveFile :procedure( filename:string; save_selection:boolean );
 	begin saveFile;
 		
 		filesys.extractExt( filename, strbuf );		
@@ -477,7 +479,11 @@ proc
 			mov( eax,hfile );
 			mov( eax, editstream.dwCookie );
 			mov( &StreamOutProc, editstream.pfnCallback );
-			w.SendMessage( hred, w.EM_STREAMOUT, w.SF_TEXT, &editstream );
+			mov( w.SF_TEXT, eax );
+			if( save_selection ) then
+				or( w.SFF_SELECTION, eax );
+			endif;
+			w.SendMessage( hred, w.EM_STREAMOUT, eax, &editstream );
 			fileio.close( hfile );
 			w.SendMessage(hred, w.EM_SETMODIFY, false, 0);
 			mov( false,eax );
@@ -495,9 +501,8 @@ proc
 		done:
 	end saveFile;
 	
-	SaveAs :procedure {@noframe};
-	begin SaveAs;
-
+	getFileName	:procedure {@noframe};
+	begin getFileName;
 		w.RtlZeroMemory( &ofn, @size(ofn) );
 		mov( @size(ofn), ofn.lStructSize );
 		mov( hwnd, ofn.hWndOwner );
@@ -515,25 +520,17 @@ proc
 		
 		dbg.put("ofn");
 		w.GetSaveFileName( ofn );
+		ret();
+	end getFileName;
+
+	SaveAs :procedure {@noframe};
+	begin SaveAs;
+		
+		getFileName();
 		if(eax) then
 			
 			str.cpyz( &buffer, filepath );
-			str.rmvLastChar2( filepath, hide.strbuf );
-			if( al = '.') then
-				
-				str.cpy( hide.strbuf, filepath );
-				
-			else
-				
-				if( ! filesys.hasExtension( filepath ) ) then
-					
-					str.put2( filepath, s_txtext );
-					
-				endif;
-				
-			endif;
-			
-			saveFile( filepath );
+			saveFile( filepath, false );
 			if(eax) then
 			 	// reset FileName to untitled
 			 	str.cpy( s_untitled, filepath );
@@ -550,6 +547,19 @@ proc
 		endif;
 		ret();
 	end SaveAs;
+
+	SaveSelectionAs :procedure {@noframe};
+	begin SaveSelectionAs;
+		
+		getFileName();	
+		if(eax) then
+			
+			str.cpyz( &buffer, hide.strbuf );
+			saveFile( hide.strbuf, true );
+		endif;
+		ret();
+	end SaveSelectionAs;
+
 
 	checkSave :procedure { @noframe };
 	begin checkSave;
@@ -572,7 +582,7 @@ proc
 		endif;
 		
 		if( ! eax  ) then
-			saveFile( filepath );
+			saveFile( filepath, false );
 		endif;
 		setWindowTitle();
 		
@@ -673,16 +683,16 @@ proc
 	begin GetSelText;
 	
 		mov( lpBuff, eax );
-		mov( eax, tr.lpstrText );
+		mov( eax, find_range.lpstrText );
 		
-		w.SendMessage(hred, w.EM_EXGETSEL,0, &tr.chrg);
-		mov	(tr.chrg.cpMax,eax);
-		sub	(tr.chrg.cpMin,eax);
+		w.SendMessage(hred, w.EM_EXGETSEL,0, &find_range.chrg);
+		mov	(find_range.chrg.cpMax,eax);
+		sub	(find_range.chrg.cpMin,eax);
 		if( eax >= @elements( findbuf ) ) then
-			mov( @elements( findbuf) -1, tr.chrg.cpMax );
+			mov( @elements( findbuf) -1, find_range.chrg.cpMax );
 		endif;
 		
-		w.SendMessage(hred, w.EM_GETTEXTRANGE,0,&tr);
+		w.SendMessage(hred, w.EM_GETTEXTRANGE,0,&find_range);
 	
 	end GetSelText;
 		
@@ -773,10 +783,10 @@ proc
 	checkLog :procedure{ @noframe };
 	begin checkLog;
 		//dbg.put ("CheckLog");
-		mov( 0, tr.chrg.cpMin );
-		mov( 5, tr.chrg.cpMax );
-		mov( &buffer,tr.lpstrText );
-		w.SendMessage( hred, w.EM_GETTEXTRANGE, 0, &tr);
+		mov( 0, find_range.chrg.cpMin );
+		mov( 5, find_range.chrg.cpMax );
+		mov( &buffer,find_range.lpstrText );
+		w.SendMessage( hred, w.EM_GETTEXTRANGE, 0, &find_range);
 		mov(&buffer,esi);
 		lodsd();
 		if ( eax = $474f4c2e ) then	// .LOG
@@ -911,7 +921,7 @@ proc
 		
 		w.GetMenu( hwnd );
 		w.GetSubMenu( eax, 0 );
-		w.ModifyMenu( eax, 7, w.MF_BYPOSITION | w.MF_POPUP| w.MF_ENABLED,
+		w.ModifyMenu( eax, 8, w.MF_BYPOSITION | w.MF_POPUP| w.MF_ENABLED,
 					hsubmenu, s_recent );
 		w.DrawMenuBar( hwnd );
 		
@@ -1117,17 +1127,17 @@ proc
 		mov( 0, hmem );
 		je retFalse;
 		
-		move( ft.chrg.cpMin, tr.chrg.cpMin );
+		move( ft.chrg.cpMin, find_range.chrg.cpMin );
 		w.SendMessage( hred, w.WM_GETTEXTLENGTH, 0, 0 );
-		mov( eax, tr.chrg.cpMax );
+		mov( eax, find_range.chrg.cpMax );
 		sub( ft.chrg.cpMin, eax );
 		
 		add( 4, eax );
 		mem.zalloc( eax );
 		mov( eax, hmem );
-		mov( eax, tr.lpstrText );
+		mov( eax, find_range.lpstrText );
 		
-		w.SendMessage( hred, w.EM_GETTEXTRANGE, 0, &tr );
+		w.SendMessage( hred, w.EM_GETTEXTRANGE, 0, &find_range );
 		mov( hmem, esi );
 		str.cpyz( &findbuf, hide.strbuf );
 		scan.pfind( hide.strbuf, findOpts.matchcase );
@@ -1242,7 +1252,8 @@ proc
 		w.AppendMenu( file_menu, w.MF_STRING, IDM_INST, "New &Window	Shift+Ctrl+N");
 		w.AppendMenu( file_menu, w.MF_SEPARATOR, NULL, NULL);
 		w.AppendMenu( file_menu, w.MF_STRING, IDM_SAVE, "&Save	Ctrl+S");
-		w.AppendMenu( file_menu, w.MF_STRING, IDM_SAVEAS, "Save &As	Shift+Ctrl+S");
+		w.AppendMenu( file_menu, w.MF_STRING, IDM_SAVEAS, "Save &As...	Shift+Ctrl+S");
+		w.AppendMenu( file_menu, w.MF_STRING, IDM_SAVE_SELECTION_AS, "Save Se&lection As...");
 		w.AppendMenu( file_menu, w.MF_SEPARATOR, NULL, NULL);
 		w.AppendMenu( file_menu, w.MF_STRING, IDM_RECENT, "Recent Files");
 		w.AppendMenu( file_menu, w.MF_SEPARATOR, NULL, NULL);
@@ -1689,14 +1700,6 @@ proc
 		ret();
 	end initWindow;
 
-	KeyDownTest	:procedure( hwin:dword; wparam:dword; lparam:dword );
-	begin KeyDownTest;
-		
-		dbg.put(" key down from cmd");
-		
-	end KeyDownTest;
-
-
 	Cmd_File_Quit :procedure( hwin:dword; wparam:dword; lparam:dword );
 	begin Cmd_File_Quit;
 		
@@ -1712,7 +1715,7 @@ proc
 	
 	begin updateStatus;
 		
-		getInfo();		
+		getInfo(info);		
 		mov( info.line.number, eax );
 		inc( eax );
 		conv.u32ToStr( eax, 20, ' ', hide.strbuf );
@@ -2015,7 +2018,7 @@ proc
 	begin Msg_Destroy;
 	
 		dbg.put("destroy");
-		getInfo();
+		getInfo(info);
 		
 		w.GetWindowPlacement( hwin, wndpos );
 		w.GetWindowRect( hwin, rect );
@@ -2077,20 +2080,27 @@ proc
 	end getLineInfo;
 
 	
-	getInfo: procedure;
+	getInfo: procedure ( var inf:EditInfo );
 	
 		// collects informaiton about the edit state
 		// and stores it in the info structure
 	
 	begin getInfo;
-		
-		w.SendMessage( hred, w.EM_EXGETSEL, 0, &info.cursor);
-		w.SendMessage( hred, w.EM_EXLINEFROMCHAR, 0, info.cursor.cpMin );
-		mov( eax, info.line.number );
-		getLineInfo(info.line);
-		mov( info.cursor.cpMin, eax );
-		sub( info.line.index, eax );
-		mov( eax, info.charIndex );
+		//dbg.put(" ******************");
+
+		push( edi );
+		push( esi );
+		mov( inf, edi );
+		lea( esi, (type EditInfo[edi]).cursor );
+		w.SendMessage( hred, w.EM_EXGETSEL, 0, esi );
+		w.SendMessage( hred, w.EM_EXLINEFROMCHAR, 0, (type w.CHARRANGE[esi]).cpMin );
+		mov( eax, (type EditInfo[edi]).line.number );
+		getLineInfo((type EditInfo[edi]).line);
+		mov( (type EditInfo[edi]).cursor.cpMin, eax );
+		sub( (type EditInfo[edi]).line.index, eax );
+		mov( eax, (type EditInfo[edi]).charIndex );
+		pop( esi );
+		pop( edi );
 
 	end getInfo;
 
@@ -2152,7 +2162,7 @@ proc
 				// key down state, see if any control keys
 				// are pressed
 				
-				dbg.put(" key down from notify ");
+				//dbg.put(" key down from notify ");
 				
 				switch( ebx );
 						
@@ -2171,7 +2181,7 @@ proc
 					case( w.VK_D )
 						if( ctrl_down ) then
 							
-							getInfo();
+							getInfo(info);
 							inc( info.cursor.cpMin );
 							w.SendMessage( hred, w.EM_EXSETSEL, 0, &info.cursor );
 							w.SendMessage( hred, w.EM_REPLACESEL,true, s_empty );
@@ -2183,7 +2193,7 @@ proc
 							
 							// cut current line
 							
-							getInfo();
+							getInfo(info);
 							mov( info.line.index, eax );
 							mov( eax, info.cursor.cpMin );
 							add( info.line.length, eax );
@@ -2213,7 +2223,7 @@ proc
 								
 							// move cursor up
 							
-							getInfo();
+							getInfo(info);
 							if( want_pos = 0 ) then
 								mov( info.charIndex, eax );
 								mov( eax, want_pos );
@@ -2249,7 +2259,7 @@ proc
 							while ( w.PeekMessage( msg, hred, w.WM_KEYFIRST, w.WM_KEYLAST, w.PM_REMOVE)) do
 							endwhile;
 							
-							getInfo();
+							getInfo(info);
 							
 							// move to beginning of line
 							if( shift_down ) then
@@ -2260,7 +2270,7 @@ proc
 									
 									dec (eax );
 									w.SendMessage( hred, w.EM_SETSEL, eax, eax );
-									getInfo();
+									getInfo(info);
 								endif;
 								w.SendMessage( hred, w.EM_SETSEL, info.line.index, info.line.index );
 								jmp done;
@@ -2285,7 +2295,7 @@ proc
 
 							// move cursor down							
 							
-							getInfo();
+							getInfo(info);
 							if( want_pos = 0 ) then
 								mov( info.charIndex, eax );
 								mov( eax, want_pos );
@@ -2323,7 +2333,7 @@ proc
 								add( info.line.index, eax );
 								inc( eax ); // go over the carriage return
 								w.SendMessage( hred, w.EM_SETSEL, eax, eax );
-								getInfo();
+								getInfo(info);
 							endif;
 							mov( info.line.length, eax );
 							add( info.line.index, eax );
@@ -2339,7 +2349,7 @@ proc
 
 							// control shift L makes list
 							if( !shift_down ) then
-								getInfo();
+								getInfo(info);
 								mov( info.cursor.cpMin, eax );
 								inc( eax );
 								w.SendMessage( hred, w.EM_SETSEL, eax, eax );
@@ -2357,7 +2367,7 @@ proc
 							Msg_Command( hwnd, IDM_OPEN,0 );
 						endif;	
 					
-					case( w.VK_P )
+//					case( w.VK_P )
 					
 					case( w.VK_S )
 						if( ctrl_down && shift_down ) then
@@ -2403,7 +2413,66 @@ proc
 						if( ctrl_down ) then
 							w.PostMessage( hred, w.WM_KEYDOWN, w.VK_RIGHT, 0 );
 						endif;
+						
+					case( w.VK_TAB )
+					
+						if( shift_down ) then
+							dbg.put("tabb...");
+							
+							// consume the key_up command so it won't send to wm_char
+							while ( w.PeekMessage( msg, hred, w.WM_KEYFIRST, w.WM_KEYLAST, w.PM_REMOVE)) do
+							endwhile;
 
+							if( ctrl_down ) then
+								
+								// reduce indent
+								w.LockWindowUpdate(hred);
+								getInfo( sinfo );
+								
+								mov( &buffer, eax );
+								mov( eax, tr.lpstrText );
+								mov( sinfo.line.index, eax );
+								mov( eax, ecx );
+								inc( ecx );
+								w.SendMessage( hred, w.EM_SETSEL, eax, ecx );
+								w.SendMessage(hred, w.EM_EXGETSEL,0, &tr.chrg);
+								w.SendMessage(hred, w.EM_GETTEXTRANGE,0,&tr);
+								mov( buffer[0], al );
+								xor( ecx, ecx );
+								if( al = $09 ) then
+									str.cpy ("", strbuf );
+									w.SendMessage( hred, w.EM_REPLACESEL, true, strbuf );
+									mov( 1, ecx );
+								endif;
+								mov( sinfo.cursor.cpMin, eax );
+								if( eax != sinfo.line.index ) then
+									sub( ecx, eax );
+								endif;
+								w.SendMessage( hred, w.EM_SETSEL, eax, eax);
+								w.LockWindowUpdate(NULL);
+								or( 1, eax );
+								jmp done;
+							endif;
+
+							
+							// indent line
+							getInfo(sinfo);
+							w.LockWindowUpdate(hred);
+							mov( sinfo.line.index, eax );
+
+							w.SendMessage( hred, w.EM_SETSEL, eax, eax );
+							mov ($09, buffer[0]);
+							mov( 0, buffer[1] );
+							w.SendMessage( hred, w.EM_REPLACESEL,true, &buffer );
+							mov( sinfo.line.index, eax );
+							add( sinfo.charIndex, eax );
+							inc( eax );
+							w.SendMessage( hred, w.EM_SETSEL, eax, eax );
+							w.LockWindowUpdate( NULL );
+							or( 1, eax );
+							jmp done;
+						endif;
+					
 					case( w.VK_ESCAPE )
 
 						w.SendMessage(hwnd,w.WM_CLOSE,0,0 );
@@ -2423,7 +2492,7 @@ proc
 							
 							// toggle mark state
 							
-							getInfo();
+							getInfo(info);
 							
 							if( info.is_marked ) then
 								
@@ -2457,6 +2526,7 @@ proc
 							
 						endif;
 						
+						
 					case( w.VK_RETURN )
 						
 						if( config.readBool( s_settings, s_autoindent ) ) then
@@ -2478,8 +2548,9 @@ proc
 								endwhile;
 								
 								// if we are here, then ecx contains number of tabs
-								str.cpy("", strbuf );
+								
 								if( ecx ) then
+									str.cpy("", strbuf );
 									while( ecx ) do
 										str.cat( "	", strbuf);
 										dec( ecx );
@@ -2553,6 +2624,11 @@ proc
 		case( IDM_SAVEAS )
 		
 			SaveAs();
+			w.SetFocus(hred);
+			
+		case( IDM_SAVE_SELECTION_AS )
+		
+			SaveSelectionAs();
 			w.SetFocus(hred);
 			
 	   	case( IDM_CUT )

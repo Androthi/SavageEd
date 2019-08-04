@@ -42,6 +42,9 @@ will cover only items that may differ.
 		
 	- Ctrl-SPC	Toggles mark. Shows M on status bar when mark is set.
 				Press again to select marked text. Any other key cancels.
+				
+	- Shift-TAB	indent line from anywhere on the line
+	- Ctrl-Shift-TAB	outdent line from anywhere on the line
 
 ## File Menu > New Window
 	This menu option executes another instance of SavageEd.

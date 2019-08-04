@@ -1,5 +1,11 @@
 # Change Log
 
+## 8/04/2019
+	0.5.7	- added Save Selection As option
+			- removed .txt extension assumption. Save As now saves filenames
+			  exactly as typed.
+			- added shift-tab indent line, ctrl-shift-tab  outdent line.
+
 ## 7/31/2019
 	0.5.0	- removing printing capability.
 			  it was always more of a hack and there are better programs

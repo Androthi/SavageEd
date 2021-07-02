@@ -46,6 +46,3 @@ As it is now, it is feature complete.
 However, as I find myself using this alsmost as much as my main code editor,
 I'm considering continuing with the project even though I have to fight the awful
 Windows API every step of the way.
-
-The next major implementation that I'm planning is to add a mini-buffer to extend
-the command versatility and start to do away with relying on windows popup dialoges.

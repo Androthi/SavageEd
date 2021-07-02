@@ -2,12 +2,20 @@
 
 # Quick Start
 	All you need to run SavageEd is the file SavageEd.exe
+	
 	After the first run, the program will create a settings file in
 	the parent folder called "SavageEd.ini"
-	The About->Documents menu looks for this file "SavageEd.md" in the same directory
-	but will ignore it if one can't be found.
+	If you wish to use your "%USERPROFILE%\config" folder instead,
+	create a config folder (if one doesn't already exist) in your user profile
+	folder, and move the SavageEd.ini file there.
+	
+	eg: "c:\user\mako\config\SavageEd.ini"
+	
+	If there is a SavageEd.ini file in the SavageEd parent folder, SavageEd
+	will always prioritise using that config instead.
 
-
+	Reading anything beyond this point is optional.
+	
 SavageEd is designed to be a quick editing/note taking program.
 As such it:
 
@@ -25,26 +33,30 @@ will cover only items that may differ.
 	Apart from the standard menu shortcuts, SavageEd has some additional
 	hard coded shortcuts.
 	
-### Cursor Navigation
-	These are similar to VIM keys, but better.
-	
+### Cursor Navigation Shortcuts
+		
 	- Ctrl-i	Moves the cursor up 1 line
 	- Ctrl-k	Moves the cursor down 1 line
 	- Ctrl-j	Moves the cursor left 1 character
 	- Ctrl-l	Moves the cursor rigtht 1 character
 	- Ctrl-,	Move cursor left 1 word
 	- Ctrl-.	Move cursor right 1 word
-	- Ctrl-Shift-j	Move to beginning of line, or beginning of prev line if already there
-	- Ctrl-Shift-l	Move to end of line, or end of next line if already there
+	- Ctrl-[	Move to beginning of line, or beginning of prev line if already there
+	- Ctrl-]	Move to end of line, or end of next line if already there
+	
+	- Ctrl-Enter	Open line above cursor
+	- Shift-Enter	Open line below cursor
 
-	- Ctrl-d	Delete 1 char
-	- Ctrl-\	Kill line ( line is cut, goes into clipboard )
+	- Ctrl-d		Delete 1 char
+	- Ctrl-w		Delete 1 word under the cursor
+	- Ctrl-Shift-w	Copy word under the cursor (word includes everything except white space)
+	- Ctrl-\		Kill line ( line is cut, goes into clipboard )
 		
 	- Ctrl-SPC	Toggles mark. Shows M on status bar when mark is set.
-				Press again to select marked text. Any other key cancels.
-				
-	- Shift-TAB	indent line from anywhere on the line
-	- Ctrl-Shift-TAB	outdent line from anywhere on the line
+				Press again to select marked text.
+	
+	- Shift-TAB			increase indent from anywhere on the line
+	- Ctrl-Shift-TAB	decrease indent from anywhere on the line
 
 ## File Menu > New Window
 	This menu option executes another instance of SavageEd.
@@ -147,15 +159,24 @@ Save and SaveAs still function.
 	value, expect crazy results.
 	Default tab spacing is 4 characters.
 
-## Options > Auto Indent
-	Automatically indents the cursor to the previous line tab.
+## Options > Tabs As Spaces
+	Enters a number of white spaces indicated by the tab spacing number, default 4, when the tab key is pressed.
 
+## Options > Auto Indent
+	Automatically indents the cursor to the previous line whitespace. Not reccommended to mix spaces and tabs as there is no check for this edge case.
+	
 ## AES Encryption
 Options > *Encrypt...
 
 Options > Decrypt...
 
-SavageEd offers an AES [Advanced Encryption Standard] encryption for documents.
+SavageEd offers an AES [Advanced Encryption Standard] encryption for ASCII documents only.
+Warning: This will likely corrupt unicode files that have foreign language glyphs.
+	SavageEd will not alter the original file.
+Warning: Don't forget your password. Don't contact me if you forget your password.
+	I can't help you.
+	
+
 To encrypt, enter a password up to 32 characters long
 	For better security, enter a password that is 32 charactres long and varied with
 	letters, numbers and symbols.
@@ -222,13 +243,18 @@ https://sites.google.com/view/androth/home/high-level-assembly
 
 ## Requirements and further notes:
 
-	- This program may or may not be distributed with documents and source.  The only required file is "SavageEd.exe"
-	- Reading anything beyond this point is optional.
+	- This program may be distributed alone (SavageEd.exe) or 
+	  bundled with the source code. The only required file is "SavageEd.exe"
 	- Some options may require other files to be present, but will function without them.
 	- There is no installation.  SavageEd does not write to the evil registry.  SavageEd does not read from the evil registry.
+	  The only place SavageEd will look outside of it's own folder is in the
+	  %USERPROFILE%\config folder for an optional config file.
 	- At this time, SavageEd does not access the internet, so beware of spooky versions that try to access the internet, I didn't write them.
 	- SavageEd will create a "SavageEd.ini" file in the same directory.
 	  This file will store all the user selected settings and options.
+	  After this file is created, you may optionally move it tO
+	  %USERPROFILE%\config\SavageEd.ini if you prefer that SavageEd use that
+	  folder for configuration.
 
 ## Disclaimer:
 This software is open source freeware written in a high level assembly

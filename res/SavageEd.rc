@@ -1,3 +1,4 @@
+#define ID_SAVAGEED_MANUAL 4000
 #define ID_JAKAL 1000
 #define ID_FINDDLG 2000
 #define IDC_FINDTEXT 2001
@@ -15,6 +16,7 @@
 #define IDC_EDT_INPUT 3001
 
 ID_JAKAL ICON DISCARDABLE "jakal.ico"
+ID_SAVAGEED_MANUAL 4001 "SavageEd.md"
 
 ID_FINDDLG DIALOGEX 6,5,202,112
 CAPTION "Find/Replace ... press Esc to exit"

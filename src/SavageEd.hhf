@@ -1,0 +1,316 @@
+
+readonly
+
+	version			:string := "SavageEd v0.6.03";
+	
+type
+	// Message and dispatch table related definitions:
+		  
+	MsgProc_t:	procedure( hwin:dword; wParam:dword; lParam:dword );
+	
+	MsgProcPtr_t:
+		record
+			MessageValue	:dword;
+			MessageHndlr	:MsgProc_t;			
+		endrecord;
+
+	wnd_settings:
+		record
+			hwnd		:dword;	// window handle
+			hmenu		:dword; // menu handle
+			hstatus		:dword; // status bar handle
+			hsubmenu	:dword;	// sub menu handle
+			hcontextmenu:dword;	// context menu handle
+			xPos		:uns32;	// window x position
+			yPos		:uns32; // window y position
+			width		:uns32; // window width
+			height		:uns32; // window height
+		endrecord;
+	
+	LineInfo:
+		record
+			number	:uns32;
+			index	:uns32;
+			length	:uns32;
+		endrecord;
+	
+	EditInfo:
+		record
+			
+			hred	:dword;	// handle of edit control
+			hfont	:dword; // font used by the edit control
+			tabs	:uns32; // tabs in edit control size
+			
+			// text and background colors
+			textColor	:w.COLORREF;
+			backColor	:w.COLORREF;
+			
+			// selection
+			cursor		:w.CHARRANGE;
+			
+			// column of cursor
+			charIndex	:uns32;
+			
+			// line info of cursor, has number, index and length
+			line		:LineInfo;
+			
+			// if mark is set, this contains the index
+			markIndex	:uns32;
+			is_marked	:boolean;
+			ins_ovr		:boolean;
+		endrecord;
+		
+	findMode:
+		record
+			down		:boolean;
+			wholeword	:boolean;
+			matchcase	:boolean;
+			matchpattern:boolean;
+		endrecord;
+
+	menu_items :enum {
+		IDM_NEW,
+		IDM_OPEN,
+		IDM_INST,
+		IDM_SAVE,
+		IDM_SAVEAS,
+		IDM_SAVE_SELECTION_AS,
+		IDM_RECENT,  
+		IDM_PAGESETUP,
+		IDM_QUIT,
+		IDM_UNDO,
+		IDM_REDO,
+		IDM_CUT, 
+		IDM_COPY,
+		IDM_PASTE,    
+		IDM_SELECTALL, 
+		IDM_FIND,
+		IDM_FINDNEXT, 
+		IDM_FINDPREV,
+		IDM_REPLACE,
+		IDM_EDIT_GOTO,
+		IDM_TIME,
+		IDM_FONT,
+		IDM_BACKGROUND,
+		IDM_FORGROUND, 
+		IDM_AUTO,
+		IDM_WRAP,
+		IDM_PEG,       
+		IDM_READONLY,
+		IDM_SETTAB,
+		IDM_TAB_AS_SPACE,
+		IDM_AUTOINDENT,
+		IDM_RECENTNEW,
+		IDM_CLEAREXIT,
+		IDM_OPENRECENT,
+		IDM_REMEMBERPOS,
+		IDM_OPTIONS_ENCRYPTAES,
+		IDM_OPTIONS_DECRYPTAES,
+		IDM_VIEW_STATUS,
+		IDM_ABOUT,
+		IDM_DOCUMENTS
+	};
+
+	rect_t:
+	record
+		union
+			left	:uns32;
+			x		:uns32;
+		endunion;
+		union
+			top		:uns32;
+			y		:uns32;
+		endunion;
+		union
+			right	:uns32;
+			width	:uns32;
+		endunion;
+		union
+			bottom	:uns32;
+			height	:uns32;
+		endunion;
+	endrecord;
+
+const
+	ID_JAKAL				:= 1000;
+	ID_FINDDLG              := 2000;
+	IDC_FINDTEXT            := 2001;
+	IDC_REPLACETEXT         := 2002;
+	IDC_BTN_REPLACE         := 2007;
+	IDC_BTN_REPLACEALL      := 2008;
+	IDC_CHK_MATCHCASE       := 2003;
+	IDC_CHK_WHOLEWORD       := 2004;
+	IDC_RBN_UP              := 2006;
+	IDC_RBN_DOWN            := 2005;
+	IDC_CHK_PATTERN         := 2009;
+	ID_ABOUT                := 6000;
+	ID_ABOUTGRP             := 1001;
+	ID_INPUT                := 3000;
+	IDC_EDT_INPUT           := 3001;
+	ID_SAVAGEED_MANUAL		:= 4000;
+	RAW_DATA 				:= 4001;
+
+
+	RECENT_MENU_START	:= 9000;
+	RECENT_MENU_END		:= 9019;	// 10 items in recent menu
+	IDC_SBAR			:= 9020;
+	statusht_c			:= 21;		// height of status bar
+
+	STATUS_PARTS		:= 4;
+	POS_LINES			:=200;
+	POS_INS				:=POS_LINES+30;
+	POS_READONLY		:=POS_INS+18;
+	POS_MARK			:=POS_READONLY+18;
+	
+	DEFAULT_TAB_STOP	:= 4;
+
+	color_white :w.COLORREF := $00FF_FFFF;
+	color_black :w.COLORREF := $0000_0000;
+	
+	szLINEBUFFER	:= 3000;	
+	
+	VK_OEM_4		:= $DB; // [
+	VK_OEM_5		:= $DC; // \
+	VK_OEM_6		:= $DD; // ]
+
+readonly
+
+	// this is the main configuration file name
+	config_file		:string := "SavageEd.ini";
+	
+	// this is the section header in the file
+	// under which to save window settings
+	s_window 	:string := "Window";
+	ClassName	:string:="SavageEDClass";
+	AppName		:string:="SavageEd";
+	
+	RichEditDLL		:string :="riched20.dll";
+	
+	// strings and error messages
+	s_recent	:string := "Recent Files";
+	s_settings	:string := "Settings";
+	s_tabs		:string := "Tabs";
+	s_tabsasspace:string	:= "Tabs as Spaces";
+	s_font		:string := "Font";
+	s_find		:string := "Find";
+	s_text		:string := "Text";
+	s_background_color	:string := "Background Color";
+	s_text_color		:string := "Text Color";
+	s_custcolors:string := "Custom Colors";
+	s_openrecent:string := "Open Recent";
+	s_rememberpos :string := "Remember Position";
+	s_wrap		:string := "Word Wrap";
+	s_autosave	:string := "Auto Save";
+	s_autoindent:string := "Auto Indent";
+	s_topwindow	:string := "Top Window";
+	s_status	:string := "status";
+	s_clearexit	:string := "Clear On Exit";
+	s_recentnew	:string := "New Recent Window";
+	s_readonly	:string := "Read Only";
+	s_resedClass:string := "RichEdit20A";
+	s_untitled	:string := "Untitled";
+	s_txtext	:string := ".txt";
+	s_fontname	:string := "Courier New";
+	s_nl		:string := nl;
+	s_insert	:string := "INS";
+	s_overwrite	:string := "OVR";
+	s_r			:string := "R";
+	s_b			:string := " ";
+	s_mark		:string := "M";
+	s_empty		:string := "";
+	s_inputlinen:string := "Enter Line Number";
+	s_inputpwd	:string := "Enter a password upto 32 characters";
+	s_inputtab	:string := "Enter tab spacing in number of characters";
+	s_encext	:string := ".enc";
+	s_enc		:string := "enc";
+	
+	s_document		:string := "SavageEd.md";	
+	s_missingDLL	:string := "Could not open Riched20.dll";
+	s_missingDocs	:string := "Missing Documents: SavageEd.md";
+	s_nosave		:string := "Could Not Save File";
+	s_noopen		:string := "Unable to open file";
+	s_notemp		:string := "Unable to create temporary file";
+	s_savechanges	:string := "Save changes to ";
+	s_savetitle		:string := "Save As: Extension Is Not Assumed";
+	
+	curdir			:byte := '.';	// '.' = curdir
+
+storage
+	logfont			:w.LOGFONT;
+	hinst			:dword;
+	hredDLL			:dword;			// RichEd DLL handle
+	hFind			:dword;			// find dialog handle
+	hFindEdt		:dword;			// handle for find edit control
+	hAbout			:dword;			// About dialog handle
+	frflags			:dword;
+	hfile			:dword;			// file handle
+	buffer			:byte[szLINEBUFFER];
+	findbuf			:byte[300];
+	replacebuf		:byte[300];
+	ft				:w.FINDTEXTEX;
+	fres			:dword;
+	return			:string;	// returned from Proc_Input, caller must free string
+
+	ofn			:w.OPENFILENAME;
+	customColors:dword[16];
+		
+	editstream	:w.EDITSTREAM;
+	chrg		:w.CHARRANGE;
+	find_range	:w.TEXTRANGE;
+	msg			:w.MSG;			// Windows messages go here.
+	
+	config		:tConfig;
+	window		:wnd_settings;
+	align(4);
+
+static
+	Align(4);
+	fr			:dword := 1;
+	info		:EditInfo;
+	sinfo		:EditInfo;
+	queryLine	:LineInfo;
+	want_pos	:uns32 := 0;	// want to keep cursor in this column
+	findOpts	:findMode := findMode:[ true, false, false, false ];
+	filepath	:str.strvar( w.MAX_PATH );	// store full file path
+	statusParts	:int32[STATUS_PARTS]:=[POS_LINES, POS_INS, POS_READONLY, POS_MARK];
+	strbuf		:str.strvar( w.MAX_PATH );
+	strtabs		:str.strvar( w.MAX_PATH ); // user specified tabs converted to spaces
+
+readonly
+
+	// main window message table
+//bm=window_commands	
+	message_table	:MsgProcPtr_t; @nostorage;
+		MsgProcPtr_t	
+			MsgProcPtr_t:[ w.WM_COMMAND,	&Msg_Command	],
+			MsgProcPtr_t:[ w.WM_DESTROY,	&Msg_Destroy	],
+			MsgProcPtr_t:[ w.WM_CLOSE,		&Msg_Close		],
+			MsgProcPtr_t:[ w.WM_CREATE,		&Msg_Create		],
+			MsgProcPtr_t:[ w.WM_SIZE,		&Msg_Size		],
+			MsgProcPtr_t:[ w.WM_CONTEXTMENU,&Msg_Context	],
+			MsgProcPtr_t:[ w.WM_SETFOCUS,	&Msg_SetFocus	],
+			MsgProcPtr_t:[ w.WM_DROPFILES,  &openDroppedFile],
+			MsgProcPtr_t:[ w.WM_NOTIFY,		&Msg_Notify],
+
+			// add more messages here
+			MsgProcPtr_t:[ 0, NULL ];	// This marks the end of the list.
+
+	// WM_COMMAND message table, wparam items go here
+	command_table	:MsgProcPtr_t; @nostorage;
+		MsgProcPtr_t
+			MsgProcPtr_t:[ IDM_QUIT,	&Cmd_File_Quit	],
+			
+			// add more commands here
+			MsgProcPtr_t:[ 0,				NULL			];
+
+proc
+	// forward declarations
+	
+	updateStatus :procedure; @forward;
+	WndProc :procedure( lparam:dword; wparam:dword; umsg:uns32; hwin:dword ); @forward;
+	Msg_Command :procedure( hwin:dword; wparam:dword; lparam:dword ); @forward;
+	loadFile :procedure( filename:string ); @forward;
+	updateRecentLog :procedure; @forward;
+	getInfo :procedure ( var inf:EditInfo); @forward;
+	getConfigPath :procedure( s:string ); @forward;
+

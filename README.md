@@ -1,3 +1,4 @@
+![SavageEd](https://user-images.githubusercontent.com/46191274/124263707-966b5980-db01-11eb-985d-5ea1ef24feaa.png)
 # SavageEd
 A small text editor written in Randal Hyde's high level assembly for Windows
 

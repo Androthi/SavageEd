@@ -41,7 +41,7 @@ SavageEd.rc,res,resource
 README.md,,misc
 CHANGE_LOG.md,,misc
 SavageEd.md,,misc
-SavageEd.hhf,,include
+SavageEd.hhf,src,include
 
 [SavageEd.extlinked]
 kernel32.lib
@@ -58,6 +58,47 @@ aeslib.lib
 
 [Notes]
 <text>
-	CreateAcceleratorTableA(		* paccel,		int cAccel );			*paccel		a table of ACCEL structures	cAccel		the number of structures in the paccel table			typedef struct tabACCEL {		byte fVirt;		word key;		word cmd;	} ACCEL, *lpaccel;		fVirt		FALT		0x10	alt key pressed		FCONTROL	0x08	ctrl key pressed		FSHIFT		0x04	shift key pressed		FVIRTKEY	0X01	true = virtual key, false = character code			key		either a virtual key or character code			cmd		identifier	= lo order word of wParam in WM_COMMAND and WM_SYSCOMMAND			explore using w.RegisterHotKey( hwnd, ID, modifier, vk )		where modifier = 		MOD_ALT		MOD_CONTROL		MOD_KEYUP		MOD_SHIFT		MOD_WIN		// how to send a keyboard message	// note, if modifier keys are pressed, this will take that	// into account.		w.PostMessage( hred, w.WM_KEYDOWN, w.VK_UP, 0);
+	CreateAcceleratorTableA(
+		* paccel,
+		int cAccel );
+		
+	*paccel
+		a table of ACCEL structures
+	cAccel
+		the number of structures in the paccel table
+		
+	typedef struct tabACCEL {
+		byte fVirt;
+		word key;
+		word cmd;
+	} ACCEL, *lpaccel;
+	
+	fVirt
+		FALT		0x10	alt key pressed
+		FCONTROL	0x08	ctrl key pressed
+		FSHIFT		0x04	shift key pressed
+		FVIRTKEY	0X01	true = virtual key, false = character code
+		
+	key
+		either a virtual key or character code
+		
+	cmd
+		identifier	= lo order word of wParam in WM_COMMAND and WM_SYSCOMMAND
+	
+	
+	explore using w.RegisterHotKey( hwnd, ID, modifier, vk )
+	
+	where modifier = 
+		MOD_ALT
+		MOD_CONTROL
+		MOD_KEYUP
+		MOD_SHIFT
+		MOD_WIN
+	
+	// how to send a keyboard message
+	// note, if modifier keys are pressed, this will take that
+	// into account.	
+	w.PostMessage( hred, w.WM_KEYDOWN, w.VK_UP, 0);
+
 </text>
 

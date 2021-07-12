@@ -1995,8 +1995,8 @@ proc
 			Error("Couldn't Load Resource, file may be corrupted.", true);
 			
 			
-		endif; 
-		
+		endif;
+		ret();	
 
 	end command_display_manual;
 
@@ -3179,13 +3179,6 @@ proc
 	
 			endif;	
 	
-			/*
-			if( filesys.exists( s_document ) ) then
-				newInstance( s_document );
-			else
-				Error( s_missingDocs, true );
-			endif;
-*/
 		case( IDM_QUIT ) 
 		
 			 w.SendMessage(hwin,w.WM_CLOSE,0,0);

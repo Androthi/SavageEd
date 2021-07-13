@@ -1,7 +1,7 @@
 
 readonly
 
-	version			:string := "SavageEd v0.6.03";
+	version			:string := "SavageEd v0.6.05";
 	
 type
 	// Message and dispatch table related definitions:
@@ -21,12 +21,23 @@ type
 			hstatus		:dword; // status bar handle
 			hsubmenu	:dword;	// sub menu handle
 			hcontextmenu:dword;	// context menu handle
+			hfind		:dword;	// find dialog window handle
+			habout		:dword;	// about window handle
+			msg			:w.MSG;	// windows messaging
 			xPos		:uns32;	// window x position
 			yPos		:uns32; // window y position
 			width		:uns32; // window width
 			height		:uns32; // window height
 		endrecord;
-	
+
+	FindMode:
+		record
+			down		:boolean;
+			wholeword	:boolean;
+			matchcase	:boolean;
+			matchpattern:boolean;
+		endrecord;
+			
 	LineInfo:
 		record
 			number	:uns32;
@@ -58,15 +69,9 @@ type
 			markIndex	:uns32;
 			is_marked	:boolean;
 			ins_ovr		:boolean;
+			find_mode	:FindMode;
 		endrecord;
 		
-	findMode:
-		record
-			down		:boolean;
-			wholeword	:boolean;
-			matchcase	:boolean;
-			matchpattern:boolean;
-		endrecord;
 
 	menu_items :enum {
 		IDM_NEW,
@@ -239,11 +244,7 @@ storage
 	logfont			:w.LOGFONT;
 	hinst			:dword;
 	hredDLL			:dword;			// RichEd DLL handle
-	hFind			:dword;			// find dialog handle
-	hFindEdt		:dword;			// handle for find edit control
-	hAbout			:dword;			// About dialog handle
 	frflags			:dword;
-	hfile			:dword;			// file handle
 	buffer			:byte[szLINEBUFFER];
 	findbuf			:byte[300];
 	replacebuf		:byte[300];
@@ -251,13 +252,11 @@ storage
 	fres			:dword;
 	return			:string;	// returned from Proc_Input, caller must free string
 
-	ofn			:w.OPENFILENAME;
 	customColors:dword[16];
 		
 	editstream	:w.EDITSTREAM;
 	chrg		:w.CHARRANGE;
 	find_range	:w.TEXTRANGE;
-	msg			:w.MSG;			// Windows messages go here.
 	
 	config		:tConfig;
 	window		:wnd_settings;
@@ -265,12 +264,8 @@ storage
 
 static
 	Align(4);
-	fr			:dword := 1;
 	info		:EditInfo;
-	sinfo		:EditInfo;
-	queryLine	:LineInfo;
 	want_pos	:uns32 := 0;	// want to keep cursor in this column
-	findOpts	:findMode := findMode:[ true, false, false, false ];
 	filepath	:str.strvar( w.MAX_PATH );	// store full file path
 	statusParts	:int32[STATUS_PARTS]:=[POS_LINES, POS_INS, POS_READONLY, POS_MARK];
 	strbuf		:str.strvar( w.MAX_PATH );

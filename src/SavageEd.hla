@@ -102,6 +102,7 @@ proc
 		
 	end Msg_Size;
 		
+	
 	setWindowTitle :procedure {@noframe};
 	
 		// set the window title
@@ -822,11 +823,11 @@ proc
 		updateStatus();
 	end fileOpen;
 
-	openDroppedFile :procedure( hwnd:dword; wParam:dword; lParam:dword );
+	Msg_OpenDroppedFile :procedure( hwnd:dword; wParam:dword; lParam:dword );
 
 		// handles opening dropped files
 
-	begin openDroppedFile;
+	begin Msg_OpenDroppedFile;
 		pushabi;
 		
 		w.SetForegroundWindow(window.hwnd);
@@ -844,7 +845,7 @@ proc
 		popabi;
 		xor( eax, eax );
 		
-	end openDroppedFile;	
+	end Msg_OpenDroppedFile;	
 		
 	findNormal :procedure( opts:dword );
 	
@@ -1097,6 +1098,59 @@ proc
 
 	end AddMenus;
 
+	Proc_Edit	:procedure( lParam:dword; wParam:dword; uMsg:uns32; hWin:dword );
+	
+		// this is the subclassed window procedure of the edit control
+		// here we will intercept key messages and pass down only
+		// the ones we want the edit control to receive.
+		var
+			key_buffer	:dword[32];			
+		
+		
+	begin Proc_Edit;
+		
+		//dbg.put("subclassed edit message");
+		mov( uMsg, eax );
+		switch( eax );
+			
+			case( w.WM_SYSKEYDOWN )
+				dbg.put("syskey down =>", wParam );
+				
+			case( w.WM_SYSCHAR );
+				dbg.put("syschar =>", wParam );
+			
+			case( w.WM_SYSKEYUP );
+				dbg.put("syskey up =>", wParam );
+			
+			case( w.WM_KEYDOWN );
+				dbg.put("key down =>", wParam );
+			
+			case( w.WM_KEYUP );
+				dbg.put("key up =>", wParam );
+			
+			case( w.WM_CHAR );
+				dbg.put("char =>", wParam );
+			
+			default
+				
+		endswitch;
+		
+		
+		// test for alt key pressed
+		// we might also be interested in
+		// w.VK_LMENU, w.VK_RMENU
+//		w.GetKeyState(w.VK_MENU);
+//		and( $8000, eax );
+//		if( eax ) then
+//			dbg.put("alt down");
+//		endif;
+		
+		
+		// pass control to the default edit window proc
+		w.CallWindowProc(info.old_proc, hWin, uMsg, wParam, lParam );
+	end Proc_Edit;
+
+
 	Proc_Input :procedure( lParam:dword; wParam:dword; uMsg:uns32; hWin:dword );
 	
 		// opens a text box to get text input
@@ -1331,8 +1385,6 @@ proc
 			endif;
 			
 		elseif (eax = w.WM_ACTIVATE) then
-			//w.GetDlgItem( hWin, IDC_FINDTEXT );
-			//w.SetFocus(eax);
 			w.SetFocus( window.hfind );
 	
 		elseif (eax = w.WM_CLOSE) then
@@ -1648,9 +1700,13 @@ proc
 					edit_style, 0, 0, 0, 0, window.hwnd, window.hcontextmenu, hinst, NULL );
 		
 		mov( eax, info.hred );
+		
+		// subclass the edit control
+		w.SetWindowLong(info.hred, w.GWL_WNDPROC, &Proc_Edit);
+		mov( eax, info.old_proc);
+		
 		w.SendMessage( info.hred, w.EM_SETEVENTMASK, 0, w.ENM_SELCHANGE | w.ENM_KEYEVENTS
 						| w.ENM_MOUSEEVENTS );
-		//dbg.put("info.hred = ", info.hred );
 		
 		setFormat();
 		w.SetFocus( info.hred );
@@ -2430,7 +2486,6 @@ proc
 	
 	begin Msg_Notify;
 		
-		//pushabi;
 		//dbg.separator;
 		
 		mov( lparam, edx );
@@ -2512,7 +2567,7 @@ proc
 
 						endif;
 						
-					case( VK_OEM_5 )  // backslash / pipe key
+					case( w.VK_BSLASH )  // backslash / pipe key
 						if( ctrl_down ) then
 							
 							command_cut_line();
@@ -2580,7 +2635,7 @@ proc
 							endif;
 						endif;
 					
-					case( VK_OEM_4 ) // left bracket
+					case( w.VK_LBRACKET )
 					
 						if( ctrl_down ) then
 							
@@ -2588,7 +2643,7 @@ proc
 							jmp done;
 						endif;
 						
-					case( VK_OEM_6 ) // right bracket
+					case( w.VK_RBRACKET )
 					
 						
 						if( ctrl_down ) then

@@ -1,7 +1,7 @@
 
 readonly
 
-	version			:string := "SavageEd v0.6.05";
+	version			:string := "SavageEd v0.7.00";
 	
 type
 	// Message and dispatch table related definitions:
@@ -47,7 +47,7 @@ type
 	
 	EditInfo:
 		record
-			
+			old_proc:dword; // original window proc of edit control
 			hred	:dword;	// handle of edit control
 			hfont	:dword; // font used by the edit control
 			tabs	:uns32; // tabs in edit control size
@@ -174,10 +174,6 @@ const
 	
 	szLINEBUFFER	:= 3000;	
 	
-	VK_OEM_4		:= $DB; // [
-	VK_OEM_5		:= $DC; // \
-	VK_OEM_6		:= $DD; // ]
-
 readonly
 
 	// this is the main configuration file name
@@ -277,15 +273,15 @@ readonly
 //bm=window_commands	
 	message_table	:MsgProcPtr_t; @nostorage;
 		MsgProcPtr_t	
-			MsgProcPtr_t:[ w.WM_COMMAND,	&Msg_Command	],
-			MsgProcPtr_t:[ w.WM_DESTROY,	&Msg_Destroy	],
-			MsgProcPtr_t:[ w.WM_CLOSE,		&Msg_Close		],
-			MsgProcPtr_t:[ w.WM_CREATE,		&Msg_Create		],
-			MsgProcPtr_t:[ w.WM_SIZE,		&Msg_Size		],
-			MsgProcPtr_t:[ w.WM_CONTEXTMENU,&Msg_Context	],
-			MsgProcPtr_t:[ w.WM_SETFOCUS,	&Msg_SetFocus	],
-			MsgProcPtr_t:[ w.WM_DROPFILES,  &openDroppedFile],
-			MsgProcPtr_t:[ w.WM_NOTIFY,		&Msg_Notify],
+			MsgProcPtr_t:[ w.WM_COMMAND,	&Msg_Command			],
+			MsgProcPtr_t:[ w.WM_DESTROY,	&Msg_Destroy			],
+			MsgProcPtr_t:[ w.WM_CLOSE,		&Msg_Close				],
+			MsgProcPtr_t:[ w.WM_CREATE,		&Msg_Create				],
+			MsgProcPtr_t:[ w.WM_SIZE,		&Msg_Size				],
+			MsgProcPtr_t:[ w.WM_CONTEXTMENU,&Msg_Context			],
+			MsgProcPtr_t:[ w.WM_SETFOCUS,	&Msg_SetFocus			],
+			MsgProcPtr_t:[ w.WM_DROPFILES,  &Msg_OpenDroppedFile	],
+			MsgProcPtr_t:[ w.WM_NOTIFY,		&Msg_Notify				],
 
 			// add more messages here
 			MsgProcPtr_t:[ 0, NULL ];	// This marks the end of the list.
@@ -308,4 +304,3 @@ proc
 	updateRecentLog :procedure; @forward;
 	getInfo :procedure ( var inf:EditInfo); @forward;
 	getConfigPath :procedure( s:string ); @forward;
-

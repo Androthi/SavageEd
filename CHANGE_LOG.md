@@ -1,5 +1,8 @@
 # Change Log
 
+## 07/18/2021
+	0.7.xx	- internall changes
+
 ## 07/02/2021
 	0.6.03	- Changed behavior in where SavageEd looks for SavageEd.ini file.
 			  It will look in current folder first, if found, SavageEd will use

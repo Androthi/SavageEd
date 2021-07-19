@@ -1,16 +1,28 @@
+///		Goals for v.0.7.xx
+///	[X]	Subclass the richedit control
+///	[X]	Move keyboard processing control to the subclassed proc
+///	[ ]	Isolate the edit structure to prepare for multi-buffers
+///
+///		these are 'maybe' features
+/// [ ]	Allow user to customize keys
+/// [ ] remove the options from menu and allow user to edit
+///		SavageEd.ini directly in the editor.
+///		this might require rethinking some of the .ini setup
+
 program SavageEd;
 
 	#includeonce("w.hhf")
 	#includeonce("hide\hidelib.hhf")
+	#includeonce("macros\extensions.hhf")
 	#includeonce("stdlib.hhf")
 	#includeonce("hide\dbgwin.hhf")
 	#includeonce("w32\shell32.hhf" )
-	#includeonce("hide\aeslib.hhf" )
 	
 	#include("SavageEd.hhf")
 
 	?@nodisplay :=true;
 	?@nostackalign := true;
+
 	
 proc
 
@@ -39,7 +51,6 @@ proc
 		endif;
 	
 	end Error;
-
 
 	getTempName :procedure( prefix:string; ext:string; dest:string );
 	
@@ -153,10 +164,6 @@ proc
 	begin saveFile;
 		
 		filesys.extractExt( filename, strbuf );
-		if( str.ieq( strbuf, s_enc ) ) then
-			Error( "can't save encrypted files", true );
-			jmp done;
-		endif;
 		
 		try
 			fileio.openNew( filename );
@@ -761,17 +768,6 @@ proc
 
 			dbg.put("filename = ", filename );
 			filesys.extractExt( filename, strbuf );
-			if( str.ieq( strbuf, s_enc ) ) then
-				dbg.put("is encrypted" );
-				w.EnableMenuItem( window.hmenu, IDM_OPTIONS_DECRYPTAES, w.MF_BYCOMMAND | w.MF_ENABLED );
-				w.EnableMenuItem( window.hmenu, IDM_OPTIONS_ENCRYPTAES, w.MF_BYCOMMAND | w.MF_GRAYED );
-			else
-				dbg.put("not encrypted");
-				w.EnableMenuItem( window.hmenu, IDM_OPTIONS_DECRYPTAES, w.MF_BYCOMMAND | w.MF_GRAYED );
-				w.EnableMenuItem( window.hmenu, IDM_OPTIONS_ENCRYPTAES, w.MF_BYCOMMAND | w.MF_ENABLED );
-			endif;
-
-			
 			checkLog();
 			updateRecentLog();
 			setFormat();
@@ -1073,8 +1069,6 @@ proc
 			w.AppendMenu( s_recent_menu, w.MF_STRING, IDM_OPENRECENT, "Open Most Recent");
 			w.AppendMenu( s_recent_menu, w.MF_STRING, IDM_REMEMBERPOS, "Remember Position");
 		w.AppendMenu( options_menu, w.MF_SEPARATOR, NULL, NULL);
-		w.AppendMenu( options_menu, w.MF_STRING, IDM_OPTIONS_ENCRYPTAES, "AES &Encrypt");
-		w.AppendMenu( options_menu, w.MF_STRING | w.MF_DISABLED, IDM_OPTIONS_DECRYPTAES, "AES &Decrypt");
 		w.AppendMenu( window.hmenu, w.MF_POPUP, options_menu, "&Options");
 
 		//
@@ -1103,34 +1097,357 @@ proc
 		// this is the subclassed window procedure of the edit control
 		// here we will intercept key messages and pass down only
 		// the ones we want the edit control to receive.
-		var
-			key_buffer	:dword[32];			
+		static
+			ctrl_down	:boolean;
+			shift_down	:boolean;
+			alt_down	:boolean;
+			
 		
 		
 	begin Proc_Edit;
 		
-		//dbg.put("subclassed edit message");
+		NOTE(Sevag:
+			if we open any dialog while processing a key stroke
+			set ctrl_down to false since the key_up
+			message will be lost in the dialog's window proc)
+			
 		mov( uMsg, eax );
-		switch( eax );
+		switch( eax )
 			
 			case( w.WM_SYSKEYDOWN )
 				dbg.put("syskey down =>", wParam );
+				mov( true, alt_down );
 				
-			case( w.WM_SYSCHAR );
+			case( w.WM_SYSCHAR )
 				dbg.put("syschar =>", wParam );
 			
-			case( w.WM_SYSKEYUP );
+			case( w.WM_SYSKEYUP )
 				dbg.put("syskey up =>", wParam );
+				mov( false, alt_down );
 			
-			case( w.WM_KEYDOWN );
+			case( w.WM_KEYDOWN )
 				dbg.put("key down =>", wParam );
+				mov( wParam, eax );
+				switch( eax )
+				
+					case( w.VK_SHIFT )
+						mov( true, shift_down );
+
+					case( w.VK_CONTROL )
+						mov( true, ctrl_down );
+						// we don't want the control key
+						// going to rich edit
+						jmp skip_proc;
+	
+					case( w.VK_W )
+						
+						// delete word under cursor
+						if( ctrl_down ) then
+							
+							if( shift_down ) then
+								command_copy_word();
+							else
+								command_delete_word();
+							endif;
+						endif;
+
+					case( w.VK_D )
+
+						if( ctrl_down ) then
+							
+							getInfo(info);
+							inc( info.cursor.cpMin );
+							w.SendMessage( info.hred, w.EM_EXSETSEL, 0, &info.cursor );
+							w.SendMessage( info.hred, w.EM_REPLACESEL,true, s_empty );
+						
+						endif;
+						
+					case( w.VK_BSLASH )
+
+						if( ctrl_down ) then
+							
+							command_cut_line();
+							
+						endif;
+						
+					case( w.VK_F )
 			
-			case( w.WM_KEYUP );
+						if( ctrl_down ) then
+							Msg_Command( window.hwnd, IDM_FIND,0 );
+							mov( false, ctrl_down );
+						endif;
+
+					case( w.VK_G )
+
+						if( ctrl_down ) then
+							Msg_Command( window.hwnd, IDM_EDIT_GOTO,0 );
+							mov( false, ctrl_down );
+						endif;
+
+					case( w.VK_I )
+						
+						if( ctrl_down ) then
+							command_cursor_up();
+						endif;
+
+					case( w.VK_J )
+					
+						if( ctrl_down ) then
+							command_cursor_left();
+							mov( 0, info.wantCharIndex );
+						endif;
+
+					case( w.VK_K )
+						
+						if( ctrl_down) then
+							command_cursor_down();
+						endif;
+
+					case( w.VK_L )
+						
+						if( ctrl_down ) then
+							command_cursor_right();
+							mov( 0, info.wantCharIndex );
+						endif;
+
+					case( w.VK_LBRACKET )
+					
+						if( ctrl_down ) then
+							command_move_to_bol();
+						endif;
+
+					case( w.VK_RBRACKET )
+						if( ctrl_down ) then
+							command_move_to_eol();
+						endif;
+
+					case( w.VK_N )
+						if( ctrl_down ) then
+							Msg_Command( window.hwnd, IDM_NEW, 0 );
+							mov( false, ctrl_down );  
+						endif;
+
+					case( w.VK_O )
+						if( ctrl_down ) then
+							Msg_Command( window.hwnd, IDM_OPEN,0 );
+							mov( false, ctrl_down );
+						endif;	
+
+					case( w.VK_S )
+						if( ctrl_down && shift_down ) then
+							Msg_Command( window.hwnd, IDM_SAVEAS,0 );
+						elseif( ctrl_down ) then
+							Msg_Command( window.hwnd, IDM_SAVE,0 );
+						endif;
+						mov( false, ctrl_down );
+
+					case( w.VK_T )
+						if( ctrl_down ) then
+							Msg_Command( window.hwnd, IDM_PEG,0 );
+						endif;
+
+					case( w.VK_F2 )
+						Msg_Command( window.hwnd, IDM_AUTO,0 );
+						mov( false, ctrl_down );
+
+					case( w.VK_F3 )
+						if( ctrl_down ) then
+							Msg_Command( window.hwnd, IDM_FINDPREV,0 );
+						else
+							Msg_Command( window.hwnd, IDM_FINDNEXT,0 );
+						endif;
+						
+					case( w.VK_F4 )
+						Msg_Command( window.hwnd, IDM_WRAP,0 );
+
+					case( w.VK_F5 )
+						Msg_Command( window.hwnd, IDM_TIME,0 );
+						
+					case( w.VK_F6 )
+						Msg_Command( window.hwnd, IDM_READONLY,0 );
+
+					case( w.VK_COMMA )
+						if( ctrl_down ) then
+							// same as ctrl-left
+							// put VK_LEFT in wParam and let
+							// hred window proc handle it.
+							mov( w.VK_LEFT, wParam );
+						endif;
+						
+					case( w.VK_PERIOD )
+					
+							
+						if( ctrl_down ) then
+							// same as ctrl-right
+							// put VK_RIGHT in wParam and let
+							// hred window proc handle it.
+							mov(w.VK_RIGHT, wParam );
+						endif;
+
+					case( w.VK_TAB )
+						
+						if( shift_down ) then
+							if( ctrl_down ) then
+								
+								command_reduce_indent();							
+								jmp skip_proc;
+							else
+								command_increase_indent();
+								jmp skip_proc;
+							endif;
+						
+						elseif( config.readBool( s_settings, s_tabsasspace )) then
+						
+							w.SendMessage( info.hred, w.EM_REPLACESEL,true, strtabs );
+							jmp skip_proc;
+							
+						else
+							// it's a normal tab, let hred handle it
+							mov( w.WM_CHAR, uMsg );
+							mov( w.VK_TAB, wParam );
+						endif;
+
+					case( w.VK_RETURN )
+						
+						NOTE(Sevag:
+							This isn't working properly if there
+							is word wrap going on
+						)
+						
+						// intercept the enter key
+						// if shift-enter, then create empty line below and move cursor there
+						// if ctrl-enter then create empty line above and move cursor there
+						// we want to maintain auto indent features if possible. will
+						// probably not work if new line is being created above the 1st line.
+					
+						if( ctrl_down ) then
+							
+							// check to see if we are on line 1
+							if( info.line.number = 0 ) then
+								
+								// doesn't work as intended, but we need
+								// to get too hacky, so just go with this.
+								command_move_to_bol();
+								
+							else
+							
+								// open line above
+								command_cursor_up();
+								jmp do_shift;
+							
+							endif;
+						
+						elseif( shift_down ) then
+							
+							do_shift:
+							//open line below
+							// if we are not at eol, then move to eol
+							mov( info.charIndex, eax );
+							if( info.line.length != eax ) then
+								command_move_to_eol();
+							endif;
+						
+						endif;
+						
+						
+					case( w.VK_ESCAPE )
+
+						w.SendMessage( window.hwnd, w.WM_CLOSE, 0, 0 );
+
+					default
+						dbg.put("reached default");
+						mov( 0, info.wantCharIndex );
+
+				endswitch;
+			
+			case( w.WM_KEYUP )
 				dbg.put("key up =>", wParam );
+				mov( wParam, eax );
+				switch( eax )
+					case( w.VK_SHIFT )
+						mov( false, shift_down );
+						
+					case( w.VK_CONTROL )
+						mov( false, ctrl_down );
+						jmp skip_proc;
+
+					case( w.VK_RETURN )
+						// a return was just processed in the edit control
+						// do auto indent stuff
+						if( config.readBool( s_settings, s_autoindent ) ) then
+
+							w.SendMessage( info.hred, w.EM_LINEFROMCHAR, -1, 0);
+							dec( eax );
+							mov( szLINEBUFFER-1, (type word buffer[0]));
+							w.SendMessage( info.hred, w.EM_GETLINE, eax, &buffer );
+							if( eax ) then
+								xor( ecx, ecx );
+								while( eax ) do
+									mov( buffer[ecx], dl );
+									
+									// counts the number of white spaces, either tabs or spaces
+									if( dl == $09 || dl == ' ' ) then
+										inc( ecx );
+									else
+										break;
+									endif;
+									dec( eax );
+								endwhile;
+								
+								// if we are here, then ecx contains number of white space
+								
+								if( ecx ) then
+									str.cpy("", strbuf );
+									if( config.readBool( s_settings, s_tabsasspace ) ) then
+										while( ecx ) do
+											str.cat( " ", strbuf);
+											dec( ecx );
+										endwhile;
+									else
+										while( ecx ) do
+											str.cat( "	", strbuf);
+											dec( ecx );
+										endwhile;
+									endif;
+									w.SendMessage( info.hred, w.EM_GETSEL, &chrg.cpMin, &chrg.cpMax);
+									w.SendMessage( info.hred, w.EM_REPLACESEL,true, strbuf );
+									w.SendMessage( info.hred, w.EM_SCROLLCARET,0,0);
+								endif;
+							endif;
+						endif;
+
+				default
+				endswitch;
 			
-			case( w.WM_CHAR );
+			case( w.WM_CHAR )
 				dbg.put("char =>", wParam );
-			
+				
+				mov( wParam, eax );
+				switch( eax )
+					
+					// we'll want to skip some WM_CHAR messages
+					// since they might do nasty things to the file
+					case( w.VK_TAB )
+						jmp skip_proc;
+					case( $0A )
+						jmp skip_proc;
+					case( $0B )
+						jmp skip_proc;
+					case( w.VK_CLEAR )
+						jmp skip_proc;
+						
+					case( w.VK_SPACE )
+						
+						if( ctrl_down ) then
+							command_toggle_mark();
+							jmp skip_proc;
+						endif;
+
+					default
+						mov( 0, info.wantCharIndex );
+
+				endswitch;
+					
 			default
 				
 		endswitch;
@@ -1145,9 +1462,12 @@ proc
 //			dbg.put("alt down");
 //		endif;
 		
-		
 		// pass control to the default edit window proc
 		w.CallWindowProc(info.old_proc, hWin, uMsg, wParam, lParam );
+		
+		skip_proc:
+			// jump here to prevent richedit processing the key press
+		
 	end Proc_Edit;
 
 
@@ -1473,6 +1793,8 @@ proc
 			mov( false, info.find_mode.matchcase );
 			mov( false, info.find_mode.matchpattern );
 			
+			mov( 0, info.wantCharIndex );
+			
 			// config file exists, read it and
 			// apply settings as per file.
 			config.create_file( hide.strbuf );
@@ -1625,16 +1947,16 @@ proc
 		inc( eax );
 		conv.u32ToStr( eax, 20, ' ', hide.strbuf );
 		str.trim( hide.strbuf );
-		str.put( strbuf, "Ln: ", hide.strbuf, "   " );
+		str.put( strbuf, "Line: ", hide.strbuf, "   " );
 		conv.u32ToStr( info.charIndex, 20,' ', hide.strbuf );
 		str.trim( hide.strbuf );
-		str.put2( strbuf, "Col: ", hide.strbuf, "   " );
+		str.put2( strbuf, "Column: ", hide.strbuf, "   " );
 		
 		
-		w.SendMessage( info.hred, w.EM_GETLINECOUNT, 0, 0 );
-		conv.u32ToStr( eax, 20,' ', hide.strbuf );
-		str.trim( hide.strbuf );
-		str.put2( strbuf, "Lns: ", hide.strbuf, "    Pos: ", (type uns32 info.cursor.cpMin ));
+		//conv.u32ToStr( eax, 20,' ', hide.strbuf );
+		//str.trim( hide.strbuf );
+		mov( info.lines, eax );
+		str.put2( strbuf, "    Pos: ", (type uns32 info.cursor.cpMin ), " | Lines: ", (type uns32 eax));
 		
 		w.SendMessage( window.hstatus, w.SB_SETTEXT, 0, strbuf ); 
 		
@@ -1780,9 +2102,6 @@ proc
 			
 		endif;
 		
-		w.EnableMenuItem( window.hmenu, IDM_OPTIONS_DECRYPTAES, w.MF_BYCOMMAND | w.MF_GRAYED );
-
-
 		// check for a filename passed as an argument and try to open that file.
 		// if file doesn't exist, start new document with that filename.
 		
@@ -1890,24 +2209,6 @@ proc
 		
 	end Msg_Context;
 	
-	getPassword :procedure( dest:string ) {@returns("EAX") };
-	
-		// for encryption, opens text input dialog
-	
-	begin getPassword;
-		
-		w.DialogBoxParam( hinst, val ID_INPUT, window.hwnd, &Proc_Input, s_inputpwd );
-		if( return > 0 ) then
-			str.cpy( return, dest );
-			str.free( return );
-			or( 1, eax );
-			
-		else
-			xor( eax, eax );
-		endif;
-		
-	end getPassword;
-
 	setTabWidth :procedure { @noframe, @returns("EAX") };
 	
 		// opens dialog to set tab width
@@ -2036,6 +2337,9 @@ proc
 		mov( (type EditInfo[edi]).cursor.cpMin, eax );
 		sub( (type EditInfo[edi]).line.index, eax );
 		mov( eax, (type EditInfo[edi]).charIndex );
+		w.SendMessage( info.hred, w.EM_GETLINECOUNT, 0, 0 );
+		mov( eax, (type EditInfo[edi]).lines );
+
 		pop( esi );
 		pop( edi );
 
@@ -2211,9 +2515,9 @@ proc
 	begin command_cursor_up;
 		// move cursor up
 		getInfo(info);
-		if( want_pos = 0 ) then
+		if( info.wantCharIndex = 0 ) then
 			mov( info.charIndex, eax );
-			mov( eax, want_pos );
+			mov( eax, info.wantCharIndex );
 		endif;
 
 		// if we are at line 0, no point in doing anything);
@@ -2222,7 +2526,7 @@ proc
 			dec( eax );
 			mov( eax, queryLine.number );
 			getLineInfo( queryLine ); // info of prev. line
-			mov( want_pos, eax );
+			mov( info.wantCharIndex, eax );
 			if( queryLine.length >= eax ) then
 
 				add( queryLine.index, eax );
@@ -2244,34 +2548,36 @@ proc
 	begin command_cursor_down;
 		// move cursor down							
 		getInfo(info);
-		if( want_pos = 0 ) then
+		if( info.wantCharIndex = 0 ) then
 			mov( info.charIndex, eax );
-			mov( eax, want_pos );
+			mov( eax, info.wantCharIndex );
 		endif;
-		
+	
 		mov( info.line.number, eax );
 		inc( eax );
-		mov( eax, queryLine.number );
-		getLineInfo( queryLine );
-		
-		//mov( info.charIndex, eax );
-		mov( want_pos, eax );
-		if( queryLine.length >= eax ) then
+		if( eax < info.lines ) then
+			mov( eax, queryLine.number );
+			getLineInfo( queryLine );
 			
-			add( queryLine.index, eax );
-			
-		else
-			mov( queryLine.length, eax );
-			add( queryLine.index, eax );
+			mov( info.wantCharIndex, eax );
+			if( queryLine.length >= eax ) then
+				
+				add( queryLine.index, eax );
+				
+			else
+				mov( queryLine.length, eax );
+				add( queryLine.index, eax );
+			endif;
+			w.SendMessage( info.hred, w.EM_SETSEL, eax, eax );
+			w.SendMessage( info.hred, w.EM_SCROLLCARET, 0, 0);
 		endif;
-		w.SendMessage( info.hred, w.EM_SETSEL, eax, eax );
-		w.SendMessage( info.hred, w.EM_SCROLLCARET, 0, 0);
 	end command_cursor_down;
 
 
 	command_cursor_left	:procedure {@noframe};
 	begin command_cursor_left;
-		// move cursor left 1 character
+		
+		dbg.put("cursor_left")
 		getInfo(info);
 		mov( info.cursor.cpMin, eax );
 		if( eax ) then
@@ -2285,6 +2591,8 @@ proc
 	
 	command_cursor_right	:procedure {@noframe};
 	begin command_cursor_right;
+		
+		dbg.put("cursor_right");
 		getInfo(info);
 		mov( info.cursor.cpMin, eax );
 		inc( eax );
@@ -2471,22 +2779,7 @@ proc
 
 
 	Msg_Notify :procedure( hwin:dword; wparam:dword; lparam:dword );
-		
-		// any changes to the edit control are notified here
-		
-		static
-		ctrl_down	:boolean := false;
-		shift_down	:boolean := false;
-
-		// probably need to implement accelerator nonsense to make this key work
-		// using syskeydown/up works, but can't get rid of annoying bleeps and
-		// can't intercept alt key. it always gets passed to the parent window
-		// no matter what I return in eax.
-		alt_down	:boolean := false;		
-	
 	begin Msg_Notify;
-		
-		//dbg.separator;
 		
 		mov( lparam, edx );
 		mov( (type w.NMHDR[EDX]).code, eax );
@@ -2495,389 +2788,10 @@ proc
 			
 			updateStatus();
 			setWindowTitle();
-
-		elseif( eax = w.EN_MSGFILTER ) then
-			
-			// should return zero if the control will process
-			// and return 1 if the control should ignore
-			
-			mov((type w.MSGFILTER[EDX]).msg, eax );
-			mov((type w.MSGFILTER[EDX]).wParam, ebx);
-
-			if( eax = w.WM_KEYUP ) then
-				
-				switch( ebx );				
-						
-					case( w.VK_SHIFT )
-						mov( false, shift_down );
-						
-					case( w.VK_CONTROL )	
-						mov( false, ctrl_down );
-					
-					case( w.VK_INSERT )
-						xor( 1, info.ins_ovr );
-					
-					
-					default
-				endswitch;
-				updateStatus();
-				or( 1, eax );
-				jmp done;
-
-			elseif( eax = w.WM_KEYDOWN ) then
-
-				// key down state, see if any control keys
-				// are pressed
-				
-				//dbg.put(" key down from notify ");
-				
-				switch( ebx );
-						
-					case( w.VK_SHIFT )
-						mov( true, shift_down );
-						
-					case( w.VK_CONTROL )	
-						mov( true, ctrl_down );
-					
-					
-//bm=keycommands
-					// process all commands and keyboard shortcuts here
-					
-					// custom keyboard commands
-					
-					case( w.VK_W )
-						
-						// delete word under cursor
-						if( ctrl_down ) then
-							
-							if( shift_down ) then
-								command_copy_word();
-							else
-								command_delete_word();
-							endif;
-						endif;
-					
-					case( w.VK_D )
-						if( ctrl_down ) then
-							
-							getInfo(info);
-							inc( info.cursor.cpMin );
-							w.SendMessage( info.hred, w.EM_EXSETSEL, 0, &info.cursor );
-							w.SendMessage( info.hred, w.EM_REPLACESEL,true, s_empty );
-
-						endif;
-						
-					case( w.VK_BSLASH )  // backslash / pipe key
-						if( ctrl_down ) then
-							
-							command_cut_line();
-							
-						endif;
-					
-					case( w.VK_F )
-						if( ctrl_down ) then
-							Msg_Command( hwin, IDM_FIND,0 );
-							mov( false, ctrl_down );
-						endif;
-					
-					case( w.VK_G )
-						if( ctrl_down ) then
-							Msg_Command( hwin, IDM_EDIT_GOTO,0 );
-							mov( false, ctrl_down );
-						endif;
-					
-					case( w.VK_I )
-						
-						if( ctrl_down ) then
-
-							// remove default ctrl-i behavior
-							while ( w.PeekMessage( window.msg, info.hred, w.WM_KEYFIRST, w.WM_KEYLAST, w.PM_REMOVE)) do
-							endwhile;
-							
-							command_cursor_up();
-						endif;
-						
-				
-					case( w.VK_J )
-					
-						if( ctrl_down ) then
-							
-							while ( w.PeekMessage( window.msg, info.hred, w.WM_KEYFIRST, w.WM_KEYLAST, w.PM_REMOVE)) do
-							endwhile;
-							
-							command_cursor_left();
-							
-						endif;
-						
-					case( w.VK_K )
-						
-						if( ctrl_down) then
-							
-							// consume the key_up command so it won't send to wm_char
-							while ( w.PeekMessage( window.msg, info.hred, w.WM_KEYFIRST, w.WM_KEYLAST, w.PM_REMOVE)) do
-							endwhile;
-							
-							command_cursor_down();
-							
-						endif;
-						
-					case( w.VK_L )
-						
-						// move cursor right 1 character
-						if( ctrl_down ) then
-							
-							while ( w.PeekMessage( window.msg, info.hred, w.WM_KEYFIRST, w.WM_KEYLAST, w.PM_REMOVE)) do
-							endwhile;
-							
-							// control shift L makes list
-							if( !shift_down ) then	
-								command_cursor_right();
-							endif;
-						endif;
-					
-					case( w.VK_LBRACKET )
-					
-						if( ctrl_down ) then
-							
-							command_move_to_bol();
-							jmp done;
-						endif;
-						
-					case( w.VK_RBRACKET )
-					
-						
-						if( ctrl_down ) then
-							command_move_to_eol();
-							jmp done;
-						endif;
-					
-					case( w.VK_N )
-						if( ctrl_down ) then
-							Msg_Command( hwin, IDM_NEW, 0 );
-							
-							// stupid windows behavior
-							// if user cancels dialog, somehow key up command is getting lost.
-							// so we have to hack in a false on ctrl_down pressed here
-							mov( false, ctrl_down );  
-						endif;
-					
-					case( w.VK_O )
-						if( ctrl_down ) then
-							Msg_Command( hwin, IDM_OPEN,0 );
-						endif;	
-					
-//					case( w.VK_P )
-					
-					case( w.VK_S )
-						if( ctrl_down && shift_down ) then
-							Msg_Command( hwin, IDM_SAVEAS,0 );
-						elseif( ctrl_down ) then
-							Msg_Command( hwin, IDM_SAVE,0 );
-						endif;
-					
-					case( w.VK_T )
-						if( ctrl_down ) then
-							Msg_Command( hwin, IDM_PEG,0 );
-						endif;
-					
-					case( w.VK_F2 )
-						Msg_Command( hwin, IDM_AUTO,0 );
-						
-					case( w.VK_F3 )
-						if( ctrl_down ) then
-							Msg_Command( hwin, IDM_FINDPREV,0 );
-						else
-							Msg_Command( hwin, IDM_FINDNEXT,0 );
-						endif;
-						
-					case( w.VK_F4 )
-						Msg_Command( hwin, IDM_WRAP,0 );
-						
-					case( w.VK_F5 )
-						Msg_Command( hwin, IDM_TIME,0 );
-						
-					case( w.VK_F6 )
-						Msg_Command( hwin, IDM_READONLY,0 );
-						
-					case( w.VK_COMMA )
-						
-						// same as ctrl-left
-						if( ctrl_down ) then
-							w.PostMessage( info.hred, w.WM_KEYDOWN, w.VK_LEFT, 0 );
-						endif;
-						
-					case( w.VK_PERIOD )
-					
-						// same as ctrl-right
-						if( ctrl_down ) then
-							w.PostMessage( info.hred, w.WM_KEYDOWN, w.VK_RIGHT, 0 );
-						endif;
-						
-					case( w.VK_TAB )
-						
-						if( shift_down ) then
-							dbg.put("tabb...");
-							
-							// consume the key_up command so it won't send to wm_char
-							while ( w.PeekMessage( window.msg, info.hred, w.WM_KEYFIRST, w.WM_KEYLAST, w.PM_REMOVE)) do
-							endwhile;
-
-							if( ctrl_down ) then
-								
-								// reduce indent
-								command_reduce_indent();							
-
-								or( 1, eax );
-								jmp done;
-							endif;
-
-							// indent line
-							command_increase_indent();
-							or( 1, eax );
-							jmp done;
-						
-						elseif( config.readBool( s_settings, s_tabsasspace )) then
-						
-							// consume the key_up command so it won't send to wm_char
-							while ( w.PeekMessage( window.msg, info.hred, w.WM_KEYFIRST, w.WM_KEYLAST, w.PM_REMOVE)) do
-							endwhile;
-							w.SendMessage( info.hred, w.EM_REPLACESEL,true, strtabs );
-							or( 1, eax );
-							jmp done;
-
-						endif;
-						
-					case( w.VK_RETURN )
-					
-						// intercept the enter key
-						// if shift-enter, then create empty line below and move cursor there
-						// if ctrl-enter then create empty line above and move cursor there
-						// we want to maintain auto indent features if possible. will
-						// probably not work if new line is being created above the 1st line.
-					
-						if( ctrl_down ) then
-							
-							// check to see if we are on line 1
-							if( info.line.number = 0 ) then
-								
-								// doesn't work as intended, but we need
-								// to get too hacky, so just go with this.
-								command_move_to_bol();
-								
-							else
-							
-								// open line above
-								command_cursor_up();
-								jmp do_shift;
-							
-							endif;
-						
-						elseif( shift_down ) then
-							
-							do_shift:
-							//open line below
-							// if we are not at eol, then move to eol
-							mov( info.charIndex, eax );
-							if( info.line.length != eax ) then
-								command_move_to_eol();
-							endif;
-						
-						endif;
-					
-					case( w.VK_ESCAPE )
-
-						w.SendMessage(hwin,w.WM_CLOSE,0,0 );
-						or( 1, eax );
-						jmp done;
-					default;
-				endswitch;
-				
-			elseif ( eax = w.WM_CHAR ) then
-
-				
-				switch( ebx );
-					
-					case( w.VK_SPACE )
-						
-						if( ctrl_down ) then
-							
-							command_toggle_mark();
-							or( 1, eax );
-							jmp done;
-							
-						endif;
-						
-						
-					case( w.VK_RETURN )
-						
-						
-						// do auto indent stuff
-						
-						if( config.readBool( s_settings, s_autoindent ) ) then
-
-							w.SendMessage( info.hred, w.EM_LINEFROMCHAR, -1, 0);
-							dec( eax );
-							mov( szLINEBUFFER-1, (type word buffer[0]));
-							w.SendMessage( info.hred, w.EM_GETLINE, eax, &buffer );
-							if( eax ) then
-								xor( ecx, ecx );
-								while( eax ) do
-									mov( buffer[ecx], dl );
-									
-									// counts the number of white spaces, either tabs or spaces
-									if( dl == $09 || dl == ' ' ) then
-										inc( ecx );
-									else
-										break;
-									endif;
-									dec( eax );
-								endwhile;
-								
-								// if we are here, then ecx contains number of white space
-								
-								if( ecx ) then
-									str.cpy("", strbuf );
-									if( config.readBool( s_settings, s_tabsasspace ) ) then
-										while( ecx ) do
-											str.cat( " ", strbuf);
-											dec( ecx );
-										endwhile;
-									else
-										while( ecx ) do
-											str.cat( "	", strbuf);
-											dec( ecx );
-										endwhile;
-									endif;
-									w.SendMessage( info.hred, w.EM_GETSEL, &chrg.cpMin, &chrg.cpMax);
-									w.SendMessage( info.hred, w.EM_REPLACESEL,true, strbuf );
-									w.SendMessage( info.hred, w.EM_SCROLLCARET,0,0);
-								endif;
-							endif;
-						endif;
-						
-					default;
-						
-						//dbg.put("CHAR mark = false");
-						mov( 0, want_pos );
-						
-						// do we want to erase the set mark
-						// when user starts typing or keep it?
-						// false will reset mark if it is set
-						//mov( false, info.is_marked );
-					
-				endswitch;
-			
-			elseif( eax = w.WM_LBUTTONDOWN ) then
-				
-				mov( 0, want_pos );
-
-			endif;
-				
-		endif;
 		
-		// return default - control should handle key
+		endif;
 		xor( eax, eax );
-		done:
+		
 	end Msg_Notify;
 
 	
@@ -3209,42 +3123,6 @@ proc
 			endif;
 			config.writeBool( s_settings, s_tabsasspace, al );			
 			
-		case(  IDM_OPTIONS_ENCRYPTAES )
-			
-			if( ! getConfirm() ) then
-				if( getPassword( hide.strbuf ) ) then
-					
-					dbg.put("password :", hide.strbuf );
-					mov( hide.strbuf, ecx );
-					aes.init( aes.bits256, [ecx], str.length( hide.strbuf ) );
-					str.cpy( filepath, strbuf );
-					filesys.deleteExt( strbuf, strbuf );
-					str.put2( strbuf, s_encext );
-					aes.encrypt( filepath, strbuf );
-					loadFile( strbuf );
-					aes.free();
-					
-				endif;
-			endif;
-			
-		case(  IDM_OPTIONS_DECRYPTAES ) 
-			
-			if( ! getConfirm() ) then
-				if( getPassword( hide.strbuf ) ) then
-					
-					dbg.put("password :", hide.strbuf );
-					mov( hide.strbuf, ecx );
-					aes.init( aes.bits256, [ecx], str.length( hide.strbuf ) );
-					str.cpy( filepath, strbuf );
-					filesys.deleteExt( strbuf, strbuf );
-					str.put2( strbuf, s_txtext );
-					aes.decrypt( filepath, strbuf );
-					loadFile( strbuf );
-					aes.free();
-	
-				endif;
-			endif;
-			
 		case(  IDM_VIEW_STATUS ) 
 			
 			if( config.readBool( s_window, s_status ) ) then
@@ -3321,6 +3199,7 @@ proc
 
 begin SavageEd;
 
+	dbg.cls;
 	initConfig();
 	initWindow();
 	

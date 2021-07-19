@@ -1,7 +1,7 @@
 
 readonly
 
-	version			:string := "SavageEd v0.7.00";
+	version			:string := "SavageEd v0.7.03";
 	
 type
 	// Message and dispatch table related definitions:
@@ -16,18 +16,18 @@ type
 
 	wnd_settings:
 		record
-			hwnd		:dword;	// window handle
-			hmenu		:dword; // menu handle
-			hstatus		:dword; // status bar handle
-			hsubmenu	:dword;	// sub menu handle
-			hcontextmenu:dword;	// context menu handle
-			hfind		:dword;	// find dialog window handle
-			habout		:dword;	// about window handle
-			msg			:w.MSG;	// windows messaging
-			xPos		:uns32;	// window x position
-			yPos		:uns32; // window y position
-			width		:uns32; // window width
-			height		:uns32; // window height
+			hwnd		:dword;
+			hmenu		:dword;
+			hstatus		:dword;
+			hsubmenu	:dword;
+			hcontextmenu:dword;
+			hfind		:dword;
+			habout		:dword;
+			msg			:w.MSG;
+			xPos		:uns32;
+			yPos		:uns32;
+			width		:uns32;
+			height		:uns32;
 		endrecord;
 
 	FindMode:
@@ -48,8 +48,8 @@ type
 	EditInfo:
 		record
 			old_proc:dword; // original window proc of edit control
-			hred	:dword;	// handle of edit control
-			hfont	:dword; // font used by the edit control
+			hred	:dword;
+			hfont	:dword;
 			tabs	:uns32; // tabs in edit control size
 			
 			// text and background colors
@@ -60,10 +60,12 @@ type
 			cursor		:w.CHARRANGE;
 			
 			// column of cursor
-			charIndex	:uns32;
+			charIndex		:uns32;
+			wantCharIndex	:uns32; // stores where the cursor 'wants' to be
 			
 			// line info of cursor, has number, index and length
 			line		:LineInfo;
+			lines		:uns32;
 			
 			// if mark is set, this contains the index
 			markIndex	:uns32;
@@ -109,8 +111,6 @@ type
 		IDM_CLEAREXIT,
 		IDM_OPENRECENT,
 		IDM_REMEMBERPOS,
-		IDM_OPTIONS_ENCRYPTAES,
-		IDM_OPTIONS_DECRYPTAES,
 		IDM_VIEW_STATUS,
 		IDM_ABOUT,
 		IDM_DOCUMENTS
@@ -162,7 +162,7 @@ const
 	statusht_c			:= 21;		// height of status bar
 
 	STATUS_PARTS		:= 4;
-	POS_LINES			:=200;
+	POS_LINES			:=270;
 	POS_INS				:=POS_LINES+30;
 	POS_READONLY		:=POS_INS+18;
 	POS_MARK			:=POS_READONLY+18;
@@ -222,8 +222,6 @@ readonly
 	s_inputlinen:string := "Enter Line Number";
 	s_inputpwd	:string := "Enter a password upto 32 characters";
 	s_inputtab	:string := "Enter tab spacing in number of characters";
-	s_encext	:string := ".enc";
-	s_enc		:string := "enc";
 	
 	s_document		:string := "SavageEd.md";	
 	s_missingDLL	:string := "Could not open Riched20.dll";
@@ -261,7 +259,6 @@ storage
 static
 	Align(4);
 	info		:EditInfo;
-	want_pos	:uns32 := 0;	// want to keep cursor in this column
 	filepath	:str.strvar( w.MAX_PATH );	// store full file path
 	statusParts	:int32[STATUS_PARTS]:=[POS_LINES, POS_INS, POS_READONLY, POS_MARK];
 	strbuf		:str.strvar( w.MAX_PATH );
@@ -304,3 +301,20 @@ proc
 	updateRecentLog :procedure; @forward;
 	getInfo :procedure ( var inf:EditInfo); @forward;
 	getConfigPath :procedure( s:string ); @forward;
+	command_copy_word :procedure; @forward;
+	command_delete_word :procedure; @forward;
+	command_cut_line :procedure; @forward;
+	command_cursor_up :procedure; @forward;
+	command_cursor_left :procedure; @forward;	
+	command_cursor_down :procedure; @forward;	
+	command_cursor_right :procedure; @forward;	
+	command_move_to_bol :procedure; @forward;
+	command_move_to_eol :procedure; @forward;
+	command_reduce_indent :procedure; @forward;
+	command_increase_indent :procedure; @forward;	
+	command_toggle_mark :procedure; @forward;	
+		
+		
+
+
+

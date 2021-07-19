@@ -2,7 +2,7 @@
 [HPR Settings]
 tab=4
 backups=0
-options=00000040
+options=00000840
 Project Version=10
 usetemp=false
 useunits=true
@@ -24,7 +24,7 @@ console=false
 output=SavageEd.exe
 type=modular
 main=SavageEd.md
-debug=false
+debug=true
 
 [SavageEd.link]
 -heap:0xF4240,0xF4240

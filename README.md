@@ -28,8 +28,6 @@ Only the source files are guaranteed to be the latest version.
 
 - uses local ini file to save options and window position settings. does not alter the windows registry, has no installer.
 
-- AES encryption
-
 ## Documention
 See SavageEd.md for the manual
 

@@ -165,36 +165,6 @@ Save and SaveAs still function.
 ## Options > Auto Indent
 	Automatically indents the cursor to the previous line whitespace. Not reccommended to mix spaces and tabs as there is no check for this edge case.
 	
-## AES Encryption
-Options > *Encrypt...
-
-Options > Decrypt...
-
-SavageEd offers an AES [Advanced Encryption Standard] encryption for ASCII documents only.
-Warning: This will likely corrupt unicode files that have foreign language glyphs.
-	SavageEd will not alter the original file.
-Warning: Don't forget your password. Don't contact me if you forget your password.
-	I can't help you.
-	
-
-To encrypt, enter a password up to 32 characters long
-	For better security, enter a password that is 32 charactres long and varied with
-	letters, numbers and symbols.
-	More character may be entered, but only the first 32 will be considered for encryption
-	*Do not forget the password*  If you lose the original document, there is no way
-	to recover an encrypted file without the correct password.
-	Encrypted files will be saved with the name of the current document and an ".enc"
-	extension.
-	SavageEd or kAES.exe is required to decrypt the file.  At this time,
-	kAES.exe is only available with the HIDE distribution, in the bin folder.
-	
-To decrypt, load an encrypted file (one that has an ".enc" extension) and select decrypt...
-	Enter the correct password.
-	The decrypted file will be saved with the name of the current file and a ".txt"
-	extension.
-	*if the original file is in the same directory, make sure to back it up first.*
-	
-
 ## Log files.
 If you wish to use the log feature, it is compatible to the .LOG
 feature of Notepad.exe, with an additional extension.
@@ -215,10 +185,10 @@ the bottom.
 Shows/hides the status bar
 The status bar shows the following information:
 1st section:
-	current line number		'Ln: xx'
-	current column number	'Col: xx'
-	total number of lines	'Lns: xx'
+	current line number		'Line: xx'
+	current column number	'Column: xx'
 	cursor position			'Pos: xx'
+	total number of lines	'Lines: xx'
 2nd section:
 	insert/overwrite mode 	'INS'/'OVR'
 3rd section:

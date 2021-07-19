@@ -1,5 +1,9 @@
 # Change Log
 
+## 07/19/2021
+			- removed AES support. It wasn't working properly with
+			  unicode files.
+
 ## 07/18/2021
 	0.7.xx	- internall changes
 

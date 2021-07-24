@@ -1,8 +1,14 @@
+	#includeonce("macros\macros.hhf")
+	#includeonce("w.hhf")
+	#includeonce("hide\hidelib.hhf")
+	#includeonce("stdlib.hhf")
+	#includeonce("hide\dbgwin.hhf")
+	#includeonce("w32\shell32.hhf" )
 
 readonly
 
-	version			:string := "SavageEd v0.7.03";
-	
+	version			:string := "SavageEd v0.7.10";
+
 type
 	// Message and dispatch table related definitions:
 		  
@@ -12,6 +18,12 @@ type
 		record
 			MessageValue	:dword;
 			MessageHndlr	:MsgProc_t;			
+		endrecord;
+		
+	range:
+		record
+			start_index	:uns32;
+			end_index	:uns32;
 		endrecord;
 
 	wnd_settings:
@@ -28,6 +40,11 @@ type
 			yPos		:uns32;
 			width		:uns32;
 			height		:uns32;
+
+			// text and background colors
+			textColor	:w.COLORREF;
+			backColor	:w.COLORREF;
+
 		endrecord;
 
 	FindMode:
@@ -52,24 +69,19 @@ type
 			hfont	:dword;
 			tabs	:uns32; // tabs in edit control size
 			
-			// text and background colors
-			textColor	:w.COLORREF;
-			backColor	:w.COLORREF;
-			
 			// selection
-			cursor		:w.CHARRANGE;
-			
-			// column of cursor
-			charIndex		:uns32;
-			wantCharIndex	:uns32; // stores where the cursor 'wants' to be
+			cursor				:range;
+			column_index		:uns32; // column of cursor
+			saved_column_index	:uns32; // stores where the cursor 'wants' to be
+			mark:
+				record
+					index	:uns32;
+					isSet	:boolean;
+				endrecord;
 			
 			// line info of cursor, has number, index and length
 			line		:LineInfo;
 			lines		:uns32;
-			
-			// if mark is set, this contains the index
-			markIndex	:uns32;
-			is_marked	:boolean;
 			ins_ovr		:boolean;
 			find_mode	:FindMode;
 		endrecord;
@@ -165,7 +177,7 @@ const
 	POS_LINES			:=270;
 	POS_INS				:=POS_LINES+30;
 	POS_READONLY		:=POS_INS+18;
-	POS_MARK			:=POS_READONLY+18;
+	POs_mark			:=POS_READONLY+18;
 	
 	DEFAULT_TAB_STOP	:= 4;
 
@@ -179,8 +191,6 @@ readonly
 	// this is the main configuration file name
 	config_file		:string := "SavageEd.ini";
 	
-	// this is the section header in the file
-	// under which to save window settings
 	s_window 	:string := "Window";
 	ClassName	:string:="SavageEDClass";
 	AppName		:string:="SavageEd";
@@ -249,7 +259,7 @@ storage
 	customColors:dword[16];
 		
 	editstream	:w.EDITSTREAM;
-	chrg		:w.CHARRANGE;
+	chrg		:range;
 	find_range	:w.TEXTRANGE;
 	
 	config		:tConfig;
@@ -260,7 +270,7 @@ static
 	Align(4);
 	info		:EditInfo;
 	filepath	:str.strvar( w.MAX_PATH );	// store full file path
-	statusParts	:int32[STATUS_PARTS]:=[POS_LINES, POS_INS, POS_READONLY, POS_MARK];
+	statusParts	:int32[STATUS_PARTS]:=[POS_LINES, POS_INS, POS_READONLY, POs_mark];
 	strbuf		:str.strvar( w.MAX_PATH );
 	strtabs		:str.strvar( w.MAX_PATH ); // user specified tabs converted to spaces
 
@@ -278,7 +288,7 @@ readonly
 			MsgProcPtr_t:[ w.WM_CONTEXTMENU,&Msg_Context			],
 			MsgProcPtr_t:[ w.WM_SETFOCUS,	&Msg_SetFocus			],
 			MsgProcPtr_t:[ w.WM_DROPFILES,  &Msg_OpenDroppedFile	],
-			MsgProcPtr_t:[ w.WM_NOTIFY,		&Msg_Notify				],
+//			MsgProcPtr_t:[ w.WM_NOTIFY,		&Msg_Notify				],
 
 			// add more messages here
 			MsgProcPtr_t:[ 0, NULL ];	// This marks the end of the list.
@@ -290,6 +300,11 @@ readonly
 			
 			// add more commands here
 			MsgProcPtr_t:[ 0,				NULL			];
+
+const
+	
+	typeConsts( edit, EditInfo, edi )
+	typeConsts( charrange, range, esi )
 
 proc
 	// forward declarations

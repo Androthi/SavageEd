@@ -1,5 +1,16 @@
 # Change Log
 
+## 07/24/2021
+	0.7.1x	- internals changes:
+				-migrated color settings to the window structure
+			 	-added range record to replace windows CHARRANGE
+				-implemented typeConsts macros
+			 	-changed config, no longer saves cpMin/cpMax, now just
+				-saves Start Position. there is a plan to eventually move
+			 	 this to section that saves start position by file rather than
+			 	 by last opened file.
+			 	-changed various label names to make them more verbose and self-commenting
+
 ## 07/19/2021
 			- removed AES support. It wasn't working properly with
 			  unicode files.

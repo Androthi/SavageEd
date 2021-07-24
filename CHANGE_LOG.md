@@ -1,7 +1,9 @@
 # Change Log
 
 ## 07/24/2021
-	0.7.1x	- internals changes:
+	0.7.1x	- feature changes:
+				-find dialog now uses incremental find
+			- internals changes:
 				-migrated color settings to the window structure
 			 	-added range record to replace windows CHARRANGE
 				-implemented typeConsts macros

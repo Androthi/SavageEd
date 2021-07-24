@@ -3,11 +3,13 @@
 ///	[X]	Move keyboard processing control to the subclassed proc
 ///	[ ]	Isolate the edit structure to prepare for multi-buffers
 ///
-///		these are 'maybe' features
+///		these are 'maybe' features, could get cancelled, could get
+///		moved to other minor versions
 /// [ ]	Allow user to customize keys
 /// [ ] remove the options from menu and allow user to edit
 ///		SavageEd.ini directly in the editor.
 ///		this might require rethinking some of the .ini setup
+/// [ ] add command bar
 
 program SavageEd;
 
@@ -932,6 +934,22 @@ proc
 		dbg.exits( "findPattern" );		
 	end findPattern;
 	
+	getFindMode :procedure {@noframe};
+	begin getFindMode;
+		xor( eax, eax );
+		if( info.find_mode.down ) then
+			or( w.FR_DOWN, eax );
+		endif;
+		if( info.find_mode.matchcase ) then
+			or( w.FR_MATCHCASE, eax );
+		endif;
+		if( info.find_mode.wholeword ) then
+			or( w.FR_WHOLEWORD, eax );
+		endif;
+		ret();
+	end getFindMode;
+
+	
 	Find :procedure {@noframe};
 	
 		// looks for selection
@@ -943,13 +961,12 @@ proc
 		w.SendMessage(info.hred, w.EM_EXGETSEL,0, &ft.chrg);
 		
 		if( info.find_mode.down ) then
-	
+			
 			mov( ft.chrg.cpMax, eax );
 			if( eax != ft.chrg.cpMin ) then
 				// we have a selection already, don't try to find
-				// currently selected text!
-				push( ft.chrg.cpMax );
-				pop( ft.chrg.cpMin );
+				// currently selected text
+				mov( eax, ft.chrg.cpMin );
 			endif;
 			mov( -1, ft.chrg.cpMax );
 
@@ -958,18 +975,8 @@ proc
 			mov( 0, ft.chrg.cpMax );
 
 		endif;
-
-		xor( eax, eax );
-		if( info.find_mode.down ) then
-			or( w.FR_DOWN, eax );
-		endif;
-		if( info.find_mode.matchcase ) then
-			or( w.FR_MATCHCASE, eax );
-		endif;
-		if( info.find_mode.wholeword ) then
-			or( w.FR_WHOLEWORD, eax );
-		endif;
-
+		
+		getFindMode();
 		if( info.find_mode.matchpattern ) then
 			
 			findPattern( eax );
@@ -1179,6 +1186,7 @@ proc
 						
 						if( ctrl_down ) then
 							command_cursor_up();
+							jmp skip_proc;
 						endif;
 
 					case( w.VK_J )
@@ -1186,12 +1194,14 @@ proc
 						if( ctrl_down ) then
 							command_cursor_left();
 							mov( 0, info.saved_column_index );
+							jmp skip_proc;
 						endif;
 
 					case( w.VK_K )
 						
 						if( ctrl_down) then
 							command_cursor_down();
+							jmp skip_proc;
 						endif;
 
 					case( w.VK_L )
@@ -1199,17 +1209,20 @@ proc
 						if( ctrl_down ) then
 							command_cursor_right();
 							mov( 0, info.saved_column_index );
+							jmp skip_proc;
 						endif;
 
 					case( w.VK_LBRACKET )
 					
 						if( ctrl_down ) then
 							command_move_to_bol();
+							jmp skip_proc;
 						endif;
 
 					case( w.VK_RBRACKET )
 						if( ctrl_down ) then
 							command_move_to_eol();
+							jmp skip_proc;
 						endif;
 
 					case( w.VK_N )
@@ -1266,8 +1279,6 @@ proc
 						endif;
 						
 					case( w.VK_PERIOD )
-					
-							
 						if( ctrl_down ) then
 							// same as ctrl-right
 							// put VK_RIGHT in wParam and let
@@ -1348,10 +1359,11 @@ proc
 							jmp skip_proc;
 						endif;
 					
-					case( w.VK_SLASH )
+					TODO( need to add command bar )
+					//case( w.VK_SLASH )
 						
 						// experimental : do incremental search
-						//mov( true, info.increment_search );
+					//	mov( true, info.incremental_search );
 
 					case( w.VK_ESCAPE )
 
@@ -1364,6 +1376,7 @@ proc
 				endswitch;
 			
 			case( w.WM_KEYUP )
+				
 				dbg.put("key up =>", wParam );
 				mov( wParam, eax );
 				switch( eax )
@@ -1662,6 +1675,13 @@ proc
 						w.SendDlgItemMessage(hWin, ebx, w.WM_GETTEXT, @elements(findbuf)-1, &findbuf);
 						mov	(-1, fres);
 						
+						getFindMode();
+						findNormal( eax );
+						if( fres != -1 ) then
+							updateStatus();
+						endif;
+
+						
 					elseif( ebx = IDC_REPLACETEXT) then
 						w.SendDlgItemMessage(hWin, ebx, w.WM_GETTEXT, @elements(replacebuf)-1, &replacebuf);
 						mov	(-1, fres);
@@ -1671,9 +1691,6 @@ proc
 					w.SendDlgItemMessage( hWin, ebx, w.EM_SETMODIFY, false, 0 );
 				endif;
 				
-
-
-
 				pop( ebx );
 	
 			endif;
@@ -2307,10 +2324,7 @@ proc
 		push( esi );
 		mov( inf, edi );
 		lea( esi, editedi.cursor );
-		w.SendMessage( info.hred, w.EM_EXGETSEL, 0, esi );
-		
-		dbg.put("got selection :", editedi.cursor.start_index, "  :  ", editedi.cursor.end_index );
-		
+		w.SendMessage( info.hred, w.EM_EXGETSEL, 0, esi );	
 		w.SendMessage( info.hred, w.EM_EXLINEFROMCHAR, 0, charrangeesi.start_index );
 		mov( eax, editedi.line.number );
 		getLineInfo(editedi.line);
@@ -2558,7 +2572,6 @@ proc
 	begin command_cursor_left;
 		
 		dbg.put("cursor_left")
-	//	getInfo(info);
 		mov( info.cursor.start_index, eax );
 		if( eax ) then
 			dec( eax );
@@ -2573,7 +2586,6 @@ proc
 	begin command_cursor_right;
 		
 		dbg.put("cursor_right");
-	//	getInfo(info);
 		mov( info.cursor.start_index, eax );
 		inc( eax );
 		w.SendMessage( info.hred, w.EM_SETSEL, eax, eax );

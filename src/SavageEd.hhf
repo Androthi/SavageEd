@@ -7,7 +7,7 @@
 
 readonly
 
-	version			:string := "SavageEd v0.7.10";
+	version			:string := "SavageEd v0.7.11";
 
 type
 	// Message and dispatch table related definitions:
@@ -68,10 +68,11 @@ type
 			hred	:dword;
 			hfont	:dword;
 			tabs	:uns32; // tabs in edit control size
-			
+			find_mode	:FindMode;
+						
 			// selection
 			cursor				:range;
-			column_index		:uns32; // column of cursor
+			column_index		:uns32;
 			saved_column_index	:uns32; // stores where the cursor 'wants' to be
 			mark:
 				record
@@ -80,10 +81,11 @@ type
 				endrecord;
 			
 			// line info of cursor, has number, index and length
-			line		:LineInfo;
-			lines		:uns32;
-			ins_ovr		:boolean;
-			find_mode	:FindMode;
+			line				:LineInfo;
+			lines				:uns32;
+			ins_ovr				:boolean;
+			//incremental_search	:boolean; TODO(need to add command bar )
+
 		endrecord;
 		
 
@@ -253,7 +255,7 @@ storage
 	findbuf			:byte[300];
 	replacebuf		:byte[300];
 	ft				:w.FINDTEXTEX;
-	fres			:dword;
+	fres			:int32;
 	return			:string;	// returned from Proc_Input, caller must free string
 
 	customColors:dword[16];

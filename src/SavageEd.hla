@@ -2348,7 +2348,7 @@ proc
 	
 	begin command_display_manual;
 		
-		if( w.FindResource(hinst, val ID_SAVAGEED_MANUAL, val RAW_DATA ) ) then
+		if( w.FindResource(hinst, val ID_SAVAGEED_MANUAL, val ID_RAWDATA ) ) then
 
 			if( w.LoadResource(hinst, eax ) ) then
 				

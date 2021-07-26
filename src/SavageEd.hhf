@@ -7,7 +7,7 @@
 
 readonly
 
-	version			:string := "SavageEd v0.7.17";
+	version			:string := "SavageEd v0.7.19";
 
 type
 	// Message and dispatch table related definitions:
@@ -309,7 +309,7 @@ proc
 	Msg_SetFocus :procedure( hwin:dword; wparam:dword; lparam:dword ); @external;
 	Msg_Context :procedure( hwnd:dword; wParam:dword; lParam:dword ); @external;		
 	Msg_Size :procedure( hwin:dword; wparam:dword; lparam:dword ); @external;
-	Msg_Create :procedure( hwin:dword; wparam:dword; lparam:dword ); @external;
+	Msg_Create :procedure( hwin:dword; wParam:dword; lparam:dword ); @external;
 	Msg_Close :procedure( hwin:dword; wparam:dword; lparam:dword ); @external;
 	Msg_Destroy :procedure( hwin:dword; wparam:dword; lparam:dword ); @external;
 	Error :procedure( error_msg:string; warning:boolean ); @external;

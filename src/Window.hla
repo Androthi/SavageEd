@@ -918,7 +918,7 @@ proc
 	end setFormat;
 	
 	
-	Msg_Create :procedure( hwin:dword; wparam:dword; lparam:dword );
+	Msg_Create :procedure( hwin:dword; wParam:dword; lparam:dword );
 	
 		// create the main window
 		// read settings from config to determine positions
@@ -959,20 +959,19 @@ proc
 					edit_style, 0, 0, 0, 0, window.hwnd, window.hcontextmenu, window.hinst, NULL );
 		
 		mov( eax, info.hred );
-		
+				
 		// subclass the edit control
 		w.SetWindowLong(info.hred, w.GWL_WNDPROC, &Proc_Edit);
 		mov( eax, info.old_proc);
 		
-		w.SendMessage( info.hred, w.EM_SETEVENTMASK, 0, w.ENM_SELCHANGE | w.ENM_KEYEVENTS
-						| w.ENM_MOUSEEVENTS );
+		w.SendMessage( info.hred, w.EM_SETEVENTMASK, 0, w.ENM_SELCHANGE	);
 		
 		setFormat();
 		w.SetFocus( info.hred );
 	
 		// check for a filename passed as an argument and try to open that file.
 		// if file doesn't exist, start new document with that filename.
-		
+		str.cpy("", strtabs);
 		arg.c();
 		if( eax > 1 ) then
 			

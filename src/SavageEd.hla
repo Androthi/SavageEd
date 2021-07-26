@@ -37,6 +37,7 @@ storage
 	ft				:w.FINDTEXTEX;
 	fres			:int32;
 	return			:string;	// returned from Proc_Input, caller must free string
+	proc_return		:boolean;	// hack needed to ignore a rogue WM_KEYUP being sent from the syetem after startup from commandline or by a keypress 
 
 	customColors:dword[16];
 		
@@ -459,6 +460,7 @@ proc
 		ret();
 	end Find;
 
+
 	Proc_Edit	:procedure( lParam:dword; wParam:dword; uMsg:uns32; hWin:dword );
 	
 		// this is the subclassed window procedure of the edit control
@@ -720,6 +722,8 @@ proc
 						
 						endif;
 					
+						mov( true, proc_return );
+					
 					case( w.VK_SPACE )
 						
 						if( ctrl_down ) then
@@ -759,48 +763,50 @@ proc
 					case( w.VK_RETURN )
 						// a return was just processed in the edit control
 						// do auto indent stuff
-						if( config.readBool( s_settings, s_autoindent ) ) then
-
-							w.SendMessage( info.hred, w.EM_LINEFROMCHAR, -1, 0);
-							dec( eax );
-							mov( szLINEBUFFER-1, (type word buffer[0]));
-							w.SendMessage( info.hred, w.EM_GETLINE, eax, &buffer );
-							if( eax ) then
-								xor( ecx, ecx );
-								while( eax ) do
-									mov( buffer[ecx], dl );
+						dbg.put("return :", proc_return );
+						if( proc_return ) then
+							if( config.readBool( s_settings, s_autoindent ) ) then
+	
+								w.SendMessage( info.hred, w.EM_LINEFROMCHAR, -1, 0);
+								dec( eax );
+								mov( szLINEBUFFER-1, (type word buffer[0]));
+								w.SendMessage( info.hred, w.EM_GETLINE, eax, &buffer );
+								if( eax ) then
+									xor( ecx, ecx );
+									while( eax ) do
+										mov( buffer[ecx], dl );
+										
+										// counts the number of white spaces, either tabs or spaces
+										if( dl == $09 || dl == ' ' ) then
+											inc( ecx );
+										else
+											break;
+										endif;
+										dec( eax );
+									endwhile;
 									
-									// counts the number of white spaces, either tabs or spaces
-									if( dl == $09 || dl == ' ' ) then
-										inc( ecx );
-									else
-										break;
+									// if we are here, then ecx contains number of white space
+									
+									if( ecx ) then
+										str.cpy("", strbuf );
+										if( config.readBool( s_settings, s_tabsasspace ) ) then
+											while( ecx ) do
+												str.cat( " ", strbuf);
+												dec( ecx );
+											endwhile;
+										else
+											while( ecx ) do
+												str.cat( "	", strbuf);
+												dec( ecx );
+											endwhile;
+										endif;
+										w.SendMessage( info.hred, w.EM_REPLACESEL,true, strbuf );
+										w.SendMessage( info.hred, w.EM_SCROLLCARET,0,0);
 									endif;
-									dec( eax );
-								endwhile;
-								
-								// if we are here, then ecx contains number of white space
-								
-								if( ecx ) then
-									str.cpy("", strbuf );
-									if( config.readBool( s_settings, s_tabsasspace ) ) then
-										while( ecx ) do
-											str.cat( " ", strbuf);
-											dec( ecx );
-										endwhile;
-									else
-										while( ecx ) do
-											str.cat( "	", strbuf);
-											dec( ecx );
-										endwhile;
-									endif;
-									w.SendMessage( info.hred, w.EM_REPLACESEL,true, strbuf );
-									w.SendMessage( info.hred, w.EM_SCROLLCARET,0,0);
 								endif;
 							endif;
+							mov( false, proc_return );
 						endif;
-
-
 				default
 				endswitch;
 				
@@ -2144,12 +2150,13 @@ proc
 begin SavageEd;
 
 	dbg.cls;
+	mov( false, proc_return );
 	initConfig();
 	initWindow();
 	mov( MODE_INSERT, info.mode );
 	cmp( eax, 0 );
 	je _exit;
-		
+	
 	FOREVER
 		w.GetMessage(window.msg,NULL,0,0);
 		breakif( ! eax );

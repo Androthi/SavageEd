@@ -668,16 +668,17 @@ proc
 							endif;
 						
 						elseif( config.readBool( s_settings, s_tabsasspace )) then
-						
+							dbg.put("tabs :", strtabs );
 							w.SendMessage( info.hred, w.EM_REPLACESEL,true, strtabs );
 							jmp skip_proc;
 							
 						else
 							// it's a normal tab, let hred handle it
+							dbg.put("tab.....");
 							mov( w.WM_CHAR, uMsg );
 							mov( w.VK_TAB, wParam );
 						endif;
-
+					
 					case( w.VK_RETURN )
 						
 						NOTE(Sevag:
@@ -803,11 +804,11 @@ proc
 				default
 				endswitch;
 				
-			
 			case( w.WM_CHAR )
 				dbg.put("char =>", wParam );
 				
-				if( ctrl_down ) then
+				mov( wParam, eax );
+				if( ctrl_down || eax = w.VK_TAB ) then
 					jmp skip_proc;
 				endif;
 

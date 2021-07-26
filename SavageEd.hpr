@@ -42,6 +42,7 @@ README.md,,misc
 CHANGE_LOG.md,,misc
 SavageEd.md,,misc
 SavageEd.hhf,src,include
+Window.hla,src,hlaunit
 
 [SavageEd.extlinked]
 kernel32.lib

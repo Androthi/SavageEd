@@ -1,5 +1,14 @@
 # Change Log
 
+## 07/26/2021
+	0.7.17	- features changes:
+				- added the option to edit/view the Savage.ini file from an open
+				  SavageEd instance.
+			- internals changes:
+				- began splitting build into units to move more stable procedures
+				  and declutter SavageEd.hla
+				- fixed ctrl-enter bug introduced during some refactoring
+
 ## 07/24/2021
 	0.7.1x	- feature changes:
 				-find dialog now uses incremental find
@@ -8,7 +17,7 @@
 			 	-added range record to replace windows CHARRANGE
 				-implemented typeConsts macros
 			 	-changed config, no longer saves cpMin/cpMax, now just
-				-saves Start Position. there is a plan to eventually move
+				saves Start Position. there is a plan to eventually move
 			 	 this to section that saves start position by file rather than
 			 	 by last opened file.
 			 	-changed various label names to make them more verbose and self-commenting

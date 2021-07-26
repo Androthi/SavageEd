@@ -7,13 +7,13 @@
 	the parent folder called "SavageEd.ini"
 	If you wish to use your "%USERPROFILE%\config" folder instead,
 	create a config folder (if one doesn't already exist) in your user profile
-	folder, and move the SavageEd.ini file there.
+	folder, and move a SavageEd.ini file there.
 	
 	eg: "c:\user\mako\config\SavageEd.ini"
 	
 	If there is a SavageEd.ini file in the SavageEd parent folder, SavageEd
 	will always prioritise using that config instead.
-
+ fcdfdfddddfeeee
 	Reading anything beyond this point is optional.
 	
 SavageEd is designed to be a quick editing/note taking program.
@@ -74,6 +74,7 @@ to have multiple copies of SavageEd in different directories.
 ## Edit > Find/Replace
 	This opens a find/replace dialog that allows searching and replacing.
 	Options set in find/replace dialog are saved in the configuration file.
+	Find searches are incremental for normal mode.
 	There is the added option of "Whole Word".
 	There is a built in quick find feature:
 	  Pressing F3 without opening find/replace
@@ -164,6 +165,13 @@ Save and SaveAs still function.
 
 ## Options > Auto Indent
 	Automatically indents the cursor to the previous line whitespace. Not reccommended to mix spaces and tabs as there is no check for this edge case.
+
+## Options > Edit Options
+	Opens SavageEd.ini and allows you to edit it directly instead of using menu items.
+	Opening this file will set SavageEd into Edit Configuration mode, if you modify and
+	change this file, the configuration will be reloaded and new options are in effect.
+	Use with caution. There is no error checking.
+	A backup file of "SavageEd.in~" is created when this option is selected. 
 	
 ## Log files.
 If you wish to use the log feature, it is compatible to the .LOG
@@ -203,10 +211,13 @@ The most recently accessed file will be at the top of the menu.
 These files are saved from session to session.  To clear the recent menu,
 use the menu Option "Clear Recent On Exit"
 
+## Documents
+	This document file can be accessed from the Help menu. It will be opened
+	in an edit window, changing the mode to "View Documentation"
 
 ## Kudos and Curses to:
 
-androth.pro@gmail.com
+sevag.krikorian@gmail.com
 
 https://sites.google.com/view/androth/home/high-level-assembly
 

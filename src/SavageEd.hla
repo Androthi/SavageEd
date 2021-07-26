@@ -1,13 +1,13 @@
 ///		Goals for v.0.7.xx
 ///	[X]	Subclass the richedit control
 ///	[X]	Move keyboard processing control to the subclassed proc
-///	[ ]	Isolate the edit structure to prepare for multi-buffers
 ///
 ///		these are 'maybe' features, could get cancelled, could get
+///
+///	[ ]	Isolate the edit structure to prepare for multi-buffers
 ///		moved to other minor versions
 /// [ ]	Allow user to customize keys
-/// [ ] remove the options from menu and allow user to edit
-///		SavageEd.ini directly in the editor.
+/// [X] allow user to edit SavageEd.ini directly in the editor.
 ///		this might require rethinking some of the .ini setup
 /// [ ] add command bar
 
@@ -18,547 +18,45 @@ program SavageEd;
 	?@nodisplay :=true;
 	?@nostackalign := true;
 
+readonly
+	// WM_COMMAND message table, wparam items go here
+	command_table	:MsgProcPtr_t; @nostorage;
+		MsgProcPtr_t
+			MsgProcPtr_t:[ IDM_QUIT,	&Cmd_File_Quit	],
+			
+			// add more commands here
+			MsgProcPtr_t:[ 0,				NULL			];
+
+
+storage
+	logfont			:w.LOGFONT;
+	frflags			:dword;
+	buffer			:byte[szLINEBUFFER];
+	findbuf			:byte[300];
+	replacebuf		:byte[300];
+	ft				:w.FINDTEXTEX;
+	fres			:int32;
+	return			:string;	// returned from Proc_Input, caller must free string
+
+	customColors:dword[16];
+		
+	chrg		:range;
+	find_range	:w.TEXTRANGE;
+	
+	config		:tConfig;
+	window		:wnd_settings;
+	align(4);
+
+static
+	Align(4);
+	info		:EditInfo;
+	statusParts	:int32[STATUS_PARTS]:=[POS_LINES, POS_INS, POS_READONLY, POS_MARK, POS_MODE];
+	strbuf		:str.strvar( w.MAX_PATH );
+	strtabs		:str.strvar( w.MAX_PATH ); // user specified tabs converted to spaces
+
 	
 proc
 
-	Error :procedure( error_msg:string; warning:boolean );
-
-		// quick message box for critical errors and warnings reporting
-
-	begin Error;
-	
-		if( warning ) then
-			
-			w.MessageBox( NULL, error_msg, "Warning", w.MB_OK | w.MB_ICONWARNING );
-		
-		else
-			
-			w.MessageBox(NULL,error_msg,"ERROR",w.MB_OK | w.MB_ICONERROR );
-			
-			cmp(window.hwnd,0);
-			je _nowindow;
-			w.PostQuitMessage(0);
-			exit Error;
-			
-		_nowindow:
-			xor(eax,eax);
-			
-		endif;
-	
-	end Error;
-
-	getTempName :procedure( prefix:string; ext:string; dest:string );
-	
-		// gets a temp name based on current directory
-		// format:
-		// curdir\prefixxxxxxxxxext
-	
-	begin getTempName;
-		
-		// doubt there will ever be a similar result, but just in case...
-		forever
-			w.GetTickCount();
-			conv.u32ToStr( eax, 20, ' ', hide.strbuf );
-			str.trim( hide.strbuf );
-			filesys.gwd( dest );
-			str.put2( dest, chars.dir_sep, prefix, hide.strbuf, ext );
-			
-			breakif( ! filesys.exists( dest ) );
-		endfor;
-		
-	end getTempName;
-
-	Msg_SetFocus :procedure( hwin:dword; wparam:dword; lparam:dword );
-	
-		// set window focus to active editor control
-	
-	begin Msg_SetFocus;
-		
-		w.SetFocus( info.hred );
-		xor( eax, eax );
-		
-	end Msg_SetFocus;
-
-	
-	Msg_Size :procedure( hwin:dword; wparam:dword; lparam:dword );
-		
-		// size the main window
-		
-		var
-			rect	:w.RECT;
-			height	:dword;
-
-	begin Msg_Size;
-		
-		w.GetClientRect( window.hwnd, rect );
-		mov( rect.bottom, eax );
-		sub( rect.top, eax );
-		mov( eax, height );
-		
-		if( config.readBool( s_window, s_status ) ) then
-		
-			sub( statusht_c, height );
-			w.SendMessage( window.hstatus, w.WM_SIZE, 0, 0 );
-
-		endif;
-		w.MoveWindow( info.hred, 0, rect.top, rect.right, height, true );
-		
-		xor( eax, eax );
-		
-	end Msg_Size;
-		
-	
-	setWindowTitle :procedure {@noframe};
-	
-		// set the window title
-		// called anytime the title needs to be changed or updated
-	
-	begin setWindowTitle;
-		
-		filesys.extractFilename( filepath, hide.strbuf );
-		if(info.hred) then
-			if (w.SendMessage(info.hred, w.EM_GETMODIFY,0,0)) then
-				str.insert("*",0, hide.strbuf);
-			endif;
-		endif;
-		w.SetWindowText( window.hwnd, hide.strbuf );
-		ret();
-
-	end setWindowTitle;
-	
-	StreamInProc :procedure( var pBytesRead:dword ; NumBytes:dword ; var pbuffer:dword ; _hFile:dword );	
-
-		// read file into edit buffer
-
-	begin StreamInProc;
-		
-		w.ReadFile( _hFile, pbuffer, NumBytes, pBytesRead, NULL );
-		xor	(1, eax);
-	
-	end StreamInProc;
-
-	StreamOutProc :procedure( var pBytesRead:dword ; NumBytes:dword ; var pbuffer:dword ; _hFile:dword );
-	
-		// output edit buffer into file
-	
-	begin StreamOutProc;
-		
-		w.WriteFile( _hFile, pbuffer, NumBytes, pBytesRead, NULL );
-		xor	(1, eax);
-
-	end StreamOutProc;
-
-	saveFile :procedure( filename:string; save_selection:boolean );
-
-		// saves contents of edit buffer or selection to file
-		var
-			hfile	:dword;
-			
-
-	begin saveFile;
-		
-		filesys.extractExt( filename, strbuf );
-		
-		try
-			fileio.openNew( filename );
-			mov( eax,hfile );
-			mov( eax, editstream.dwCookie );
-			mov( &StreamOutProc, editstream.pfnCallback );
-			mov( w.SF_TEXT, eax );
-			if( save_selection ) then
-				or( w.SFF_SELECTION, eax );
-			endif;
-			w.SendMessage( info.hred, w.EM_STREAMOUT, eax, &editstream );
-			fileio.close( hfile );
-			w.SendMessage(info.hred, w.EM_SETMODIFY, false, 0);
-			mov( false,eax );
-			
-		anyexception
-			
-			Error( s_nosave, true );
-			mov( true, eax );
-			
-		endtry;
-		push( eax );
-		updateRecentLog();
-		setWindowTitle();
-		pop( eax );
-		done:
-		
-	end saveFile;
-	
-	getFileName	:procedure;
-	
-		// copies the current filename into buffer
-		var
-			ofn	:w.OPENFILENAME;
-			
-	
-	begin getFileName;
-		lea( ofn, eax );
-		w.RtlZeroMemory( eax, @size(ofn) );
-		mov( @size(ofn), ofn.lStructSize );
-		mov( window.hwnd, ofn.hWndOwner );
-		mov( hinst, ofn.hInstance );
-		mov( &curdir, eax );
-		mov( eax, ofn.lpstrInitialDir );
-		
-		zstr.cpy( (type zstring filepath ), &buffer );
-		mov( &buffer, eax );
-		mov( eax, ofn.lpstrFile );
-		mov( s_savetitle, eax );
-		mov( eax, ofn.lpstrTitle );
-		mov( @elements(buffer)-1, ofn.nMaxFile );
-		mov( w.OFN_EXPLORER | w.OFN_LONGNAMES | w.OFN_OVERWRITEPROMPT, ofn.Flags );
-		
-		dbg.put("ofn");
-		w.GetSaveFileName( ofn );
-	//	ret();
-	end getFileName;
-
-	SaveAs :procedure {@noframe};
-	
-		// save the current file under a new name
-		// new name becomes default
-	
-	begin SaveAs;
-		
-		getFileName();
-		if(eax) then
-			
-			str.cpyz( &buffer, filepath );
-			saveFile( filepath, false );
-			if(eax) then
-			 	// reset FileName to untitled
-			 	str.cpy( s_untitled, filepath );
-
-			endif; 
-			
-			setWindowTitle();
-			xor( eax, eax );
-			
-		else
-			
-			mov(-1,eax);
-			
-		endif;
-		ret();
-	end SaveAs;
-
-	SaveSelectionAs :procedure {@noframe};
-	
-		// save selected text with new name
-		// does not change current document.
-	
-	begin SaveSelectionAs;
-		
-		getFileName();	
-		if(eax) then
-			
-			str.cpyz( &buffer, hide.strbuf );
-			saveFile( hide.strbuf, true );
-		endif;
-		ret();
-	end SaveSelectionAs;
-
-
-	checkSave :procedure { @noframe };
-	
-		// checks to see if the current document has a title
-		// if not, it will generate a random name if that
-		// option is on.
-	
-	begin checkSave;
-		
-		if( str.ieq( filepath, s_untitled ) ) then
-			
-			if( config.readBool( s_settings, s_autosave ) ) then
-				
-				getTempName( s_untitled, s_txtext, filepath );
-				mov( 0, eax );
-			else
-				
-				SaveAs();
-				
-			endif;
-		else
-			
-			mov( 0, eax );
-			
-		endif;
-		
-		if( ! eax  ) then
-			saveFile( filepath, false );
-		endif;
-		setWindowTitle();
-		
-		ret();
-	end checkSave;
-	
-	getConfirm :procedure { @noframe, @returns("EAX") };
-
-		// checks for modified file, gets confirmation from user
-
-	begin getConfirm;
-		w.SendMessage(info.hred, w.EM_GETMODIFY,0,0);
-		if (eax) then
-			if( config.readBool( s_settings, s_autosave ) ) then
-
-				checkSave();
-				mov( false, eax );
-			
-			else
-				
-				w.MessageBox(window.hwnd, filepath, s_savechanges, w.MB_YESNOCANCEL | w.MB_ICONQUESTION);
-				if( eax=w.IDYES ) then
-						
-					checkSave();
-					xor( eax, eax );
-					
-				elseif (eax=w.IDNO) then
-			
-					xor( eax, eax );
-			
-				else
-			 
-					mov( true, eax );
-					
-				endif;
-				
-			endif;
-		else
-			
-			xor( eax, eax );
-			
-		endif;
-		ret();
-	end getConfirm;
-
-	
-	setFormat :procedure;
-		
-		// initializes a new edit buffer
-		// sets background and foreground colors
-		// sets font and margins
-		// sets tab width
-		
-		var
-			cf	:w.CHARFORMAT2;
-			tm	:w.TEXTMETRIC;	
-			
-	begin setFormat;
-		
-		w.SendMessage(info.hred, w.EM_GETMODIFY,0,0);
-		push( eax );
-		w.SendMessage(info.hred, w.EM_EXLIMITTEXT,0,-1);
-		
-		lea (eax, cf);
-		w.RtlZeroMemory (eax, @size(cf));
-		mov	(@size(cf), cf.cbSize);
-		mov	(w.CFM_CHARSET | w.CFM_FACE | w.CFM_SIZE | w.CFM_COLOR, cf.dwMask);
-		mov	(logfont.lfCharSet, al);
-		mov	(al,cf.bCharSet);
-		mov	(logfont.lfPitchAndFamily, al);
-		mov	(al, cf.bPitchAndFamily);
-		w.lstrcpyn(cf.szFaceName,&logfont.lfFaceName,w.LF_FACESIZE);
-		mov	(logfont.lfHeight, eax);
-		neg	(eax);
-		mov	(15,ecx);
-		mul (ecx);
-		mov	(eax, cf.yHeight);
-		push (window.textColor);
-		pop (cf.crTextColor);
-		w.SendMessage( info.hred, w.EM_SETBKGNDCOLOR, false, window.backColor);
-		w.SendMessage( info.hred, w.WM_SETFONT, info.hfont, true );
-	
-		
-		w.GetDialogBaseUnits();
-		movzx( ax, ecx );
-		str.cpy( "", strtabs );
-		config.readUns( s_settings, s_tabs );
-		push( eax );
-		// fill the tabs as spaces string
-		while( eax ) do
-			str.cat( " ", strtabs );
-			dec( eax ); 
-		endwhile;
-		pop( eax );
-		
-		mul( ecx );
-		shr( 1, eax );
-		mov( eax, info.tabs );
-		dbg.put("tabs :", info.tabs );
-		w.SendMessage(info.hred, w.EM_SETTABSTOPS, 1, &info.tabs );
-		
-		w.SendMessage( info.hred, w.EM_SETMARGINS, w.EC_LEFTMARGIN | w.EC_RIGHTMARGIN, 5<<16 | 5 );
-		
-		lea(eax, cf);
-		w.SendMessage( info.hred, w.EM_SETCHARFORMAT, w.SCF_ALL, eax );
-		pop	(eax);
-		w.SendMessage( info.hred, w.EM_SETMODIFY, eax,0 );
-		
-	end setFormat;
-
-	GetSelText :procedure( lpBuff:dword );
-	
-		// gets the selected text range for use
-		// with find
-	
-	begin GetSelText;
-	
-		mov( lpBuff, eax );
-		mov( eax, find_range.lpstrText );
-		
-		w.SendMessage(info.hred, w.EM_EXGETSEL,0, &find_range.chrg);
-		mov	(find_range.chrg.cpMax,eax);
-		sub	(find_range.chrg.cpMin,eax);
-		if( eax >= @elements( findbuf ) ) then
-			mov( @elements( findbuf) -1, find_range.chrg.cpMax );
-		endif;
-		
-		w.SendMessage(info.hred, w.EM_GETTEXTRANGE,0,&find_range);
-	
-	end GetSelText;
-		
-	AboutDlgProc :procedure( lParam:dword; wParam:dword; uMsg:uns32; hDlg:dword);
-	
-		// opens a window to display version number
-	
-	begin AboutDlgProc;
-		
-		if (uMsg = w.WM_INITDIALOG) then
-			mov	(hDlg, window.habout);
-			w.SetDlgItemText( window.habout,ID_ABOUTGRP,version ); 
-			w.SetFocus(window.habout);
-			
-		elseif (uMsg = w.WM_COMMAND) then
-			 if (wParam = w.IDOK || wParam= w.IDCANCEL) then				
-
-			 	w.SendMessage(hDlg, w.WM_CLOSE,NULL,NULL);
-
-			 endif;
-		elseif (uMsg = w.WM_CLOSE) then
-
-			w.DestroyWindow(window.habout);
-			mov	(0, window.habout);
-			w.SetFocus(info.hred);
-		
-		else
-			mov (false, eax);
-			exit AboutDlgProc;
-		endif;
-	
-		mov (true, eax);	
-		
-	end AboutDlgProc;
-		
-	command_insert_time :procedure;
-	
-		// inserts date/time at cursor
-		var systime		:w.SYSTEMTIME;
-
-	begin command_insert_time;
-	
-		w.GetSystemTime(systime);
-		w.GetDateFormat(	w.LOCALE_USER_DEFAULT,
-						w.LOCALE_NOUSEROVERRIDE,
-						NULL,	// systemtime
-						NULL,	// format
-						&buffer,
-						@size(buffer));
-		mov( ' ', buffer[eax-1] );
-		mov( #$0, buffer[eax] );
-		w.SendMessage(info.hred, w.EM_REPLACESEL, true, &buffer);
-		
-		w.GetTimeFormat(	w.LOCALE_USER_DEFAULT,
-						w.LOCALE_NOUSEROVERRIDE,
-						NULL,
-						NULL,
-						&buffer,
-						@size(buffer));
-		w.SendMessage(info.hred, w.EM_REPLACESEL, true, &buffer);
-	
-	end command_insert_time;
-		
-	
-	JumpLog :procedure 
-		
-		// inserts the date/time in the editor
-		// either at the top of the file, or appends to the bottem
-		// direction is determined in al
-		
-		{@noframe};
-	begin JumpLog;
-	
-		if (al='<') then	// append at top
-			w.SendMessage( info.hred,w.EM_SETSEL,5,5 );
-			
-		else				// append at bottom
-			w.SendMessage( info.hred,w.EM_SETSEL,-1,-1 );
-		endif;
-		w.SendMessage( info.hred, w.EM_REPLACESEL,true, s_nl );
-		command_insert_time();
-		w.SendMessage( info.hred, w.EM_REPLACESEL,true, s_nl );
-		ret();
-		
-	end JumpLog;
-	
-
-	checkLog :procedure{ @noframe };
-
-		// looks at the top of the file to determine is
-		// the user desires logging
-		// looks for .LOG message on top of loaded file.
-		// optionally, there may be a direction determined by
-		// '<' this is loaded into al and control passed to JumpLog();
-
-	begin checkLog;
-		//dbg.put ("CheckLog");
-		mov( 0, find_range.chrg.cpMin );
-		mov( 5, find_range.chrg.cpMax );
-		mov( &buffer,find_range.lpstrText );
-		w.SendMessage( info.hred, w.EM_GETTEXTRANGE, 0, &find_range);
-		mov(&buffer,esi);
-		lodsd();
-		if ( eax = $474f4c2e ) then	// .LOG
-			// check direction
-			lodsb();
-			JumpLog();
-			w.SendMessage( info.hred, w.EM_SETMODIFY, false, 0 );
-		endif;
-		ret();
-	end checkLog;
-
-	newInstance :procedure( filename:string );
-		
-		// opens a new instance of SavageEd
-		
-		var
-			s	:string;
-			
-	
-	begin newInstance;
-		dbg.put("newInstance" );
-		
-		move( str.talloc( 300 ), s );
-		add( 20,window.xPos );
-		config.writeUns( s_window, "xPos",window.xPos );
-		add( 20,window.yPos );
-		config.writeUns( s_window, "yPos",window.yPos );
-		config.writeUns( s_window, "width",window.width);
-		config.writeUns( s_window, "height",window.height);
-		
-		getConfigPath( s );
-		config.writeFileName( s );
-		
-		w.GetModuleFileName( NULL, &buffer, @size(buffer) );
-		str.cpyz( &buffer, s );
-		if( filename != NULL ) then
-			str.put2( s, ' ', filename );
-		endif;
-		os.bkgnd( s );
-		
-	end newInstance;
 
 	selectFont :procedure;
 
@@ -578,7 +76,7 @@ proc
 		
 		w._ChooseFont(cf);
 		if (eax) then
-		
+
 			w.DeleteObject(info.hfont);
 			w.CreateFontIndirect(logfont);
 			mov( eax, info.hfont );
@@ -587,11 +85,20 @@ proc
 			setFormat();
 			config.writeHex( s_text, s_background_color, window.backColor);
 			config.writeHex( s_text, s_text_color, window.textColor);
-			config.writeBin( s_text, s_font, &logfont, @size( logfont ) );
+
+			config.writeInt( s_font, "Height", logfont.lfHeight );
+			config.writeInt( s_font, "Width", logfont.lfWidth );
+			config.writeInt( s_font, "Weight", logfont.lfWeight );
+			
+			movzx( logfont.lfItalic, eax );
+			config.writeInt( s_font, "Italic", eax );
+			movzx( logfont.lfPitchAndFamily, eax );
+			config.writeInt( s_font, "Pitch", eax );
+			str.cpyz (&logfont.lfFaceName, strbuf );
+			config.writeString( s_font, "Name", strbuf );
 			
 		endif;
 	end selectFont;
-	
 	selectColor :procedure { @returns("EAX") };
 		
 		// color picker
@@ -605,7 +112,7 @@ proc
 		mov( eax, cc.lStructSize );
 		push(window.hwnd );
 		pop( cc.hwndOwner );
-		push( hinst );
+		push( window.hinst );
 		pop( cc.hInstance );
 		mov( w.CC_RGBINIT, cc.Flags );
 		mov( &customColors, cc.lpCustColors);
@@ -633,7 +140,7 @@ proc
 			
 	begin updateMenu;
 		pushabi;
-		//dbg.put("updateMenu");
+		dbg.put("updateMenu");
 		if( window.hsubmenu <> 0 ) then
 			w.DestroyMenu( window.hsubmenu );
 			mov( 0, window.hsubmenu );
@@ -660,89 +167,74 @@ proc
 		w.GetSubMenu( eax, 0 );
 		w.ModifyMenu( eax, 8, w.MF_BYPOSITION | w.MF_POPUP| w.MF_ENABLED,
 					window.hsubmenu, s_recent );
+	
+		if( config.readBool( s_settings, s_wrap )) then
+			
+			w.CheckMenuItem( window.hmenu, IDM_WRAP, w.MF_BYCOMMAND | w.MF_CHECKED );
+			w.SendMessage( info.hred, w.EM_SETTARGETDEVICE, NULL, 0 );
+		else
+			w.SendMessage( info.hred, w.EM_SETTARGETDEVICE, NULL, 1 );			
+		endif;
+		
+		if( config.readBool( s_settings, s_readonly )) then
+			
+			w.CheckMenuItem( window.hmenu, IDM_READONLY, w.MF_BYCOMMAND | w.MF_CHECKED );
+		endif;
+		
+		if( config.readBool( s_settings, s_autosave ) ) then
+			w.CheckMenuItem( window.hmenu, IDM_AUTO, w.MF_BYCOMMAND | w.MF_CHECKED);
+		endif;
+		
+		if( config.readBool( s_settings, s_autoindent ) ) then
+			w.CheckMenuItem( window.hmenu, IDM_AUTOINDENT, w.MF_BYCOMMAND | w.MF_CHECKED);
+		endif;
+		
+		if( config.readBool( s_settings, s_tabsasspace ) ) then
+			w.CheckMenuItem( window.hmenu, IDM_TAB_AS_SPACE, w.MF_BYCOMMAND | w.MF_CHECKED);
+		endif;
+		
+		if( config.readBool( s_settings, s_topwindow )) then
+
+			w.CheckMenuItem( window.hmenu, IDM_PEG, w.MF_BYCOMMAND | w.MF_CHECKED );
+			w.SetWindowPos( window.hwnd, w.HWND_TOPMOST, 0, 0, 0, 0, 0 );		
+
+		endif;
+		
+		if( config.readBool( s_settings, s_clearexit ) ) then
+			
+			w.CheckMenuItem( window.hmenu, IDM_CLEAREXIT, w.MF_BYCOMMAND | w.MF_CHECKED );
+			
+		endif;
+		
+		if( config.readBool( s_settings, s_recentnew ) ) then
+			
+			w.CheckMenuItem( window.hmenu, IDM_RECENTNEW, w.MF_BYCOMMAND | w.MF_CHECKED );
+			
+		endif;
+			
+		if( config.readBool( s_settings, s_openrecent ) ) then
+			
+			w.CheckMenuItem( window.hmenu, IDM_OPENRECENT, w.MF_BYCOMMAND | w.MF_CHECKED );
+			
+		endif;
+		
+		if( config.readBool( s_settings, s_rememberpos ) ) then
+			w.CheckMenuItem( window.hmenu, IDM_REMEMBERPOS, w.MF_BYCOMMAND | w.MF_CHECKED );
+		endif;
+		
+		if( config.readBool( s_window, s_status ) ) then
+			
+			w.CheckMenuItem( window.hmenu, IDM_VIEW_STATUS, w.MF_BYCOMMAND | w.MF_CHECKED );
+			w.ShowWindow( window.hstatus, true );
+			
+		endif;
+		
 		w.DrawMenuBar( window.hwnd );
 		
 		//dbg.put("/updateMenu");
 		popabi;
 	end updateMenu;
 	
-	openRecent :procedure(id:dword);
-	
-		// opens a recent file
-		// may start a new instance, based on user options
-		
-		var
-			s	:string;
-			
-	begin openRecent;
-		//dbg.put("openRecent" );
-		move( str.talloc( 300 ), s );
-		getConfirm();
-		if (! eax) then
-			w.GetMenu( window.hwnd );
-			w.GetMenuStringA( eax, id, buffer, @elements( buffer ), w.MF_BYCOMMAND );
-			str.cpyz( &buffer, s );
-			
-			if( config.readBool( s_settings, s_recentnew )) then
-				
-				newInstance( s );
-				
-			else
-				
-				loadFile( s );
-				if( ! eax ) then
-					config.findItem( s_recent, s );
-					config.deleteItem( s_recent, eax );
-					updateMenu();
-				endif;
-				
-			endif;
-			
-		endif;
-	
-	end openRecent;
-
-	updateRecentLog :procedure {@noframe};
-	
-		// update the recent log and menu
-	
-	begin updateRecentLog;
-		//dbg.put("updateRecentLog");
-		if( config.findItem ( s_recent, filepath ) <> -1 ) then
-			
-			config.deleteItem ("Recent Files", eax);
-			
-		endif;
-		
-		config.insertItem( s_recent, 0, filepath );
-		
-		if( config.getItemCount( s_recent ) > 20) then
-			
-			config.deleteItem( s_recent, 20 );
-			
-		endif;
-		updateMenu();
-		ret();
-	end updateRecentLog;
-
-	setText :procedure( hfile:dword );
-	
-		// load a file into the buffer
-	
-	begin setText;
-		
-		w.SetWindowText( info.hred, 0 );
-		w.GetFileSize( hfile, NULL );
-		if( eax > 0 ) then
-			mov( hfile, editstream.dwCookie );
-			mov( &StreamInProc, editstream.pfnCallback );
-			w.SendMessage( info.hred, w.EM_STREAMIN, w.SF_TEXT, &editstream );
-			w.SendMessage( info.hred, w.EM_SETMODIFY, false,0 );
-		else
-		
-		endif;
-	end setText;
-
 	loadFile :procedure( filename:string );
 	
 		// load filename into the edit buffer
@@ -758,7 +250,7 @@ proc
 			mov( eax, hfile );
 			setText( hfile );
 			fileio.close( hfile );
-			str.cpy( filename, filepath );
+			str.cpy( filename, info.filepath );
 
 			dbg.put("filename = ", filename );
 			filesys.extractExt( filename, strbuf );
@@ -768,7 +260,8 @@ proc
 			// clear the undo buffer since we probably made some formatting and alterations
 			// to the file
 			w.SendMessage( info.hred, w.EM_EMPTYUNDOBUFFER, 0, 0 );
-			setWindowTitle();		
+			mov( MODE_INSERT, info.mode );
+			updateStatus();	
 			or( 1, eax );
 			
 		anyexception
@@ -794,7 +287,7 @@ proc
 		w.RtlZeroMemory(eax,@size(ofn));
 		mov	(@size(ofn),ofn.lStructSize);
 		mov	(window.hwnd,ofn.hWndOwner);
-		mov( hinst, ofn.hInstance );
+		mov( window.hinst, ofn.hInstance );
 		
 		mov	(&curdir,eax);
 		mov (eax, ofn.lpstrInitialDir);
@@ -810,32 +303,8 @@ proc
 				loadFile( hide.strbuf );
 			endif;
 		w.SetFocus(info.hred);
-		updateStatus();
+
 	end fileOpen;
-
-	Msg_OpenDroppedFile :procedure( hwnd:dword; wParam:dword; lParam:dword );
-
-		// handles opening dropped files
-
-	begin Msg_OpenDroppedFile;
-		pushabi;
-		
-		w.SetForegroundWindow(window.hwnd);
-		w.SetFocus(info.hred);	
-	
-		getConfirm();
-		if (!eax) then	
-			w.SetWindowText( info.hred, 0 );		// clear edit window
-			w.DragQueryFile( wParam, 0, &buffer, @size(buffer) );
-			w.GetLongPathName( &buffer, &buffer, @size(buffer) );
-			str.cpyz( &buffer, hide.strbuf );
-			loadFile( hide.strbuf );
-			
-		endif;
-		popabi;
-		xor( eax, eax );
-		
-	end Msg_OpenDroppedFile;	
 		
 	findNormal :procedure( opts:dword );
 	
@@ -990,107 +459,6 @@ proc
 		ret();
 	end Find;
 
-	AddMenus :procedure;
-		
-		// initializes menus
-		
-		storage
-			file_menu :dword;
-			edit_menu :dword;
-			options_menu :dword;
-			view_menu :dword;
-			help_menu :dword;
-			s_recent_menu :dword;
-			
-	begin AddMenus;
-		
-		// create all the menu handles here
-		mov( w.CreateMenu(), file_menu);
-		mov( w.CreateMenu(), edit_menu);
-		mov( w.CreateMenu(), options_menu);
-		mov( w.CreateMenu(), view_menu);
-		mov( w.CreateMenu(), help_menu);
-		mov( w.CreatePopupMenu(), s_recent_menu );
-		
-		//
-		//	File Menu
-		//
-		
-		w.AppendMenu( file_menu, w.MF_STRING, IDM_NEW, "&New	Ctrl+N");
-		w.AppendMenu( file_menu, w.MF_STRING, IDM_OPEN, "&Open	Ctrl+O");
-		w.AppendMenu( file_menu, w.MF_STRING, IDM_INST, "New &Window	Shift+Ctrl+N");
-		w.AppendMenu( file_menu, w.MF_SEPARATOR, NULL, NULL);
-		w.AppendMenu( file_menu, w.MF_STRING, IDM_SAVE, "&Save	Ctrl+S");
-		w.AppendMenu( file_menu, w.MF_STRING, IDM_SAVEAS, "Save &As...	Shift+Ctrl+S");
-		w.AppendMenu( file_menu, w.MF_STRING, IDM_SAVE_SELECTION_AS, "Save Se&lection As...");
-		w.AppendMenu( file_menu, w.MF_SEPARATOR, NULL, NULL);
-		w.AppendMenu( file_menu, w.MF_STRING, IDM_RECENT, "Recent Files");
-		w.AppendMenu( file_menu, w.MF_SEPARATOR, NULL, NULL);
-		w.AppendMenu( file_menu, w.MF_STRING, IDM_QUIT, "&Quit	ESC");
-		w.AppendMenu( window.hmenu, w.MF_POPUP, file_menu, "&File");
-
-		//
-		//	Edit Menu
-		//
-	
-		w.AppendMenu( edit_menu, w.MF_STRING, IDM_UNDO, "&Undo	Ctrl+Z");
-		w.AppendMenu( edit_menu, w.MF_STRING, IDM_REDO, "&Redo	Ctrl+Y");
-		w.AppendMenu( edit_menu, w.MF_SEPARATOR, NULL, NULL);
-		w.AppendMenu( edit_menu, w.MF_STRING, IDM_CUT, "&Cut	Ctrl+X");
-		w.AppendMenu( edit_menu, w.MF_STRING, IDM_COPY, "C&opy	Ctrl+C");
-		w.AppendMenu( edit_menu, w.MF_STRING, IDM_PASTE, "&Paste	Ctrl+V");
-		w.AppendMenu( edit_menu, w.MF_STRING, IDM_SELECTALL, "Select &All	Ctrl+A");
-		w.AppendMenu( edit_menu, w.MF_SEPARATOR, NULL, NULL);
-		w.AppendMenu( edit_menu, w.MF_STRING, IDM_FIND, "&Find / Replace	Ctrl+F");
-		w.AppendMenu( edit_menu, w.MF_STRING, IDM_FINDNEXT, "Find &Next	F3");
-		w.AppendMenu( edit_menu, w.MF_STRING, IDM_FINDPREV, "Find &Previous	Ctrl+F3");
-		w.AppendMenu( edit_menu, w.MF_STRING, IDM_EDIT_GOTO, "&Goto Line	Ctrl+G");
-		w.AppendMenu( edit_menu, w.MF_SEPARATOR, NULL, NULL);
-		w.AppendMenu( edit_menu, w.MF_STRING, IDM_TIME, "&Insert Date/Time	F5");
-		w.AppendMenu( window.hmenu, w.MF_POPUP, edit_menu, "&Edit");
-
-		//
-		//	Options Menu
-		//
-
-		w.AppendMenu( options_menu, w.MF_STRING, IDM_FONT, "&Font...");
-		w.AppendMenu( options_menu, w.MF_STRING, IDM_FORGROUND, "&Forground Color...");
-		w.AppendMenu( options_menu, w.MF_STRING, IDM_BACKGROUND, "&Background Color...");
-		w.AppendMenu( options_menu, w.MF_SEPARATOR, NULL, NULL);
-		w.AppendMenu( options_menu, w.MF_STRING, IDM_AUTO, "&Autosave	F2");
-		w.AppendMenu( options_menu, w.MF_STRING, IDM_READONLY, "&Read Only	F6");
-		w.AppendMenu( options_menu, w.MF_STRING, IDM_SETTAB, "&Set Tabs...");
-		w.AppendMenu( options_menu, w.MF_STRING, IDM_TAB_AS_SPACE, "Tabs As &Spaces");
-		w.AppendMenu( options_menu, w.MF_STRING, IDM_AUTOINDENT, "Auto &Indent");
-		w.AppendMenu( options_menu, w.MF_STRING | w.MF_POPUP, s_recent_menu, "Recent File Options");
-			w.AppendMenu( s_recent_menu, w.MF_STRING, IDM_RECENTNEW, "Open in New Window");
-			w.AppendMenu( s_recent_menu, w.MF_STRING, IDM_CLEAREXIT, "Clear History on Exit");
-			w.AppendMenu( s_recent_menu, w.MF_STRING, IDM_OPENRECENT, "Open Most Recent");
-			w.AppendMenu( s_recent_menu, w.MF_STRING, IDM_REMEMBERPOS, "Remember Position");
-		w.AppendMenu( options_menu, w.MF_SEPARATOR, NULL, NULL);
-		w.AppendMenu( window.hmenu, w.MF_POPUP, options_menu, "&Options");
-
-		//
-		//	View Menu
-		//
-
-		w.AppendMenu( view_menu, w.MF_STRING, IDM_PEG, "&Stay on Top	Ctrl+T");
-		w.AppendMenu( view_menu, w.MF_STRING, IDM_WRAP, "&Word Wrap	F4");
-		w.AppendMenu( view_menu, w.MF_STRING, IDM_VIEW_STATUS, "&Status Bar");
-		w.AppendMenu( window.hmenu, w.MF_POPUP, view_menu, "&View");
-
-		//
-		//	Help Menu
-		//
-
-		w.AppendMenu( help_menu, w.MF_STRING, IDM_ABOUT, "&About...");
-		w.AppendMenu( help_menu, w.MF_STRING, IDM_DOCUMENTS, "&Documents");
-		w.AppendMenu( window.hmenu, w.MF_POPUP, help_menu, "&Help");
-
-		w.SetMenu(window.hwnd, window.hmenu);
-
-	end AddMenus;
-
 	Proc_Edit	:procedure( lParam:dword; wParam:dword; uMsg:uns32; hWin:dword );
 	
 		// this is the subclassed window procedure of the edit control
@@ -1123,7 +491,7 @@ proc
 			case( w.WM_SYSKEYUP )
 				dbg.put("syskey up =>", wParam );
 				mov( false, alt_down );
-			
+//bm=keycommands			
 			case( w.WM_KEYDOWN )
 				dbg.put("key down =>", wParam );
 				mov( wParam, eax );
@@ -1191,12 +559,13 @@ proc
 
 					case( w.VK_J )
 					
+						dbg.put("wParam :", wParam );
 						if( ctrl_down ) then
 							command_cursor_left();
 							mov( 0, info.saved_column_index );
 							jmp skip_proc;
 						endif;
-
+						
 					case( w.VK_K )
 						
 						if( ctrl_down) then
@@ -1327,14 +696,13 @@ proc
 							// check to see if we are on line 1
 							if( info.line.number = 0 ) then
 								
-								// doesn't work as intended, but we need
-								// to get too hacky, so just go with this.
 								command_move_to_bol();
 								
 							else
 							
 								// open line above
 								command_cursor_up();
+								getInfo(info);
 								jmp do_shift;
 							
 							endif;
@@ -1435,9 +803,6 @@ proc
 				default
 				endswitch;
 				
-				// keyup was processed, things possibly happened
-				// update our status information
-				updateStatus();
 			
 			case( w.WM_CHAR )
 				dbg.put("char =>", wParam );
@@ -1447,8 +812,7 @@ proc
 				endif;
 
 		endswitch;
-		
-		
+			
 		// pass control to the default edit window proc
 		w.CallWindowProc(info.old_proc, hWin, uMsg, wParam, lParam );
 		
@@ -1458,62 +822,6 @@ proc
 	end Proc_Edit;
 
 
-	Proc_Input :procedure( lParam:dword; wParam:dword; uMsg:uns32; hWin:dword );
-	
-		// opens a text box to get text input
-	
-	begin Proc_Input;
-		pushabi;
-		
-		mov( uMsg, eax );
-		
-		if( eax = w.WM_COMMAND ) then
-	
-			mov( wParam, eax );
-			mov( eax, edx );
-			shr( 16, edx );
-			and( $0ffff, eax );
-			if( edx = w.BN_CLICKED ) then
-				
-				if( eax = w.IDOK ) then
-					
-					w.GetDlgItemTextA( hWin, IDC_EDT_INPUT, buffer, @size(buffer) );
-					str.a_cpyz( &buffer );
-					mov( eax, return );
-					
-					w.SendMessage( hWin, w.WM_DESTROY, 0, 0 );
-					
-				elseif( eax = w.IDCANCEL ) then
-					
-					mov( 0, return );
-					w.SendMessage( hWin, w.WM_DESTROY, 0, 0 );
-					
-				endif;
-				
-			endif;
-	
-		elseif( eax = w.WM_CLOSE ) then
-			
-			w.SendMessage( hWin, w.WM_DESTROY, 0, 0 );
-		
-		elseif( eax = w.WM_DESTROY ) then
-			
-			w.EndDialog( hWin, return );
-			
-		elseif( eax = w.WM_INITDIALOG ) then
-			
-			if( lParam ) then
-				w.SetWindowText( hWin, lParam );
-			endif;
-			
-			w.GetDlgItem( hWin, IDC_EDT_INPUT );
-			w.SetFocus( eax );
-			
-		endif;
-		
-		xor( eax, eax );
-		popabi;
-	end Proc_Input;
 
 	Proc_FindDlg :procedure( lParam:dword; wParam:dword; uMsg:uns32; hWin:dword );
 	
@@ -1726,7 +1034,7 @@ proc
 		
 		
 		// look for config at default location, which is SavageEd folder
-		w.GetModuleFileName (hinst, &buffer, @size(buffer) );
+		w.GetModuleFileName (window.hinst, &buffer, @size(buffer) );
 		str.cpyz( &buffer, default_config );
 		filesys.extractPath( default_config, default_config );
 		str.put2( default_config, '\', config_file );
@@ -1755,14 +1063,11 @@ proc
 			endif;
 			
 		endif;
-	
-		//dbg.put("default_config :", default_config );
-		//dbg.put("find_config :", find_config );
 		
 	end getConfigPath;
 
 
-	initConfig	:procedure { @noframe };
+	initConfig	:procedure;
 	
 	/*
 		Look for SavageEd.ini file:
@@ -1774,9 +1079,15 @@ proc
 		expand this as more settings are added
 	*/
 	
+		var
+			config_path	:string;
+			
+	
 	begin initConfig;
-		getConfigPath( hide.strbuf );
-		if( filesys.exists( hide.strbuf ) ) then
+		
+		mov( str.talloc(400), config_path );
+		getConfigPath( config_path );
+		if( filesys.exists( config_path ) ) then
 			
 			// set default find mode
 			mov( false, info.find_mode.down );
@@ -1788,7 +1099,7 @@ proc
 			
 			// config file exists, read it and
 			// apply settings as per file.
-			config.create_file( hide.strbuf );
+			config.create_file( config_path );
 			config.readUns( s_window, "xPos" );
 			mov( eax,window.xPos );
 			config.readUns( s_window, "yPos" );
@@ -1798,7 +1109,22 @@ proc
 			config.readUns( s_window, "height" );
 			mov( eax,window.height );
 			
-			config.readBin( s_text, s_font, &logfont, @size( logfont ) );
+			
+			config.readInt( s_font, "Height" );
+			mov( eax, logfont.lfHeight );
+			config.readInt( s_font, "Width" );
+			mov( eax, logfont.lfWidth );
+			config.readInt( s_font, "Weight" );
+			mov( eax, logfont.lfWeight );
+			str.cpyz (&logfont.lfFaceName, strbuf );
+			
+			config.readString( s_font, "Name", strbuf );
+			zstr.cpy( (type zstring strbuf ), &logfont.lfFaceName );
+			
+			config.readInt( s_font, "Italic");
+			mov( al, logfont.lfItalic);
+			config.readInt( s_font, "Pitch" );			
+			mov( al, logfont.lfPitchAndFamily);
 			config.readHex( s_text, s_background_color);
 			mov( eax, window.backColor );
 			config.readHex( s_text, s_text_color);
@@ -1814,8 +1140,6 @@ proc
 			
 			config.create();
 			config.writeUns( s_settings, s_tabs, DEFAULT_TAB_STOP );
-			getConfigPath( hide.strbuf );
-			config.writeFileName( hide.strbuf );
 
 			// some hard coded defaults
 			mov( 10,window.xPos );
@@ -1828,124 +1152,42 @@ proc
 			
 			// get default font
 			zstr.cpy( (type zstring s_fontname ), &logfont.lfFaceName );
+			str.cpyz( &s_fontname, strbuf );
+			config.writeString( s_font, "Name", strbuf );
 			mov( -12, logfont.lfHeight );
 			mov( 400, logfont.lfWeight );
+			mov( 0, logfont.lfItalic );
+			mov( 49, logfont.lfPitchAndFamily );
+			mov( 400, logfont.lfWeight );
+			config.writeFileName( config_path );
 			
 		endif;
-		
-		ret();		
-	end initConfig;
-
-
-	initWindow	:procedure { @noframe };
-	
-	//	window creation initialization goes here
-	//	register and create window.
-		
-	//	returns:
-	//		success = true in eax
-	//		failure = false in eax
-		static 	wc:w.WNDCLASSEX;
-
-		
-	begin initWindow;
-		
-		w.GetModuleHandle( NULL );
-		mov( eax, hinst );
-		
-		w.LoadLibrary( RichEditDLL );
-		if (eax = NULL ) then
-			Error( s_missingDLL, false );
-			xor(eax,eax);
-			ret();
-	    endif;
-	    
-		mov	(eax,hredDLL);
-		
-		w.InitCommonControls();
-		str.cpy( s_untitled, filepath );
-
-		mov( 0, findbuf[0] );
-		mov( 0, replacebuf[0] );		
-
-		w.CreateFontIndirect( &logfont );
-		mov( eax, info.hfont );
-		
-		// main window created here
-		// describe and register the window class
-		mov( @size(w.WNDCLASSEX), wc.cbSize );
-		mov( w.CS_HREDRAW | w.CS_VREDRAW, wc.style );
-		mov( &WndProc, wc.lpfnWndProc );
-		mov( NULL, wc.cbClsExtra );
-		mov( NULL, wc.cbWndExtra );
-		mov( hinst, wc.hInstance );
-		mov( w.COLOR_BTNFACE+1, wc.hbrBackground );
-		mov( ClassName, wc.lpszClassName );
-		
-		w.LoadIcon(hinst, val ID_JAKAL);
-		mov( eax, wc.hIcon );
-		mov( eax, wc.hIconSm );
-		w.LoadCursor( NULL, val w.IDC_ARROW );
-		mov( eax,wc.hCursor );
-		
-		// register the window class
-		if ( ! w.RegisterClassEx( wc )) then
-			Error( "Unable to register Window Class", false);
-			ret();
-		endif;
-			
-		// create the window
-		w.CreateWindowEx(
-				NULL,					// dwExStyle
-				ClassName,				// lpClassName
-				AppName,				// lpWindowName
-				w.WS_OVERLAPPEDWINDOW,	// dwStyle
-				window.xPos,	// x
-				window.yPos,	// y
-				window.width,	// nWidth
-				window.height,	// nHeight
-				NULL,					// hWndParent
-				NULL,					// hMenu
-				hinst,					// hInstance
-				NULL );					// lpParam
 				
-		if( ! eax ) then
-			Error( "Unable to create window", false);
-			ret();
-		endif;
-		
-		w.ShowWindow( window.hwnd, w.SW_SHOWNORMAL );
-		w.UpdateWindow( window.hwnd );
-
-		ret();
-	end initWindow;
-
-	Cmd_File_Quit :procedure( hwin:dword; wparam:dword; lparam:dword );
-	begin Cmd_File_Quit;
-		
-		w.SendMessage (hwin, w.WM_CLOSE, 0, 0 );
-		
-	end Cmd_File_Quit;
+	end initConfig;
 
 	updateStatus :procedure;
 		
 		// update the status bar
 		// called every time a key up message is processed
 		// or when the status bar needs to be updated
+		var
+			tempstr	:string;
+			
 			
 	begin updateStatus;
 		
+		mov( str.talloc( 1000 ), tempstr );
 		getInfo( info );
 		
 		// draw the line/pos information on the status bar
 		mov( info.line.number, eax );
 		inc( eax );
-		conv.u32ToStr( eax, 20, ' ', hide.strbuf );
-		str.trim( hide.strbuf );
-		str.put( strbuf, "Line: ", hide.strbuf, "   " );
-		conv.u32ToStr( info.column_index, 20,' ', hide.strbuf );
-		str.trim( hide.strbuf );
-		str.put2( strbuf, "Column: ", hide.strbuf, "   " );
+		conv.u32ToStr( eax, 20, ' ', tempstr );
+		str.trim( tempstr );
+		str.put( strbuf, "Line: ", tempstr, "   " );
+		conv.u32ToStr( info.column_index, 20,' ', tempstr );
+		str.trim( tempstr );
+		str.put2( strbuf, "Column: ", tempstr, "   " );
 		mov( info.lines, eax );
 		str.put2( strbuf, "    Pos: ", (type uns32 info.cursor.start_index ), " | Lines: ", (type uns32 eax));
 		
@@ -1965,252 +1207,41 @@ proc
 		endif;
 		
 		if( info.mark.isSet ) then
-			
-			//visual select mode is on, follow the selection
 			w.SendMessage( window.hstatus, w.SB_SETTEXT, 3, s_mark );
 			
 		else
 			w.SendMessage( window.hstatus, w.SB_SETTEXT, 3, s_b );
 		endif;
 		
+		movzx( info.mode, eax );
+		switch( eax )
+				
+			case( MODE_EDITINI )
+				str.put( tempstr, "Mode :Edit Configuration" );
+				w.SendMessage( window.hstatus, w.SB_SETTEXT, 4, tempstr );
+
+			case( MODE_VIEWDOCS )
+				str.put( tempstr, "Mode :View Documentation" );
+				w.SendMessage( window.hstatus, w.SB_SETTEXT, 4, tempstr );
+
+			default
+			
+				// default will be insert mode
+				str.put( tempstr, "Mode :Insert" );
+				w.SendMessage( window.hstatus, w.SB_SETTEXT, 4, tempstr);
+		endswitch;
+		
 		// window title may have changed somewhere along the line, update it
 		setWindowTitle();
 		
 	end updateStatus;
 
-	Msg_Create :procedure( hwin:dword; wparam:dword; lparam:dword );
-	
-		// create the main window
-		// read settings from config to determine positions
-		// update menus based on configuration settings
-		// looks for command line passed arguments to open existing file
-		// or start new file.
-		var
-			edit_style	:dword;
-			
-	
-	begin Msg_Create;
-		
-		mov(hwin, eax);
-		mov(eax, window.hwnd);
-		w.CreateMenu();
-		mov(eax, window.hmenu);
-		w.SetMenu(window.hwnd, window.hmenu);
-		//w.GetMenu( hwnd );
-		//mov( eax, hmenu );
-		AddMenus();
-		w.GetSubMenu( window.hmenu, 1 );
-		mov( eax, window.hcontextmenu );
-		w.DragAcceptFiles( window.hwnd, true );
-
-		w.CreateStatusWindow( w.WS_CHILD, NULL, window.hwnd, IDC_SBAR );
-		mov( eax, window.hstatus );
-		w.SendMessage( eax, w.SB_SETPARTS, STATUS_PARTS, &statusParts );
-
-
-		mov( 	w.ES_AUTOVSCROLL | w.ES_LEFT | w.ES_MULTILINE |
-				w.ES_NOHIDESEL | w.ES_WANTRETURN |
-				w.WS_CHILD | w.WS_CLIPSIBLINGS | w.WS_HSCROLL | w.ES_AUTOHSCROLL |
-				w.WS_VSCROLL | w.WS_VISIBLE,
-				edit_style );
-					
-				
-		// create edit window
-		w.CreateWindowEx( w.WS_EX_CLIENTEDGE, s_resedClass, NULL,
-					edit_style, 0, 0, 0, 0, window.hwnd, window.hcontextmenu, hinst, NULL );
-		
-		mov( eax, info.hred );
-		
-		// subclass the edit control
-		w.SetWindowLong(info.hred, w.GWL_WNDPROC, &Proc_Edit);
-		mov( eax, info.old_proc);
-		
-		w.SendMessage( info.hred, w.EM_SETEVENTMASK, 0, w.ENM_SELCHANGE | w.ENM_KEYEVENTS
-						| w.ENM_MOUSEEVENTS );
-		
-		setFormat();
-		w.SetFocus( info.hred );
-		
-		if( config.readBool( s_settings, s_wrap )) then
-			
-			w.CheckMenuItem( window.hmenu, IDM_WRAP, w.MF_BYCOMMAND | w.MF_CHECKED );
-			w.SendMessage( info.hred, w.EM_SETTARGETDEVICE, NULL, 0 );
-		else
-			w.SendMessage( info.hred, w.EM_SETTARGETDEVICE, NULL, 1 );			
-		endif;
-		
-		if( config.readBool( s_settings, s_readonly )) then
-			
-			w.CheckMenuItem( window.hmenu, IDM_READONLY, w.MF_BYCOMMAND | w.MF_CHECKED );
-			or( w.ES_READONLY, edit_style );
-		endif;
-		
-		
-		// update menu
-		dbg.put("updatemenu");
-		if( config.isSectionDefined( s_recent ) ) then
-			updateMenu();
-		endif;
-				
-		if( config.readBool( s_settings, s_autosave ) ) then
-			w.CheckMenuItem( window.hmenu, IDM_AUTO, w.MF_BYCOMMAND | w.MF_CHECKED);
-		endif;
-		
-		if( config.readBool( s_settings, s_autoindent ) ) then
-			w.CheckMenuItem( window.hmenu, IDM_AUTOINDENT, w.MF_BYCOMMAND | w.MF_CHECKED);
-		endif;
-		
-		if( config.readBool( s_settings, s_tabsasspace ) ) then
-			w.CheckMenuItem( window.hmenu, IDM_TAB_AS_SPACE, w.MF_BYCOMMAND | w.MF_CHECKED);
-		endif;
-		
-		if( config.readBool( s_settings, s_topwindow )) then
-
-			w.CheckMenuItem( window.hmenu, IDM_PEG, w.MF_BYCOMMAND | w.MF_CHECKED );
-			w.SetWindowPos( window.hwnd, w.HWND_TOPMOST, 0, 0, 0, 0, 0 );		
-
-		endif;
-		
-		if( config.readBool( s_settings, s_clearexit ) ) then
-			
-			w.CheckMenuItem( window.hmenu, IDM_CLEAREXIT, w.MF_BYCOMMAND | w.MF_CHECKED );
-			
-		endif;
-		
-		if( config.readBool( s_settings, s_recentnew ) ) then
-			
-			w.CheckMenuItem( window.hmenu, IDM_RECENTNEW, w.MF_BYCOMMAND | w.MF_CHECKED );
-			
-		endif;
-			
-		if( config.readBool( s_settings, s_openrecent ) ) then
-			
-			w.CheckMenuItem( window.hmenu, IDM_OPENRECENT, w.MF_BYCOMMAND | w.MF_CHECKED );
-			
-		endif;
-		
-		if( config.readBool( s_settings, s_rememberpos ) ) then
-			w.CheckMenuItem( window.hmenu, IDM_REMEMBERPOS, w.MF_BYCOMMAND | w.MF_CHECKED );
-		endif;
-		
-		if( config.readBool( s_window, s_status ) ) then
-			
-			w.CheckMenuItem( window.hmenu, IDM_VIEW_STATUS, w.MF_BYCOMMAND | w.MF_CHECKED );
-			w.ShowWindow( window.hstatus, true );
-			
-		endif;
-		
-		// check for a filename passed as an argument and try to open that file.
-		// if file doesn't exist, start new document with that filename.
-		
-		arg.c();
-		if( eax > 1 ) then
-			
-			// get an argument, see if it is a file that exists,
-			// if so, open it.
-			
-			arg.v( 1 );
-			w.GetLongPathName( eax, &buffer, @size(buffer) -1 );
-			if (eax) then
-				
-				// file path copied, try to open it.
-				
-				str.cpyz( &buffer, hide.strbuf );
-				loadFile( hide.strbuf );
-				if (eax) then
-					jmp skipOpenRecent;
-				endif;
-			else
-				
-				// there is no file, create a new document with name passed on command line
-				filesys.gwd( filepath );
-				str.cat ("\", filepath);
-				arg.v(1);
-				str.catz (eax, filepath); 
-				jmp skipOpenRecent;
-			endif;
-		endif;
-		
-		// no file requested as an argument,
-		// check config to see if we want to open the most recent document
-		
-		if( config.readBool( s_settings, s_openrecent ) ) then
-			
-			// we want to open the most recent file. do we have a recent file to open?
-			
-			if( config.isSectionDefined( s_recent )) then
-				
-				config.readItem( s_recent, 0, hide.strbuf );
-				loadFile( hide.strbuf );
-				if( ! eax ) then
-					
-					// the file we want to open doesn't exit anymore. remove it from our list.
-					config.deleteItem( s_recent, 0 );
-					updateMenu();
-				endif;
-				
-				// do we want to move the cursor to the position it was when the file was closed?
-				
-				if( config.readBool( s_settings, s_rememberpos )) then
-					config.readUns( s_settings, "Start Position");
-					mov( eax, info.cursor.start_index );
-					mov( eax, info.cursor.end_index );
-					w.SendMessage( info.hred, w.EM_EXSETSEL, 0, &info.cursor );
-					w.SendMessage( info.hred,w.EM_SCROLLCARET,0,0 );
-				endif;
-				
-			endif;
-			
-		endif;
-		
-		skipOpenRecent:	
-		setWindowTitle();
-		updateStatus();
-		
-		xor( eax, eax );
-		
-	end Msg_Create;
-
-	Msg_Context :procedure( hwnd:dword; wParam:dword; lParam:dword );
-		
-		// right click context menu
-		// opens edit menu
-		
-		var
-			pt	:w.POINT;
-		
-	begin Msg_Context;
-		mov (lParam, eax);
-		if (eax = -1) then
-			w.GetCaretPos (pt);
-			w.GetFocus();
-			mov (eax, edx);
-			w.ClientToScreen (edx, pt);
-		else
-			and ($ffff, eax);
-			mov (eax, pt.x);
-			mov (lParam, eax);
-			shr (16, eax);
-			mov (eax, pt.y);
-		endif;
-		
-		mov (wParam, eax);
-		if (eax = info.hred) then
-			w.GetMenu (hwnd);
-			w.GetSubMenu (eax, 1);	// edit menu, 2nd item
-			w.TrackPopupMenu(eax, w.TPM_LEFTALIGN | w.TPM_RIGHTBUTTON, pt.x,pt.y,0,hwnd,NULL);
-		endif;
-		
-		xor( eax, eax );
-		
-	end Msg_Context;
-	
 	setTabWidth :procedure { @noframe, @returns("EAX") };
 	
 		// opens dialog to set tab width
 	
 	begin setTabWidth;
-		w.DialogBoxParam( hinst, val ID_INPUT, window.hwnd, &Proc_Input, s_inputtab );
+		w.DialogBoxParam( window.hinst, val ID_INPUT, window.hwnd, &Proc_Input, s_inputtab );
 		if( return > 0 ) then
 			try
 				conv.strTou32( return, 0 );
@@ -2223,72 +1254,6 @@ proc
 		endif;
 		ret();
 	end setTabWidth;
-
-	Msg_Close :procedure( hwin:dword; wparam:dword; lparam:dword );
-	
-		// close app. warn about unsaved changes
-	
-	begin Msg_Close;
-	
-	 	getConfirm();
-		if (!eax) then
-		 	w.SendMessage(hwin, w.WM_DESTROY, 0, 0 );
-		 	
-		endif;
-		
-		xor( eax, eax );
-		
-	end Msg_Close;
-
-
-	Msg_Destroy :procedure( hwin:dword; wparam:dword; lparam:dword );
-		
-		// exit protocls
-		// save settings and post-close cleanups
-		
-		var
-			wndpos	:w.WINDOWPLACEMENT;
-			rect		:rect_t;
-			
-	begin Msg_Destroy;
-	
-		dbg.put("destroy");
-		
-		w.GetWindowPlacement( hwin, wndpos );
-		w.GetWindowRect( hwin, rect );
-		mov( rect.left,window.xPos );
-		mov( rect.top,window.yPos );
-		mov( rect.right, eax );
-		sub( rect.left, eax );
-		mov( eax,window.width );
-		mov( rect.bottom, eax );
-		sub( rect.top, eax );
-		mov( eax,window.height );
-		
-		config.writeUns( s_window, "xPos",window.xPos );
-		config.writeUns( s_window, "yPos",window.yPos );
-		config.writeUns( s_window, "width",window.width );
-		config.writeUns( s_window, "height",window.height );
-		config.writeBin( s_text, s_find, &info.find_mode, @size( info.find_mode ) );
-		
-		config.writeUns( s_settings, "Start Position", info.cursor.start_index );
-		
-		if( config.readBool( s_settings, s_clearexit ) ) then
-			
-			dbg.put("deleting recent");
-			config.deleteSection( s_recent );
-
-		endif;
-
-		
-		getConfigPath( hide.strbuf );
-		config.writeFileName( hide.strbuf );
-		
-	 	w.PostQuitMessage( NULL );
-	 	xor( eax, eax );
-			
-	end Msg_Destroy;
-
 
 	getLineInfo :procedure(var line:LineInfo);
 		
@@ -2341,20 +1306,52 @@ proc
 
 //bm=editcommands
 
+	command_edit_ini	:procedure;
+		
+		// Load the configuration file and allow editing
+		// set mode flag to inidcate ini file is being edited
+		// this mode flag should be intercepted by the save file
+		// command to reload the ini.
+		
+		// make sure we have already gotten confirmation to save any
+		// existing work before calling this function
+			
+		
+	begin command_edit_ini;
+		
+		str.cpy( config.fileName, info.filepath );
+		str.rmvLastChar1( config.fileName );
+		str.put2( config.fileName, "~" );
+		config.writeFile();
+		str.rmvLastChar1( config.fileName );
+		str.put2( config.fileName, "i" );
+
+		str.cpy( config.fileName, info.filepath );
+		
+		loadFile( info.filepath );
+		mov( MODE_EDITINI, info.mode );
+		updateStatus();
+		
+	end command_edit_ini;
+
 	command_display_manual	:procedure { @noframe };
 		
 		// load the SavageEd.md which is saved as a
 		// resource in SavageEd.exe
 	
+		// make sure we have already gotten confirmation to save any
+		// existing work before calling this function
+		
 	begin command_display_manual;
 		
-		if( w.FindResource(hinst, val ID_SAVAGEED_MANUAL, val ID_RAWDATA ) ) then
+		if( w.FindResource(window.hinst, val ID_SAVAGEED_MANUAL, val w.RT_RCDATA ) ) then
 
-			if( w.LoadResource(hinst, eax ) ) then
+			if( w.LoadResource(window.hinst, eax ) ) then
 				
 				w.SendMessage( info.hred,w.WM_SETTEXT,0, eax );
-				str.cpy( s_document, filepath );
-				setWindowTitle();
+				str.cpy( s_document, info.filepath );
+				mov( MODE_VIEWDOCS, info.mode );
+				updateStatus();
 				w.SetFocus(info.hred);
 				
 			else
@@ -2478,17 +1475,14 @@ proc
 
 	command_select_all :procedure {@noframe};
 	begin command_select_all;
-		
 		mov	(0, info.cursor.end_index);
 		mov	(-1,info.cursor.start_index);
 		w.SendMessage(info.hred,w.EM_EXSETSEL,0,&info.cursor);
-		ret();
-		
+		ret();		
 	end command_select_all;
 
 	command_cut_line	:procedure {@noframe};
 	begin command_cut_line;
-		// cut current line		
 		getInfo(info);
 		mov( info.line.index, eax );
 		mov( eax, info.cursor.start_index );
@@ -2507,8 +1501,6 @@ proc
 			queryLine	:LineInfo;
 			
 	begin command_cursor_up;
-		// move cursor up
-		//getInfo(info);
 		if( info.saved_column_index = 0 ) then
 			mov( info.column_index, eax );
 			mov( eax, info.saved_column_index );
@@ -2540,8 +1532,7 @@ proc
 			queryLine	:LineInfo;
 			
 	begin command_cursor_down;
-		// move cursor down							
-//		getInfo(info);
+							
 		if( info.saved_column_index = 0 ) then
 			mov( info.column_index, eax );
 			mov( eax, info.saved_column_index );
@@ -2567,7 +1558,6 @@ proc
 		endif;
 	end command_cursor_down;
 
-
 	command_cursor_left	:procedure {@noframe};
 	begin command_cursor_left;
 		
@@ -2588,6 +1578,7 @@ proc
 		dbg.put("cursor_right");
 		mov( info.cursor.start_index, eax );
 		inc( eax );
+		
 		w.SendMessage( info.hred, w.EM_SETSEL, eax, eax );
 		w.SendMessage( info.hred, w.EM_SCROLLCARET, 0, 0);
 		ret();
@@ -2597,7 +1588,6 @@ proc
 	command_move_to_bol	:procedure {@noframe};
 	begin command_move_to_bol;
 		
-		// move to beginning of line
 		mov( info.line.index, eax );
 		if( info.column_index = 0 && eax > 0 ) then
 			
@@ -2605,7 +1595,6 @@ proc
 			
 			dec (eax );
 			w.SendMessage( info.hred, w.EM_SETSEL, eax, eax );
-			//getInfo(info);
 		endif;
 		w.SendMessage( info.hred, w.EM_SETSEL, info.line.index, info.line.index );
 		ret();
@@ -2613,7 +1602,7 @@ proc
 
 	command_move_to_eol	:procedure {@noframe};
 	begin command_move_to_eol;
-		// move to end of line
+
 		mov( info.line.length, eax );
 		if( info.column_index = eax ) then
 			
@@ -2635,8 +1624,6 @@ proc
 	begin command_toggle_mark;
 		
 		dbg.put("toggle_mark");
-		// toggle mark state
-		//getInfo(info);
 		
 		if( info.mark.isSet ) then
 			
@@ -2769,24 +1756,6 @@ proc
 		
 	end command_reduce_indent;
 
-/*
-	Msg_Notify :procedure( hwin:dword; wparam:dword; lparam:dword );
-	begin Msg_Notify;
-		
-		mov( lparam, edx );
-		mov( (type w.NMHDR[EDX]).code, eax );
-			
-		if( eax = w.EN_SELCHANGE ) then
-			
-//			getInfo(info);
-//			updateStatus();
-//			setWindowTitle();
-		
-		endif;
-		xor( eax, eax );
-		
-	end Msg_Notify;
-*/
 	
 	Msg_Command :procedure( hwin:dword; wparam:dword; lparam:dword );
 	
@@ -2803,8 +1772,9 @@ proc
 			if (!eax) then	
 				
 				w.SetWindowText( info.hred, 0 );		// clear edit window
-				str.cpy( s_untitled, filepath );
-				setWindowTitle();
+				str.cpy( s_untitled, info.filepath );
+				mov( MODE_INSERT, info.mode );
+				updateStatus();
 				
 			endif;
 			w.SetFocus(info.hred);
@@ -2866,7 +1836,7 @@ proc
 		case( IDM_FIND, IDM_REPLACE )
 			if (!window.hfind) then
 				GetSelText (&findbuf);
-				w.CreateDialogParam(hinst,val ID_FINDDLG,hwin, &Proc_FindDlg,false);
+				w.CreateDialogParam(window.hinst,val ID_FINDDLG,hwin, &Proc_FindDlg,false);
 			else
 				w.SetFocus(window.hfind);
 			endif;
@@ -2899,7 +1869,7 @@ proc
 			
 		case( IDM_EDIT_GOTO )
 			
-			w.DialogBoxParam( hinst, val ID_INPUT, hwin, &Proc_Input, s_inputlinen );
+			w.DialogBoxParam( window.hinst, val ID_INPUT, hwin, &Proc_Input, s_inputlinen );
 			if( return > 0 ) then
 				
 				dbg.put("query :", return );
@@ -2981,7 +1951,17 @@ proc
 			endif;
 			
 			config.writeBool( s_settings, s_autoindent, al );
-						
+		
+		case( IDM_EDITINI )
+			
+			dbg.put("edit the ini file");
+			getConfirm();
+			if (!eax) then
+			
+				command_edit_ini(); 
+	
+			endif;	
+
 		case ( IDM_WRAP) 
 
 			if( config.readBool( s_settings, s_wrap ) ) then
@@ -3135,7 +2115,7 @@ proc
 			
 		case ( IDM_ABOUT) 
 		
-			w.CreateDialogParam(hinst,val ID_ABOUT,hwin,&AboutDlgProc,0);
+			w.CreateDialogParam(window.hinst,val ID_ABOUT,hwin,&AboutDlgProc,0);
 	
 		case ( IDM_DOCUMENTS) 
 			
@@ -3160,45 +2140,15 @@ proc
 
 	end Msg_Command;
 
-	
-	WndProc :procedure( lparam:dword; wparam:dword; umsg:uns32; hwin:dword );
-	
-		// main window message handler
-	
-	begin WndProc;
-		pushabi;
-		mov(umsg,eax);
-		mov(&message_table,edx);
-		
-		FOREVER
-			mov( (type MsgProcPtr_t [edx]).MessageHndlr, ecx );
-			IF( ecx = 0 ) THEN
-				w.DefWindowProc( hwin, umsg, wparam, lparam );
-				EXIT WndProc;
-			ELSEIF( eax = (type MsgProcPtr_t [edx]).MessageValue ) THEN
-	
-				push( hwin );
-				push( wparam );
-				push( lparam );
-				call( ecx );
-				BREAK;
-			ENDIF;
-			add( @size( MsgProcPtr_t ), edx );
-		ENDFOR;
-	
-		popabi;
-	end WndProc;
-
-
 begin SavageEd;
 
 	dbg.cls;
 	initConfig();
 	initWindow();
-	
+	mov( MODE_INSERT, info.mode );
 	cmp( eax, 0 );
 	je _exit;
-	
+		
 	FOREVER
 		w.GetMessage(window.msg,NULL,0,0);
 		breakif( ! eax );
@@ -3211,9 +2161,12 @@ begin SavageEd;
 	ENDFOR;
 	
 	// tail free some resources
+	// unnecessary, but helpful to know what needs to be freed in case
+	// we decide to move things around later
 	w.DestroyWindow( info.hred );
 	w.DeleteObject( info.hfont );
-	w.FreeLibrary(hredDLL);
+	w.FreeLibrary(window.hredDLL);
+	str.free( info.filepath );
 
 	mov( window.msg.wParam, eax );
 

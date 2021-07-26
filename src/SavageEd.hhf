@@ -1,5 +1,5 @@
-	#includeonce("macros\macros.hhf")
 	#includeonce("w.hhf")
+	#includeonce("macros\macros.hhf")
 	#includeonce("hide\hidelib.hhf")
 	#includeonce("stdlib.hhf")
 	#includeonce("hide\dbgwin.hhf")
@@ -7,7 +7,7 @@
 
 readonly
 
-	version			:string := "SavageEd v0.7.11";
+	version			:string := "SavageEd v0.7.17";
 
 type
 	// Message and dispatch table related definitions:
@@ -28,6 +28,7 @@ type
 
 	wnd_settings:
 		record
+			hinst		:dword;
 			hwnd		:dword;
 			hmenu		:dword;
 			hstatus		:dword;
@@ -35,6 +36,7 @@ type
 			hcontextmenu:dword;
 			hfind		:dword;
 			habout		:dword;
+			hredDLL		:dword;
 			msg			:w.MSG;
 			xPos		:uns32;
 			yPos		:uns32;
@@ -44,7 +46,6 @@ type
 			// text and background colors
 			textColor	:w.COLORREF;
 			backColor	:w.COLORREF;
-
 		endrecord;
 
 	FindMode:
@@ -64,6 +65,7 @@ type
 	
 	EditInfo:
 		record
+			filepath:string;
 			old_proc:dword; // original window proc of edit control
 			hred	:dword;
 			hfont	:dword;
@@ -74,20 +76,28 @@ type
 			cursor				:range;
 			column_index		:uns32;
 			saved_column_index	:uns32; // stores where the cursor 'wants' to be
-			mark:
-				record
-					index	:uns32;
-					isSet	:boolean;
-				endrecord;
 			
 			// line info of cursor, has number, index and length
 			line				:LineInfo;
 			lines				:uns32;
 			ins_ovr				:boolean;
+			mode				:byte;
+
 			//incremental_search	:boolean; TODO(need to add command bar )
 
+			mark:
+				record
+					index	:uns32;
+					isSet	:boolean;
+				endrecord;
+
 		endrecord;
-		
+	
+	edit_mode	:enum {
+		MODE_INSERT,
+		MODE_EDITINI,
+		MODE_VIEWDOCS
+	};
 
 	menu_items :enum {
 		IDM_NEW,
@@ -127,7 +137,8 @@ type
 		IDM_REMEMBERPOS,
 		IDM_VIEW_STATUS,
 		IDM_ABOUT,
-		IDM_DOCUMENTS
+		IDM_DOCUMENTS,
+		IDM_EDITINI
 	};
 
 	rect_t:
@@ -167,19 +178,18 @@ const
 	ID_INPUT                := 3000;
 	IDC_EDT_INPUT           := 3001;
 	ID_SAVAGEED_MANUAL		:= 4000;
-	ID_RAWDATA				:= 4001;
-
 
 	RECENT_MENU_START	:= 9000;
 	RECENT_MENU_END		:= 9019;	// 10 items in recent menu
 	IDC_SBAR			:= 9020;
 	statusht_c			:= 21;		// height of status bar
 
-	STATUS_PARTS		:= 4;
+	STATUS_PARTS		:= 5;
 	POS_LINES			:=270;
 	POS_INS				:=POS_LINES+30;
 	POS_READONLY		:=POS_INS+18;
-	POs_mark			:=POS_READONLY+18;
+	POS_MARK			:=POS_READONLY+18;
+	POS_MODE			:=POS_MARK + 1800;
 	
 	DEFAULT_TAB_STOP	:= 4;
 
@@ -216,7 +226,7 @@ readonly
 	s_autosave	:string := "Auto Save";
 	s_autoindent:string := "Auto Indent";
 	s_topwindow	:string := "Top Window";
-	s_status	:string := "status";
+	s_status	:string := "show status";
 	s_clearexit	:string := "Clear On Exit";
 	s_recentnew	:string := "New Recent Window";
 	s_readonly	:string := "Read Only";
@@ -246,92 +256,97 @@ readonly
 	
 	curdir			:byte := '.';	// '.' = curdir
 
-storage
-	logfont			:w.LOGFONT;
-	hinst			:dword;
-	hredDLL			:dword;			// RichEd DLL handle
-	frflags			:dword;
-	buffer			:byte[szLINEBUFFER];
-	findbuf			:byte[300];
-	replacebuf		:byte[300];
-	ft				:w.FINDTEXTEX;
-	fres			:int32;
-	return			:string;	// returned from Proc_Input, caller must free string
-
-	customColors:dword[16];
-		
-	editstream	:w.EDITSTREAM;
-	chrg		:range;
-	find_range	:w.TEXTRANGE;
-	
-	config		:tConfig;
-	window		:wnd_settings;
-	align(4);
-
-static
-	Align(4);
-	info		:EditInfo;
-	filepath	:str.strvar( w.MAX_PATH );	// store full file path
-	statusParts	:int32[STATUS_PARTS]:=[POS_LINES, POS_INS, POS_READONLY, POs_mark];
-	strbuf		:str.strvar( w.MAX_PATH );
-	strtabs		:str.strvar( w.MAX_PATH ); // user specified tabs converted to spaces
-
-readonly
-
-	// main window message table
-//bm=window_commands	
-	message_table	:MsgProcPtr_t; @nostorage;
-		MsgProcPtr_t	
-			MsgProcPtr_t:[ w.WM_COMMAND,	&Msg_Command			],
-			MsgProcPtr_t:[ w.WM_DESTROY,	&Msg_Destroy			],
-			MsgProcPtr_t:[ w.WM_CLOSE,		&Msg_Close				],
-			MsgProcPtr_t:[ w.WM_CREATE,		&Msg_Create				],
-			MsgProcPtr_t:[ w.WM_SIZE,		&Msg_Size				],
-			MsgProcPtr_t:[ w.WM_CONTEXTMENU,&Msg_Context			],
-			MsgProcPtr_t:[ w.WM_SETFOCUS,	&Msg_SetFocus			],
-			MsgProcPtr_t:[ w.WM_DROPFILES,  &Msg_OpenDroppedFile	],
-//			MsgProcPtr_t:[ w.WM_NOTIFY,		&Msg_Notify				],
-
-			// add more messages here
-			MsgProcPtr_t:[ 0, NULL ];	// This marks the end of the list.
-
-	// WM_COMMAND message table, wparam items go here
-	command_table	:MsgProcPtr_t; @nostorage;
-		MsgProcPtr_t
-			MsgProcPtr_t:[ IDM_QUIT,	&Cmd_File_Quit	],
-			
-			// add more commands here
-			MsgProcPtr_t:[ 0,				NULL			];
 
 const
 	
 	typeConsts( edit, EditInfo, edi )
 	typeConsts( charrange, range, esi )
+	typeConsts( config, tConfig, esi )
 
-proc
-	// forward declarations
+storage
+	window		:wnd_settings; @external;
 	
-	updateStatus :procedure; @forward;
-	WndProc :procedure( lparam:dword; wparam:dword; umsg:uns32; hwin:dword ); @forward;
-	Msg_Command :procedure( hwin:dword; wparam:dword; lparam:dword ); @forward;
-	loadFile :procedure( filename:string ); @forward;
-	updateRecentLog :procedure; @forward;
-	getInfo :procedure ( var inf:EditInfo); @forward;
-	getConfigPath :procedure( s:string ); @forward;
-	command_copy_word :procedure; @forward;
-	command_delete_word :procedure; @forward;
-	command_cut_line :procedure; @forward;
-	command_cursor_up :procedure; @forward;
-	command_cursor_left :procedure; @forward;	
-	command_cursor_down :procedure; @forward;	
-	command_cursor_right :procedure; @forward;	
-	command_move_to_bol :procedure; @forward;
-	command_move_to_eol :procedure; @forward;
-	command_reduce_indent :procedure; @forward;
-	command_increase_indent :procedure; @forward;	
-	command_toggle_mark :procedure; @forward;	
+	// temp, move into window record
+	config		:tConfig; @external;
+	findbuf			:byte[300]; @external;
+	replacebuf		:byte[300]; @external;
+	logfont			:w.LOGFONT; @external;
+	buffer			:byte[szLINEBUFFER]; @external;
+	find_range	:w.TEXTRANGE; @external;
+	return			:string; @external;
+
+	
+static
+	// temp, move into list, and attach list to window record
+	info		:EditInfo; @external;
+	strbuf		:string; @external;
+	strtabs		:string; @external;	
+	statusParts	:int32[STATUS_PARTS]; @external;
+	
+proc
+	// external declarations
+	
+	updateStatus :procedure; @external;
+	WndProc :procedure( lparam:dword; wparam:dword; umsg:uns32; hwin:dword ); @external;
+	Msg_Command :procedure( hwin:dword; wparam:dword; lparam:dword ); @external;
+	loadFile :procedure( filename:string ); @external;
+	updateRecentLog :procedure; @external;
+	getInfo :procedure ( var inf:EditInfo); @external;
+	getConfigPath :procedure( s:string ); @external;
+	command_copy_word :procedure; @external;
+	command_delete_word :procedure; @external;
+	command_cut_line :procedure; @external;
+	command_cursor_up :procedure; @external;
+	command_cursor_left :procedure; @external;	
+	command_cursor_down :procedure; @external;	
+	command_cursor_right :procedure; @external;	
+	command_move_to_bol :procedure; @external;
+	command_move_to_eol :procedure; @external;
+	command_reduce_indent :procedure; @external;
+	command_increase_indent :procedure; @external;	
+	command_toggle_mark :procedure; @external;	
+	Msg_OpenDroppedFile :procedure( hwnd:dword; wParam:dword; lParam:dword ); @external;
+	Msg_SetFocus :procedure( hwin:dword; wparam:dword; lparam:dword ); @external;
+	Msg_Context :procedure( hwnd:dword; wParam:dword; lParam:dword ); @external;		
+	Msg_Size :procedure( hwin:dword; wparam:dword; lparam:dword ); @external;
+	Msg_Create :procedure( hwin:dword; wparam:dword; lparam:dword ); @external;
+	Msg_Close :procedure( hwin:dword; wparam:dword; lparam:dword ); @external;
+	Msg_Destroy :procedure( hwin:dword; wparam:dword; lparam:dword ); @external;
+	Error :procedure( error_msg:string; warning:boolean ); @external;
+	initConfig	:procedure; @external;
+	initWindow	:procedure; @external;
+	updateMenu	:procedure; @external;
+ 	getConfirm	:procedure {@returns("EAX")}; @external;
+	StreamInProc :procedure( var pBytesRead:dword ; NumBytes:dword ; var pbuffer:dword ; _hFile:dword ); @external;
+	StreamOutProc :procedure( var pBytesRead:dword ; NumBytes:dword ; var pbuffer:dword ; _hFile:dword ); @external;
+	setWindowTitle :procedure; @external;
+	getTempName :procedure( prefix:string; ext:string; dest:string ); @external;
+	checkSave :procedure; @external;
+	SaveSelectionAs :procedure; @external;
+	SaveAs :procedure; @external;
+	saveFile :procedure( filename:string; save_selection:boolean ); @external;
+	getFileName	:procedure; @external;
+	setText :procedure( hfile:dword ); @external;
+	Cmd_File_Quit :procedure( hwin:dword; wparam:dword; lparam:dword ); @external;
+	checkLog :procedure; @external;
+	command_insert_time :procedure; @external;
+	GetSelText :procedure( lpBuff:dword ); @external;
+	AboutDlgProc :procedure( lParam:dword; wParam:dword; uMsg:uns32; hDlg:dword); @external;
+	AddMenus :procedure; @external;
+	setFormat :procedure; @external;
+	Proc_Edit	:procedure( lParam:dword; wParam:dword; uMsg:uns32; hWin:dword ); @external;
+	newInstance :procedure( filename:string ); @external;
+	openRecent :procedure(id:dword); @external;
+	Proc_Input :procedure( lParam:dword; wParam:dword; uMsg:uns32; hWin:dword ); @external;
+
+
+
+
+
+	
+	
 		
-		
-
-
-
+	
+	
+	
+	

@@ -39,7 +39,7 @@ storage
 static
 	Align(4);
 	info		:EditInfo;
-	statusParts	:int32[STATUS_PARTS]:=[POS_LINES, POS_INS, POS_READONLY, POS_LINEBREAK, POS_MARK, POS_MODE];
+	statusParts	:int32[STATUS_PARTS]:=[POS_LINES, POS_READONLY, POS_LINEBREAK, POS_MARK, POS_MODE];
 	strbuf		:str.strvar( w.MAX_PATH );
 	strtabs		:str.strvar( w.MAX_PATH ); // user specified tabs converted to spaces
 
@@ -1196,45 +1196,39 @@ proc
 				
 		w.SendMessage( window.hstatus, w.SB_SETTEXT, 0, build_str );
 		
-		// update insert/overwrite/visual mode notifiers
-		if( info.ins_ovr ) then
-			w.SendMessage( window.hstatus, w.SB_SETTEXT, 1, s_overwrite );
-		else
-			w.SendMessage( window.hstatus, w.SB_SETTEXT, 1, s_insert );
-		endif;
-		
+
 		if( config.readBool( s_settings, s_readonly )) then
-			w.SendMessage( window.hstatus, w.SB_SETTEXT, 2, s_r );
+			w.SendMessage( window.hstatus, w.SB_SETTEXT, 1, s_r );
 		else
-			w.SendMessage( window.hstatus, w.SB_SETTEXT, 2, s_b );
+			w.SendMessage( window.hstatus, w.SB_SETTEXT, 1, s_b );
 		endif;
 				
 		if( info.mark.isSet ) then
-			w.SendMessage( window.hstatus, w.SB_SETTEXT, 3, s_mark );
+			w.SendMessage( window.hstatus, w.SB_SETTEXT, 2, s_mark );
 			
 		else
-			w.SendMessage( window.hstatus, w.SB_SETTEXT, 3, s_b );
+			w.SendMessage( window.hstatus, w.SB_SETTEXT, 2, s_b );
 		endif;
 
 		config.readString( s_settings, "Line Break", build_str );
-		w.SendMessage( window.hstatus, w.SB_SETTEXT, 4, build_str );
+		w.SendMessage( window.hstatus, w.SB_SETTEXT, 3, build_str );
 		
 		movzx( info.mode, eax );
 		switch( eax )
 				
 			case( MODE_EDITINI )
 				str.put( build_str, "Mode :Edit Configuration" );
-				w.SendMessage( window.hstatus, w.SB_SETTEXT, 5, build_str );
+				w.SendMessage( window.hstatus, w.SB_SETTEXT, 4, build_str );
 
 			case( MODE_VIEWDOCS )
 				str.put( build_str, "Mode :View Documentation" );
-				w.SendMessage( window.hstatus, w.SB_SETTEXT, 5, build_str );
+				w.SendMessage( window.hstatus, w.SB_SETTEXT, 4, build_str );
 
 			default
 			
 				// default will be insert mode
 				str.put( build_str, "Mode :Insert" );
-				w.SendMessage( window.hstatus, w.SB_SETTEXT, 5, build_str);
+				w.SendMessage( window.hstatus, w.SB_SETTEXT, 4, build_str);
 		endswitch;
 		
 		// window title may have changed somewhere along the line, update it
@@ -1647,7 +1641,7 @@ proc
 			endif;
 			
 			w.SendMessage( info.hred, w.EM_EXSETSEL, 0, &info.cursor );
-			
+
 		else
 			
 			// start a mark
@@ -1655,9 +1649,10 @@ proc
 			mov( eax, info.mark.index );
 			
 		endif;
-	
+		
 		// toggle mark
 		xor( 1, info.mark.isSet );
+		updateStatus();
 		ret();
 
 	end command_toggle_mark;

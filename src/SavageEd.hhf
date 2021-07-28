@@ -7,7 +7,7 @@
 
 readonly
 	
-	version			:string := "SavageEd v0.8.00";
+	version			:string := "SavageEd v0.8.01";
 
 type
 	// Message and dispatch table related definitions:
@@ -85,7 +85,6 @@ type
 			// line info of cursor, has number, index and length
 			line				:LineInfo;
 			lines				:uns32;
-			ins_ovr				:boolean;
 			mode				:byte;
 			line_break			:LineBreak;
 
@@ -190,10 +189,9 @@ const
 	IDC_SBAR			:= 9020;
 	statusht_c			:= 21;		// height of status bar
 
-	STATUS_PARTS		:= 6;
+	STATUS_PARTS		:= 5;
 	POS_LINES			:=265;
-	POS_INS				:=POS_LINES+30;
-	POS_READONLY		:=POS_INS+18;
+	POS_READONLY		:=POS_LINES+18;
 	POS_LINEBREAK		:=POS_READONLY+18;
 	POS_MARK			:=POS_LINEBREAK+32;
 	POS_MODE			:=POS_MARK + 1800;
@@ -242,8 +240,6 @@ readonly
 	s_txtext	:string := ".txt";
 	s_fontname	:string := "Courier New";
 	s_nl		:string := nl;
-	s_insert	:string := "INS";
-	s_overwrite	:string := "OVR";
 	s_r			:string := "R";
 	s_b			:string := " ";
 	s_mark		:string := "M";

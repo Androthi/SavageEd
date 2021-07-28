@@ -1,15 +1,3 @@
-///		Goals for v.0.7.xx
-///	[X]	Subclass the richedit control
-///	[X]	Move keyboard processing control to the subclassed proc
-///
-///		these are 'maybe' features, could get cancelled, could get
-///
-///	[ ]	Isolate the edit structure to prepare for multi-buffers
-///		moved to other minor versions
-/// [ ]	Allow user to customize keys
-/// [X] allow user to edit SavageEd.ini directly in the editor.
-///		this might require rethinking some of the .ini setup
-/// [ ] add command bar
 
 program SavageEd;
 
@@ -51,7 +39,7 @@ storage
 static
 	Align(4);
 	info		:EditInfo;
-	statusParts	:int32[STATUS_PARTS]:=[POS_LINES, POS_INS, POS_READONLY, POS_MARK, POS_MODE];
+	statusParts	:int32[STATUS_PARTS]:=[POS_LINES, POS_INS, POS_READONLY, POS_LINEBREAK, POS_MARK, POS_MODE];
 	strbuf		:str.strvar( w.MAX_PATH );
 	strtabs		:str.strvar( w.MAX_PATH ); // user specified tabs converted to spaces
 
@@ -62,28 +50,28 @@ proc
 	selectFont :procedure;
 
 		// handles Font selection
-		static	cf:w.CHOOSEFONT;
+		static	choose_font:w.CHOOSEFONT;
 
 	begin selectFont;
 	
-		w.RtlZeroMemory( &cf, @size(cf) );
-		mov( @size(cf), cf.lStructSize );
+		w.RtlZeroMemory( &choose_font, @size(choose_font) );
+		mov( @size(choose_font), choose_font.lStructSize );
 		mov( window.hwnd, eax );
-		mov( eax, cf.hWndOwner );
-		mov( &logfont, cf.lpLogFont );
-		mov( w.CF_SCREENFONTS | w.CF_EFFECTS | w.CF_INITTOLOGFONTSTRUCT, cf.Flags );
+		mov( eax, choose_font.hWndOwner );
+		mov( &logfont, choose_font.lpLogFont );
+		mov( w.CF_SCREENFONTS | w.CF_EFFECTS | w.CF_INITTOLOGFONTSTRUCT, choose_font.Flags );
 		push( window.textColor );
-		pop( cf.rgbColors );
+		pop( choose_font.rgbColors );
 		
-		w._ChooseFont(cf);
+		w._ChooseFont(choose_font);
 		if (eax) then
 
 			w.DeleteObject(info.hfont);
 			w.CreateFontIndirect(logfont);
 			mov( eax, info.hfont );
-			push( cf.rgbColors );
+			push( choose_font.rgbColors );
 			pop( window.textColor );
-			setFormat();
+			setFont( info );
 			config.writeHex( s_text, s_background_color, window.backColor);
 			config.writeHex( s_text, s_text_color, window.textColor);
 
@@ -241,10 +229,13 @@ proc
 		// load filename into the edit buffer
 		var
 			hfile	:dword;
+			extract_str	:string;
 			
 	
 	begin loadFile;
-		dbg.put("loadFile :", filename);		
+		dbg.put("loadFile :", filename);
+		
+		mov( str.talloc( 200 ), extract_str );
 		try
 			
 			fileio.open( filename, fileio.r );
@@ -254,15 +245,14 @@ proc
 			str.cpy( filename, info.filepath );
 
 			dbg.put("filename = ", filename );
-			filesys.extractExt( filename, strbuf );
+			filesys.extractExt( filename, extract_str );
 			checkLog();
 			updateRecentLog();
-			setFormat();
+
 			// clear the undo buffer since we probably made some formatting and alterations
 			// to the file
 			w.SendMessage( info.hred, w.EM_EMPTYUNDOBUFFER, 0, 0 );
 			mov( MODE_INSERT, info.mode );
-			updateStatus();	
 			or( 1, eax );
 			
 		anyexception
@@ -281,9 +271,11 @@ proc
 		// get it loaded into buffer
 		var
 			ofn	:w.OPENFILENAME;
+			file_name	:string;
 				
 	begin fileOpen;
 	
+		mov( str.talloc( 1000 ), file_name );
 		lea( eax, ofn );
 		w.RtlZeroMemory(eax,@size(ofn));
 		mov	(@size(ofn),ofn.lStructSize);
@@ -300,8 +292,8 @@ proc
 		mov	(w.OFN_PATHMUSTEXIST | w.OFN_FILEMUSTEXIST | w.OFN_LONGNAMES,ofn.Flags);
 		w.GetOpenFileName(ofn);
 			if (eax) then
-				str.cpyz( &buffer, hide.strbuf );
-				loadFile( hide.strbuf );
+				str.cpyz( &buffer, file_name );
+				loadFile( file_name );
 			endif;
 		w.SetFocus(info.hred);
 
@@ -1136,6 +1128,13 @@ proc
 			mov( eax, window.backColor );
 			config.readHex( s_text, s_text_color);
 			mov( eax, window.textColor );
+			
+			config.readString( s_settings, "Line Break", strbuf );
+			if( str.eq( strbuf, "LF" )) then
+				mov( LF, info.line_break );
+			else
+				mov( CRLF, info.line_break );
+			endif;
 
 			config.readBin( s_text, s_custcolors, &customColors, @size( customColors ) );
 			config.readBin( s_text, s_find, &info.find_mode, @size( info.find_mode ) ); 
@@ -1147,6 +1146,7 @@ proc
 			
 			config.create();
 			config.writeUns( s_settings, s_tabs, DEFAULT_TAB_STOP );
+			config.writeString( s_settings, "Line Break", "CRLF" );
 
 			// some hard coded defaults
 			mov( 10,window.xPos );
@@ -1178,27 +1178,23 @@ proc
 		// called every time a key up message is processed
 		// or when the status bar needs to be updated
 		var
-			tempstr	:string;
+			build_str	:string;
 			
 			
 	begin updateStatus;
 		
-		mov( str.talloc( 1000 ), tempstr );
+		mov( str.talloc( 1000 ), build_str );
+		dbg.put("updatestatus :", info.lines );
 		getInfo( info );
 		
-		// draw the line/pos information on the status bar
 		mov( info.line.number, eax );
 		inc( eax );
-		conv.u32ToStr( eax, 20, ' ', tempstr );
-		str.trim( tempstr );
-		str.put( strbuf, "Line: ", tempstr, "   " );
-		conv.u32ToStr( info.column_index, 20,' ', tempstr );
-		str.trim( tempstr );
-		str.put2( strbuf, "Column: ", tempstr, "   " );
-		mov( info.lines, eax );
-		str.put2( strbuf, "    Pos: ", (type uns32 info.cursor.start_index ), " | Lines: ", (type uns32 eax));
-		
-		w.SendMessage( window.hstatus, w.SB_SETTEXT, 0, strbuf ); 
+		mov( info.column_index, ecx );
+		inc( ecx );
+		str.put( build_str, "Line: ", (type uns32 eax ), " / ", info.lines,
+				 "    Col: ", (type uns32 ecx ), "    Pos: ", info.cursor.start_index );
+				
+		w.SendMessage( window.hstatus, w.SB_SETTEXT, 0, build_str );
 		
 		// update insert/overwrite/visual mode notifiers
 		if( info.ins_ovr ) then
@@ -1212,30 +1208,33 @@ proc
 		else
 			w.SendMessage( window.hstatus, w.SB_SETTEXT, 2, s_b );
 		endif;
-		
+				
 		if( info.mark.isSet ) then
 			w.SendMessage( window.hstatus, w.SB_SETTEXT, 3, s_mark );
 			
 		else
 			w.SendMessage( window.hstatus, w.SB_SETTEXT, 3, s_b );
 		endif;
+
+		config.readString( s_settings, "Line Break", build_str );
+		w.SendMessage( window.hstatus, w.SB_SETTEXT, 4, build_str );
 		
 		movzx( info.mode, eax );
 		switch( eax )
 				
 			case( MODE_EDITINI )
-				str.put( tempstr, "Mode :Edit Configuration" );
-				w.SendMessage( window.hstatus, w.SB_SETTEXT, 4, tempstr );
+				str.put( build_str, "Mode :Edit Configuration" );
+				w.SendMessage( window.hstatus, w.SB_SETTEXT, 5, build_str );
 
 			case( MODE_VIEWDOCS )
-				str.put( tempstr, "Mode :View Documentation" );
-				w.SendMessage( window.hstatus, w.SB_SETTEXT, 4, tempstr );
+				str.put( build_str, "Mode :View Documentation" );
+				w.SendMessage( window.hstatus, w.SB_SETTEXT, 5, build_str );
 
 			default
 			
 				// default will be insert mode
-				str.put( tempstr, "Mode :Insert" );
-				w.SendMessage( window.hstatus, w.SB_SETTEXT, 4, tempstr);
+				str.put( build_str, "Mode :Insert" );
+				w.SendMessage( window.hstatus, w.SB_SETTEXT, 5, build_str);
 		endswitch;
 		
 		// window title may have changed somewhere along the line, update it
@@ -1304,6 +1303,7 @@ proc
 		sub( editedi.line.index, eax );
 		mov( eax, editedi.column_index );
 		w.SendMessage( info.hred, w.EM_GETLINECOUNT, 0, 0 );
+		dbg.put("getinfo, line count :", (type uns32 eax ));
 		mov( eax, editedi.lines );
 
 		pop( esi );
@@ -1914,7 +1914,7 @@ proc
 			if( selectColor() )  then
 				move( return, window.textColor );
 				config.writeHex( s_text, s_text_color, window.textColor);
-				setFormat();
+				setFont( info );
 			endif; 
 			w.SetFocus(info.hred);
 			
@@ -1923,7 +1923,7 @@ proc
 			if( selectColor() ) then
 				move( return, window.backColor );
 				config.writeHex( s_text, s_background_color, window.backColor);
-				setFormat();
+				w.SendMessage( info.hred, w.EM_SETBKGNDCOLOR, false, window.backColor);
 			endif;
 			w.SetFocus(info.hred);
 			
@@ -2085,7 +2085,7 @@ proc
 			
 			if( setTabWidth() ) then
 				config.writeUns( s_settings, s_tabs, eax );
-				setFormat();
+				setTabs( info );
 			endif;
 			
 		case( IDM_TAB_AS_SPACE )

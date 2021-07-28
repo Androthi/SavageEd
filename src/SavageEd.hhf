@@ -6,8 +6,8 @@
 	#includeonce("w32\shell32.hhf" )
 
 readonly
-
-	version			:string := "SavageEd v0.7.19";
+	
+	version			:string := "SavageEd v0.8.00";
 
 type
 	// Message and dispatch table related definitions:
@@ -63,6 +63,11 @@ type
 			length	:uns32;
 		endrecord;
 	
+	LineBreak: enum {
+		CRLF,
+		LF
+	};
+	
 	EditInfo:
 		record
 			filepath:string;
@@ -82,6 +87,7 @@ type
 			lines				:uns32;
 			ins_ovr				:boolean;
 			mode				:byte;
+			line_break			:LineBreak;
 
 			//incremental_search	:boolean; TODO(need to add command bar )
 
@@ -184,11 +190,12 @@ const
 	IDC_SBAR			:= 9020;
 	statusht_c			:= 21;		// height of status bar
 
-	STATUS_PARTS		:= 5;
-	POS_LINES			:=270;
+	STATUS_PARTS		:= 6;
+	POS_LINES			:=265;
 	POS_INS				:=POS_LINES+30;
 	POS_READONLY		:=POS_INS+18;
-	POS_MARK			:=POS_READONLY+18;
+	POS_LINEBREAK		:=POS_READONLY+18;
+	POS_MARK			:=POS_LINEBREAK+32;
 	POS_MODE			:=POS_MARK + 1800;
 	
 	DEFAULT_TAB_STOP	:= 4;
@@ -241,8 +248,9 @@ readonly
 	s_b			:string := " ";
 	s_mark		:string := "M";
 	s_empty		:string := "";
+	s_lf		:string := "LF";
+	s_crlf		:string := "CRLF";
 	s_inputlinen:string := "Enter Line Number";
-	s_inputpwd	:string := "Enter a password upto 32 characters";
 	s_inputtab	:string := "Enter tab spacing in number of characters";
 	
 	s_document		:string := "SavageEd.md";	
@@ -259,7 +267,7 @@ readonly
 
 const
 	
-	typeConsts( edit, EditInfo, edi )
+	typeConsts( edit, EditInfo, edi, esi)
 	typeConsts( charrange, range, esi )
 	typeConsts( config, tConfig, esi )
 
@@ -318,7 +326,7 @@ proc
 	updateMenu	:procedure; @external;
  	getConfirm	:procedure {@returns("EAX")}; @external;
 	StreamInProc :procedure( var pBytesRead:dword ; NumBytes:dword ; var pbuffer:dword ; _hFile:dword ); @external;
-	StreamOutProc :procedure( var pBytesRead:dword ; NumBytes:dword ; var pbuffer:dword ; _hFile:dword ); @external;
+	StreamOutProc :procedure( var pBytesWritten:dword ; NumBytes:dword ; var pbuffer:dword ; _hFile:dword ); @external;
 	setWindowTitle :procedure; @external;
 	getTempName :procedure( prefix:string; ext:string; dest:string ); @external;
 	checkSave :procedure; @external;
@@ -333,11 +341,13 @@ proc
 	GetSelText :procedure( lpBuff:dword ); @external;
 	AboutDlgProc :procedure( lParam:dword; wParam:dword; uMsg:uns32; hDlg:dword); @external;
 	AddMenus :procedure; @external;
-	setFormat :procedure; @external;
+	setFormat :procedure( var inf :EditInfo ); @external;
 	Proc_Edit	:procedure( lParam:dword; wParam:dword; uMsg:uns32; hWin:dword ); @external;
 	newInstance :procedure( filename:string ); @external;
 	openRecent :procedure(id:dword); @external;
 	Proc_Input :procedure( lParam:dword; wParam:dword; uMsg:uns32; hWin:dword ); @external;
+	setFont	:procedure( var inf	:EditInfo ); @external;
+	setTabs	:procedure (var inf:EditInfo); @external;
 
 
 

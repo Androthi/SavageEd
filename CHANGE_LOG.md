@@ -1,5 +1,21 @@
 # Change Log
 
+## 07/27/2021
+	0.8.00	- features changes:
+				- added option to save file with LF line endings
+				  this option can only be edited by using the "Edit Options"
+				  and changing the .ini file manually
+				  by adding a new line under
+				  
+				  [Settings]
+				  Line Break=CRLF
+				  or
+				  Line Break=LF
+				  
+			- internals changes:
+				- fixed filename mangling bug
+				- fixed line/pos not showing correctly on first load
+
 ## 07/26/2021
 	0.7.17	- features changes:
 				- added the option to edit/view the Savage.ini file from an open

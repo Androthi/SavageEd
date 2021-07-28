@@ -285,15 +285,75 @@ proc
 	
 	end StreamInProc;
 
-	StreamOutProc :procedure( var pBytesRead:dword ; NumBytes:dword ; var pbuffer:dword ; _hFile:dword );
+	StreamOutProc :procedure( var pBytesWritten:dword ; NumBytes:dword ; var pbuffer:dword ; _hFile:dword );
 	
-		// output edit buffer into file
+		// stream the contents of the richedit to file
+		// richedit doesn't have a flag to return LF line ending even though
+		// this is it's default internal representation.\
+		// what can i say, windows api sucks.
+		// in order to strip CR from line endings, we have to go through
+		// a hackey process.
+		
+		
+		var
+			buf	:tBuffer;
+			returnval	:dword;
+		
+		static
+			cr_linebreak : cset := { #$0D };
+			
 	
 	begin StreamOutProc;
 		
-		w.WriteFile( _hFile, pbuffer, NumBytes, pBytesRead, NULL );
-		xor	(1, eax);
+		if( info.line_break = LF ) then
+			
+			// user request LF linebreaks, begin hacky stuff
+			// i'll note all the hacky stuff i do. 
+			
+			pushad();
+			
+			// first, we'll copy the buffer to our custom buffer/scanner
+			// to make life a little easier
+			
+			buf.create( NumBytes );
+			mov( pbuffer, ecx );
+			buf.putBytes( ecx, NumBytes );
+			buf.bof();
+			
+			// now scan through our buffer, breaking everytime we find a CR
+			// and delete that pesky dingy. 
+			forever
+				breakif( buf.isEof() );
+				if( buf.brk( cr_linebreak ) ) then
+					buf.delete(1);
+				endif;
+			endfor;
 
+			w.WriteFile( _hFile, val buf.data, buf.length, pBytesWritten, NULL );
+			mov( eax, returnval );
+			
+			// now since we removed some bytes from the buffer,
+			// the length will be less than what richedit is expecting
+			// and it will stop. so we have to trick it into thinking
+			// we wrote everything it wanted us to write.
+
+			mov( pBytesWritten, eax );
+			mov( NumBytes, [eax] );
+			buf.destroy();
+			popad();
+			
+		else
+
+			w.WriteFile( _hFile, pbuffer, NumBytes, pBytesWritten, NULL );
+			mov( eax, returnval );			
+			// use normal write routine.
+
+		endif;
+		
+		// we have to toggle the return bit to make everything work smoothly.
+		mov( returnval, eax );
+		xor	(1, eax);
+		
 	end StreamOutProc;
 
 	setWindowTitle :procedure;
@@ -854,67 +914,86 @@ proc
 		
 	end Msg_Context;
 
-	setFormat :procedure;
-		
-		// initializes a new edit buffer
-		// sets background and foreground colors
-		// sets font and margins
-		// sets tab width
+	setFont	:procedure( var inf	:EditInfo );
 		
 		var
 			cf	:w.CHARFORMAT2;
-			tm	:w.TEXTMETRIC;	
 			
-	begin setFormat;
-		
-		w.SendMessage(info.hred, w.EM_GETMODIFY,0,0);
+	begin setFont;
+		pushabi;
+		mov( inf, esi );
+		w.SendMessage( editesi.hred, w.EM_GETMODIFY,0,0);
 		push( eax );
-		w.SendMessage(info.hred, w.EM_EXLIMITTEXT,0,-1);
-		
-		lea (eax, cf);
-		w.RtlZeroMemory (eax, @size(cf));
-		mov	(@size(cf), cf.cbSize);
-		mov	(w.CFM_CHARSET | w.CFM_FACE | w.CFM_SIZE | w.CFM_COLOR, cf.dwMask);
-		mov	(logfont.lfCharSet, al);
-		mov	(al,cf.bCharSet);
-		mov	(logfont.lfPitchAndFamily, al);
-		mov	(al, cf.bPitchAndFamily);
-		w.lstrcpyn(cf.szFaceName,&logfont.lfFaceName,w.LF_FACESIZE);
-		mov	(logfont.lfHeight, eax);
-		neg	(eax);
-		mov	(15,ecx);
-		mul (ecx);
-		mov	(eax, cf.yHeight);
-		push (window.textColor);
-		pop (cf.crTextColor);
-		w.SendMessage( info.hred, w.EM_SETBKGNDCOLOR, false, window.backColor);
-		w.SendMessage( info.hred, w.WM_SETFONT, info.hfont, true );
+
+		lea( eax, cf );
+		mem2.fillMem( [eax], @size( cf ), 0 );
+		mov( @size( cf ), cf.cbSize );
+		mov( w.CFM_CHARSET | w.CFM_FACE | w.CFM_SIZE | w.CFM_COLOR, cf.dwMask );
+		mov( logfont.lfCharSet, al );
+		mov( al,cf.bCharSet );
+		mov( logfont.lfPitchAndFamily, al );
+		mov( al, cf.bPitchAndFamily );
+		w.lstrcpyn( cf.szFaceName, &logfont.lfFaceName, w.LF_FACESIZE );
+		mov( logfont.lfHeight, eax );
+		neg( eax );
+		mov( 15,ecx );
+		mul( ecx );
+		mov( eax, cf.yHeight );
+		push( window.textColor );
+		pop( cf.crTextColor );
+		w.SendMessage( info.hred, w.WM_SETFONT, editesi.hfont, true );
+		lea( eax, cf );
+		w.SendMessage( editesi.hred, w.EM_SETCHARFORMAT, w.SCF_ALL, eax );
+
+		pop	(eax);
+		w.SendMessage( editesi.hred, w.EM_SETMODIFY, eax, 0 );
+		popabi;
+	end setFont;
+
+	setTabs	:procedure (var inf:EditInfo);
+	begin setTabs;
+		pushabi;
 		
 		w.GetDialogBaseUnits();
-		movzx( ax, ecx );
-		str.cpy( "", strtabs );
-		config.readUns( s_settings, s_tabs );
-		push( eax );
+		movzx( ax, ecx );		
+		mul( ecx );
+		shr( 1, eax );
+		
+		mov( inf, esi );
+		mov( eax, editesi.tabs );
+		lea( eax, editesi.tabs );
+		w.SendMessage(editesi.hred, w.EM_SETTABSTOPS, 1, eax );
+		
 		// fill the tabs as spaces string
+		str.cpy( "", strtabs );
+		if( ! config.readUns( s_settings, s_tabs )) then
+			mov( DEFAULT_TAB_STOP, eax );
+		endif;
 		while( eax ) do
 			str.cat( " ", strtabs );
 			dec( eax ); 
 		endwhile;
-		pop( eax );
+		dbg.put("strtabs :", strtabs );
+		popabi;
+	end setTabs;
+
+
+	setFormat :procedure( var inf :EditInfo );
 		
-		mul( ecx );
-		shr( 1, eax );
-		mov( eax, info.tabs );
-		dbg.put("tabs :", info.tabs );
-		w.SendMessage(info.hred, w.EM_SETTABSTOPS, 1, &info.tabs );
+		// initializes a new edit buffer
+		// call function to set background and foreground colors, font and margins
+		// call function to set sets tab width
+			
+	begin setFormat;
 		
-		w.SendMessage( info.hred, w.EM_SETMARGINS, w.EC_LEFTMARGIN | w.EC_RIGHTMARGIN, 5<<16 | 5 );
+		mov( inf, esi );
+		w.SendMessage( editesi.hred, w.EM_EXLIMITTEXT, 0, -1 );
 		
-		lea(eax, cf);
-		w.SendMessage( info.hred, w.EM_SETCHARFORMAT, w.SCF_ALL, eax );
-		pop	(eax);
-		w.SendMessage( info.hred, w.EM_SETMODIFY, eax,0 );
+		setFont( inf );
+		w.SendMessage( editesi.hred, w.EM_SETBKGNDCOLOR, false, window.backColor);
 		
+		setTabs( inf );
+		w.SendMessage( editesi.hred, w.EM_SETMARGINS, w.EC_LEFTMARGIN | w.EC_RIGHTMARGIN, 5<<16 | 5 );
 	end setFormat;
 	
 	
@@ -966,12 +1045,11 @@ proc
 		
 		w.SendMessage( info.hred, w.EM_SETEVENTMASK, 0, w.ENM_SELCHANGE	);
 		
-		setFormat();
+		setFormat( info );
 		w.SetFocus( info.hred );
 	
 		// check for a filename passed as an argument and try to open that file.
 		// if file doesn't exist, start new document with that filename.
-		str.cpy("", strtabs);
 		arg.c();
 		if( eax > 1 ) then
 			
@@ -1142,7 +1220,6 @@ proc
 			config.deleteItem( s_recent, 20 );
 			
 		endif;
-		updateMenu();
 		ret();
 	end updateRecentLog;
 

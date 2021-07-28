@@ -13,7 +13,6 @@
 	
 	If there is a SavageEd.ini file in the SavageEd parent folder, SavageEd
 	will always prioritise using that config instead.
- fcdfdfddddfeeee
 	Reading anything beyond this point is optional.
 	
 SavageEd is designed to be a quick editing/note taking program.
@@ -172,6 +171,17 @@ Save and SaveAs still function.
 	change this file, the configuration will be reloaded and new options are in effect.
 	Use with caution. There is no error checking.
 	A backup file of "SavageEd.in~" is created when this option is selected. 
+
+## Options > Line Break
+	This option can only be added manually by editing the .ini file
+	under [Settings] section, add "Line Break=CRLF" (this is default) for
+	MS/DOS Windows line breaks.
+	or "Line Break=LF" for unix line breaks.
+	If SavageEd generates the 1st .ini file, this will already be included in the
+	settings.
+	
+	[Settings]
+	Line Break=CRLF
 	
 ## Log files.
 If you wish to use the log feature, it is compatible to the .LOG

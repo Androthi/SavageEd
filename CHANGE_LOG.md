@@ -1,8 +1,10 @@
 # Change Log
 
 ## 07/29/2021
-	0.8.03	-internal changes:
-			 replaceall now tries to restore relative position
+	0.8.04	-internal changes:
+			 -replaceall now tries to restore relative position
+			 -got rid of global strbuf
+			 -fixed blank space in temp names
 
 ## 07/27/2021
 	0.8.00	- features changes:

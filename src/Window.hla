@@ -392,7 +392,7 @@ proc
 		forever
 			w.GetTickCount();
 			conv.u32ToStr( eax, 20, ' ', s );
-			str.trim( hide.strbuf );
+			str.trim( s );
 			filesys.gwd( dest );
 			str.put2( dest, chars.dir_sep, prefix, s, ext );
 			
@@ -530,8 +530,6 @@ proc
 			
 	begin saveFile;
 		
-		filesys.extractExt( filename, strbuf );
-		
 		try
 			fileio.openNew( filename );
 			mov( eax,hfile );
@@ -545,9 +543,8 @@ proc
 			fileio.close( hfile );
 			w.SendMessage(info.hred, w.EM_SETMODIFY, false, 0);
 			mov( false,eax );
-			dbg.put("mode here = ", info.mode );
+
 			if( info.mode = MODE_EDITINI ) then
-				dbg.put("running initConfig");
 				initConfig();
 			endif;
 			
@@ -858,8 +855,12 @@ proc
 	Msg_OpenDroppedFile :procedure( hwnd:dword; wParam:dword; lParam:dword );
 
 		// handles opening dropped files
+		var
+			build_str	:string;
+			
 
 	begin Msg_OpenDroppedFile;
+		mov( str.talloc( 1000 ), build_str );		
 		pushabi;
 		
 		w.SetForegroundWindow(window.hwnd);
@@ -870,8 +871,8 @@ proc
 			w.SetWindowText( info.hred, 0 );		// clear edit window
 			w.DragQueryFile( wParam, 0, &buffer, @size(buffer) );
 			w.GetLongPathName( &buffer, &buffer, @size(buffer) );
-			str.cpyz( &buffer, hide.strbuf );
-			loadFile( hide.strbuf );
+			str.cpyz( &buffer, build_str );
+			loadFile( build_str );
 			
 		endif;
 		popabi;
@@ -1006,9 +1007,11 @@ proc
 		// or start new file.
 		var
 			edit_style	:dword;
+			build_str	:string;
 		
 	begin Msg_Create;
 		
+		mov( str.talloc( 1000 ), build_str );
 		mov(hwin, eax);
 		mov(eax, window.hwnd);
 		w.CreateMenu();
@@ -1062,8 +1065,8 @@ proc
 				
 				// file path copied, try to open it.
 				
-				str.cpyz( &buffer, hide.strbuf );
-				loadFile( hide.strbuf );
+				str.cpyz( &buffer, build_str );
+				loadFile( build_str );
 				if (eax) then
 					jmp skipOpenRecent;
 				endif;
@@ -1087,8 +1090,8 @@ proc
 			
 			if( config.isSectionDefined( s_recent )) then
 				
-				config.readItem( s_recent, 0, hide.strbuf );
-				loadFile( hide.strbuf );
+				config.readItem( s_recent, 0, build_str );
+				loadFile( build_str );
 				if( ! eax ) then
 					
 					// the file we want to open doesn't exit anymore. remove it from our list.

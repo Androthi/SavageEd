@@ -7,7 +7,7 @@
 
 readonly
 	
-	version			:string := "SavageEd v0.8.03";
+	version			:string := "SavageEd v0.8.04";
 
 type
 	// Message and dispatch table related definitions:
@@ -273,18 +273,17 @@ storage
 	
 	// temp, move into window record
 	config		:tConfig; @external;
-	findbuf			:byte[300]; @external;
-	replacebuf		:byte[300]; @external;
-	logfont			:w.LOGFONT; @external;
-	buffer			:byte[szLINEBUFFER]; @external;
+	findbuf		:byte[300]; @external;
+	replacebuf	:byte[300]; @external;
+	logfont		:w.LOGFONT; @external;
+	buffer		:byte[szLINEBUFFER]; @external;
 	find_range	:w.TEXTRANGE; @external;
-	return			:string; @external;
+	return		:string; @external;
 
 	
 static
 	// temp, move into list, and attach list to window record
 	info		:EditInfo; @external;
-	strbuf		:string; @external;
 	strtabs		:string; @external;	
 	statusParts	:int32[STATUS_PARTS]; @external;
 	

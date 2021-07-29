@@ -1,5 +1,9 @@
 # Change Log
 
+## 07/29/2021
+	0.8.03	-internal changes:
+			 replaceall now tries to restore relative position
+
 ## 07/27/2021
 	0.8.00	- features changes:
 				- added option to save file with LF line endings

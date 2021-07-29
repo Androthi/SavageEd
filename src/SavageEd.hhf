@@ -7,7 +7,7 @@
 
 readonly
 	
-	version			:string := "SavageEd v0.8.01";
+	version			:string := "SavageEd v0.8.03";
 
 type
 	// Message and dispatch table related definitions:
@@ -185,10 +185,10 @@ const
 	ID_SAVAGEED_MANUAL		:= 4000;
 
 	RECENT_MENU_START	:= 9000;
-	RECENT_MENU_END		:= 9019;	// 10 items in recent menu
+	RECENT_MENU_END		:= 9019;	// It's over 9000!
 	IDC_SBAR			:= 9020;
-	statusht_c			:= 21;		// height of status bar
 
+	STATUS_BAR_HEIGHT	:= 21;
 	STATUS_PARTS		:= 5;
 	POS_LINES			:=265;
 	POS_READONLY		:=POS_LINES+18;
@@ -198,6 +198,7 @@ const
 	
 	DEFAULT_TAB_STOP	:= 4;
 
+	// default colors
 	color_white :w.COLORREF := $00FF_FFFF;
 	color_black :w.COLORREF := $0000_0000;
 	

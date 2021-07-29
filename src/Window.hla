@@ -186,7 +186,7 @@ proc
 		
 		if( config.readBool( s_window, s_status ) ) then
 		
-			sub( statusht_c, height );
+			sub( STATUS_BAR_HEIGHT, height );
 			w.SendMessage( window.hstatus, w.WM_SIZE, 0, 0 );
 
 		endif;
@@ -707,14 +707,14 @@ proc
 		mov( lpBuff, eax );
 		mov( eax, find_range.lpstrText );
 		
-		w.SendMessage(info.hred, w.EM_EXGETSEL,0, &find_range.chrg);
-		mov	(find_range.chrg.cpMax,eax);
-		sub	(find_range.chrg.cpMin,eax);
+		w.SendMessage( info.hred, w.EM_EXGETSEL,0, &find_range.chrg );
+		mov( find_range.chrg.cpMax,eax );
+		sub( find_range.chrg.cpMin,eax );
 		if( eax >= @elements( findbuf ) ) then
 			mov( @elements( findbuf) -1, find_range.chrg.cpMax );
 		endif;
 		
-		w.SendMessage(info.hred, w.EM_GETTEXTRANGE,0,&find_range);
+		w.SendMessage( info.hred, w.EM_GETTEXTRANGE,0,&find_range );
 	
 	end GetSelText;
 	

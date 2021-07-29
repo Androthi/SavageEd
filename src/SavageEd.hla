@@ -1,3 +1,5 @@
+//# working on getting the global string strbuf removed from use.
+
 
 program SavageEd;
 
@@ -28,8 +30,6 @@ storage
 	proc_return		:boolean;	// hack needed to ignore a rogue WM_KEYUP being sent from the syetem after startup from commandline or by a keypress 
 
 	customColors:dword[16];
-		
-	chrg		:range;
 	find_range	:w.TEXTRANGE;
 	
 	config		:tConfig;
@@ -49,12 +49,15 @@ proc
 
 	selectFont :procedure;
 
-		// handles Font selection
-		static	choose_font:w.CHOOSEFONT;
+		var			
+			font_str	:string;
+			choose_font:w.CHOOSEFONT;
 
 	begin selectFont;
-	
-		w.RtlZeroMemory( &choose_font, @size(choose_font) );
+		
+		mov( str.talloc( 1000 ), font_str );
+		lea( esi, choose_font );
+		mem2.fillMem( [esi], @size( choose_font ), 0 );
 		mov( @size(choose_font), choose_font.lStructSize );
 		mov( window.hwnd, eax );
 		mov( eax, choose_font.hWndOwner );
@@ -62,7 +65,6 @@ proc
 		mov( w.CF_SCREENFONTS | w.CF_EFFECTS | w.CF_INITTOLOGFONTSTRUCT, choose_font.Flags );
 		push( window.textColor );
 		pop( choose_font.rgbColors );
-		
 		w._ChooseFont(choose_font);
 		if (eax) then
 
@@ -83,11 +85,13 @@ proc
 			config.writeInt( s_font, "Italic", eax );
 			movzx( logfont.lfPitchAndFamily, eax );
 			config.writeInt( s_font, "Pitch", eax );
-			str.cpyz (&logfont.lfFaceName, strbuf );
-			config.writeString( s_font, "Name", strbuf );
+			str.cpyz (&logfont.lfFaceName, font_str );
+			config.writeString( s_font, "Name", font_str );
 			
 		endif;
 	end selectFont;
+	
+	
 	selectColor :procedure { @returns("EAX") };
 		
 		// color picker
@@ -894,17 +898,16 @@ proc
 				elseif (eax = IDC_BTN_REPLACEALL) then
 					
 					mov( true, info.find_mode.down );
-					
-					w.SendMessage (info.hred, w.EM_EXGETSEL, 0, &chrg);
+					push( info.cursor.start_index );
+					w.SendMessage (info.hred, w.EM_EXGETSEL, 0, &info.cursor);
 					w.LockWindowUpdate(info.hred);
 					w.SendMessage (info.hred, w.EM_SETSEL, 0, 0);
 					Find();
 					while (fres!=-1) do
 						w.SendMessage(hWin, w.WM_COMMAND, IDC_BTN_REPLACE,0);
 					endwhile;
-					push (chrg.start_index);
-					pop (chrg.end_index);
-					w.SendMessage (info.hred, w.EM_EXSETSEL, 0, &chrg);
+					pop( info.cursor.start_index );
+					w.SendMessage (info.hred, w.EM_SETSEL, info.cursor.start_index, info.cursor.start_index);
 					w.LockWindowUpdate(NULL);
 					w.SetFocus(window.hfind);
 					

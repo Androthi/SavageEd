@@ -7,7 +7,7 @@
 
 readonly
 	
-	version			:string := "SavageEd v0.8.05";
+	version			:string := "SavageEd v0.8.10";
 
 type
 	// Message and dispatch table related definitions:
@@ -344,6 +344,9 @@ proc
 	Proc_Input :procedure( lParam:dword; wParam:dword; uMsg:uns32; hWin:dword ); @external;
 	setFont	:procedure( var inf	:EditInfo ); @external;
 	setTabs	:procedure (var inf:EditInfo); @external;
+	command_select_to_eol :procedure; @external;
+	command_move_line_up :procedure; @external;
+	command_move_line_down :procedure; @external; 
 
 
 

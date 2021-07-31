@@ -49,9 +49,13 @@ Apart from the standard menu shortcuts, SavageEd has some additional hard coded 
 	- Ctrl-.	Move cursor right 1 word
 	- Ctrl-[	Move to beginning of line, or beginning of prev line if already there
 	- Ctrl-]	Move to end of line, or end of next line if already there
+	- Ctrl-e	Delete to end of line
 	
 	- Ctrl-Enter	Open line above cursor
 	- Shift-Enter	Open line below cursor
+	
+	- Alt-Up	Move current line up
+	- Alt-Down	Move current line down
 
 	- Ctrl-d	Delete 1 char
 	- Ctrl-w	Delete 1 word under the cursor

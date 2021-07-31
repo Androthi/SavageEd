@@ -478,7 +478,20 @@ proc
 			
 			case( w.WM_SYSKEYDOWN )
 				dbg.put("syskey down =>", wParam );
-				mov( true, alt_down );
+				mov( wParam, eax );
+				switch( eax )
+			
+					case( w.VK_MENU )
+						// needed for alt + other modifiers
+						mov( true, alt_down );
+						
+					case( w.VK_UP )
+						command_move_line_up();
+						
+					case( w.VK_DOWN )
+						command_move_line_down();
+
+				endswitch;
 				
 			case( w.WM_SYSCHAR )
 				dbg.put("syschar =>", wParam );
@@ -522,7 +535,16 @@ proc
 							w.SendMessage( info.hred, w.EM_REPLACESEL,true, s_empty );
 						
 						endif;
+					
+					case( w.VK_E )
 						
+						if( ctrl_down ) then
+							
+							command_select_to_eol();
+							w.SendMessage( info.hred, w.EM_REPLACESEL,true, s_empty );
+							
+						endif;
+					
 					case( w.VK_BSLASH )
 
 						if( ctrl_down ) then
@@ -717,6 +739,14 @@ proc
 					
 						mov( true, proc_return );
 					
+					case( w.VK_END )
+					
+						if( shift_down ) then
+							
+							command_select_to_eol();
+							jmp skip_proc;
+						endif;
+					
 					case( w.VK_SPACE )
 						
 						if( ctrl_down ) then
@@ -724,7 +754,8 @@ proc
 							command_toggle_mark();
 							jmp skip_proc;
 						endif;
-					
+						
+
 					TODO( need to add command bar )
 					//case( w.VK_SLASH )
 						
@@ -806,7 +837,7 @@ proc
 				dbg.put("char =>", wParam );
 				
 				mov( wParam, eax );
-				if( ctrl_down || eax = w.VK_TAB ) then
+				if( ctrl_down || eax = w.VK_TAB || eax = w.VK_ESCAPE ) then
 					jmp skip_proc;
 				endif;
 
@@ -1190,7 +1221,6 @@ proc
 	begin updateStatus;
 		
 		mov( str.talloc( 1000 ), build_str );
-		dbg.put("updatestatus :", info.lines );
 		getInfo( info );
 		
 		mov( info.line.number, eax );
@@ -1303,7 +1333,6 @@ proc
 		sub( editedi.line.index, eax );
 		mov( eax, editedi.column_index );
 		w.SendMessage( info.hred, w.EM_GETLINECOUNT, 0, 0 );
-		dbg.put("getinfo, line count :", (type uns32 eax ));
 		mov( eax, editedi.lines );
 
 		pop( esi );
@@ -1383,12 +1412,9 @@ proc
 		// copy the current line in the editor to buffer
 		
 	begin command_get_line;
-		
-		getInfo(info);
-		dbg.put ("getting line:", info.line.number);
-		
+				
 		mov( line_buffer, eax );
-		mov( 3000, (type word [eax] ) );
+		mov( szLINEBUFFER, (type word [eax] ) );
 		w.SendMessage( info.hred, w.EM_GETLINE, info.line.number, eax );
 		
 		// returns number of length of line copied in eax
@@ -1402,7 +1428,7 @@ proc
 	
 	begin command_get_word;
 		command_get_line( &buffer );
-		getInfo(info);
+		//getInfo(info);
 		
 		// if we are sitting on a space, newline or tab char, don't do anything
 		mov( &buffer, edx );
@@ -1489,7 +1515,6 @@ proc
 
 	command_cut_line	:procedure {@noframe};
 	begin command_cut_line;
-		getInfo(info);
 		mov( info.line.index, eax );
 		mov( eax, info.cursor.start_index );
 		add( info.line.length, eax );
@@ -1616,7 +1641,7 @@ proc
 			add( info.line.index, eax );
 			inc( eax ); // go over the carriage return
 			w.SendMessage( info.hred, w.EM_SETSEL, eax, eax );
-			//getInfo(info);
+
 		endif;
 		mov( info.line.length, eax );
 		add( info.line.index, eax );
@@ -1624,6 +1649,66 @@ proc
 		ret();
 
 	end command_move_to_eol;
+
+	command_move_line_up :procedure {@noframe};
+	begin command_move_line_up;
+		dbg.enters( "command_move_line_up" );
+		
+		if( info.line.number > 0 ) then
+			push( info.column_index );
+			command_get_line( &buffer );
+			mov( info.line.length, eax );
+			add( info.line.index, eax );
+			inc( eax ); // get the line feed
+			w.SendMessage( info.hred, w.EM_SETSEL, info.line.index, eax );
+			w.SendMessage( info.hred, w.EM_REPLACESEL, true, s_empty );
+			command_move_to_bol();
+			w.SendMessage( info.hred, w.EM_REPLACESEL, true, &buffer );
+			getInfo( info );
+			command_move_to_bol();
+			pop( eax );
+			add( info.line.index, eax );
+			w.SendMessage( info.hred, w.EM_SETSEL, eax, eax );
+		endif;
+		
+		dbg.exits( "command_move_line_up" );
+		ret();
+	end command_move_line_up;
+
+	command_move_line_down :procedure {@noframe};
+	begin command_move_line_down;
+		dbg.enters( "command_move_line_down" );
+		mov( info.lines, eax );
+		if( info.line.number < eax ) then
+			push( info.column_index );
+			command_get_line( &buffer );
+			mov( info.line.length, eax );
+			add( info.line.index, eax );
+			inc( eax ); // get the line feed
+			w.SendMessage( info.hred, w.EM_SETSEL, info.line.index, eax );
+			w.SendMessage( info.hred, w.EM_REPLACESEL, true, s_empty );
+			command_cursor_down();
+			w.SendMessage( info.hred, w.EM_REPLACESEL, true, &buffer );
+			getInfo( info );
+			command_move_to_bol();
+			pop( eax );
+			add( info.line.index, eax );
+			w.SendMessage( info.hred, w.EM_SETSEL, eax, eax );
+		endif;
+		dbg.exits( "command_move_line_down" );
+		ret();
+	end command_move_line_down;
+
+
+	command_select_to_eol :procedure {@noframe};
+	begin command_select_to_eol;
+
+		mov( info.line.length, eax );
+		add( info.line.index, eax );
+		w.SendMessage( info.hred, w.EM_SETSEL, info.cursor.start_index, eax );
+		ret();
+		
+	end command_select_to_eol;
 
 
 	command_toggle_mark :procedure {@noframe};

@@ -2,6 +2,11 @@
 
 
 ## 07/31/2021
+	0.8.10	-shift+end no longer selects line feed character
+			 note, selecting the line by clicking on the border
+			 and using ctrl-\ to kill line still captures LF
+			-added alt+up and alt+down to move the current line up or down
+			-added ctrl+e delete to end of line
 	0.8.04	-internal changes:
 			 -now displays app name on title bar
 			 -file not found warning now includes the filename

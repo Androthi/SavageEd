@@ -542,7 +542,7 @@ proc
 							
 							command_select_to_eol();
 							w.SendMessage( info.hred, w.EM_REPLACESEL,true, s_empty );
-							
+							jmp skip_proc;
 						endif;
 					
 					case( w.VK_BSLASH )
@@ -837,7 +837,7 @@ proc
 				dbg.put("char =>", wParam );
 				
 				mov( wParam, eax );
-				if( ctrl_down || eax = w.VK_TAB || eax = w.VK_ESCAPE ) then
+				if( ctrl_down || eax = w.VK_TAB || eax = w.VK_ESCAPE || eax = #$05 ) then
 					jmp skip_proc;
 				endif;
 

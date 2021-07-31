@@ -233,7 +233,7 @@ proc
 	begin loadFile;
 		dbg.put("loadFile :", filename);
 		
-		mov( str.talloc( 200 ), extract_str );
+		mov( str.talloc( 1000 ), extract_str );
 		try
 			
 			fileio.open( filename, fileio.r );
@@ -255,7 +255,8 @@ proc
 			
 		anyexception
 			
-			Error( s_noopen, true );
+			str.put( extract_str, s_noopen, " :", filename );
+			Error( extract_str, true );
 			xor( eax, eax );
 			
 		endtry;
@@ -275,25 +276,25 @@ proc
 	
 		mov( str.talloc( 1000 ), file_name );
 		lea( eax, ofn );
-		w.RtlZeroMemory(eax,@size(ofn));
-		mov	(@size(ofn),ofn.lStructSize);
-		mov	(window.hwnd,ofn.hWndOwner);
+		mem2.fillMem( [eax], @size( ofn ), 0 );
+		mov( @size( ofn ), ofn.lStructSize );
+		mov( window.hwnd, ofn.hWndOwner );
 		mov( window.hinst, ofn.hInstance );
 		
-		mov	(&curdir,eax);
-		mov (eax, ofn.lpstrInitialDir);
+		mov( &curdir, eax );
+		mov( eax, ofn.lpstrInitialDir );
 		
-		mov (0, buffer[0]);
-		mov (&buffer, ofn.lpstrFile);
-		mov	(@elements(buffer)-1, ofn.nMaxFile);
+		mov( 0, buffer[0] );
+		mov( &buffer, ofn.lpstrFile );
+		mov( @elements(buffer)-1, ofn.nMaxFile );
 		
-		mov	(w.OFN_PATHMUSTEXIST | w.OFN_FILEMUSTEXIST | w.OFN_LONGNAMES,ofn.Flags);
-		w.GetOpenFileName(ofn);
-			if (eax) then
+		mov( w.OFN_PATHMUSTEXIST | w.OFN_FILEMUSTEXIST | w.OFN_LONGNAMES,ofn.Flags );
+		w.GetOpenFileName( ofn );
+			if( eax ) then
 				str.cpyz( &buffer, file_name );
 				loadFile( file_name );
 			endif;
-		w.SetFocus(info.hred);
+		w.SetFocus( info.hred );
 
 	end fileOpen;
 		
@@ -1170,6 +1171,9 @@ proc
 			config.writeFileName( config_path );
 			
 		endif;
+		
+		w.CreateFontIndirect( &logfont );
+		mov( eax, info.hfont );
 		
 	dbg.exits("initConfig");
 	end initConfig;

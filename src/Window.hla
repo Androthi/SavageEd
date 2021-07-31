@@ -8,7 +8,6 @@ unit Window_unit;
 
 readonly
 
-
 	// main window message table
 //bm=window_commands	
 	message_table	:MsgProcPtr_t; @nostorage;
@@ -28,8 +27,6 @@ readonly
 
 storage
 	editstream	:w.EDITSTREAM;
-
-	
 
 proc
 
@@ -62,10 +59,7 @@ proc
 		str.cpy( s_untitled, info.filepath );
 
 		mov( 0, findbuf[0] );
-		mov( 0, replacebuf[0] );		
-
-		w.CreateFontIndirect( &logfont );
-		mov( eax, info.hfont );
+		mov( 0, replacebuf[0] );
 		
 		// main window created here
 		// describe and register the window class
@@ -151,7 +145,7 @@ proc
 	
 		if( warning ) then
 			
-			w.MessageBox( NULL, error_msg, "Warning", w.MB_OK | w.MB_ICONWARNING );
+			w.MessageBox( NULL, error_msg, "Warning", w.MB_OK );
 		
 		else
 			
@@ -368,6 +362,7 @@ proc
 		
 		mov( str.talloc(1000), title );
 		filesys.extractFilename( info.filepath, title );
+		str.insert3( "SavageEd.exe - ", 0, title );
 		if(info.hred) then
 			if (w.SendMessage(info.hred, w.EM_GETMODIFY,0,0)) then
 				str.insert("*",0, title);
@@ -571,8 +566,8 @@ proc
 	
 	begin getFileName;
 		lea( ofn, eax );
-		w.RtlZeroMemory( eax, @size(ofn) );
-		mov( @size(ofn), ofn.lStructSize );
+		mem2.fillMem( [eax], @size( ofn ), 0 );
+		mov( @size( ofn ), ofn.lStructSize );
 		mov( window.hwnd, ofn.hWndOwner );
 		mov( window.hinst, ofn.hInstance );
 		mov( &curdir, eax );
@@ -754,14 +749,17 @@ proc
 		// initializes menus
 		
 		storage
-			file_menu :dword;
-			edit_menu :dword;
-			options_menu :dword;
-			view_menu :dword;
-			help_menu :dword;
-			s_recent_menu :dword;
+			file_menu 		:dword;
+			edit_menu 		:dword;
+			options_menu 	:dword;
+			view_menu 		:dword;
+			help_menu		:dword;
+			s_recent_menu 	:dword;
+			build_str		:string;
 			
 	begin AddMenus;
+		
+		mov( str.talloc( 1000 ), build_str );
 		
 		// create all the menu handles here
 		mov( w.CreateMenu(), file_menu);

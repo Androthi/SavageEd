@@ -1,7 +1,10 @@
 # Change Log
 
-## 07/29/2021
+
+## 07/31/2021
 	0.8.04	-internal changes:
+			 -now displays app name on title bar
+			 -file not found warning now includes the filename
 			 -replaceall now tries to restore relative position
 			 -got rid of global strbuf
 			 -fixed blank space in temp names

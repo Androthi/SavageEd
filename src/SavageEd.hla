@@ -475,7 +475,7 @@ proc
 			
 		mov( uMsg, eax );
 		switch( eax )
-			
+
 			case( w.WM_SYSKEYDOWN )
 				dbg.put("syskey down =>", wParam );
 				mov( wParam, eax );
@@ -840,6 +840,14 @@ proc
 				if( ctrl_down || eax = w.VK_TAB || eax = w.VK_ESCAPE || eax = #$05 ) then
 					jmp skip_proc;
 				endif;
+				
+						
+			//case( w.WM_SETFOCUS )
+			
+				//dbg.put("proc edit got focus");
+				//w.CreateCaret( info.hred, 0, 10, 20 );
+				//w.ShowCaret( info.hred );
+				//jmp skip_proc;
 
 		endswitch;
 			
@@ -1170,16 +1178,33 @@ proc
 			endif;
 
 			config.readBin( s_text, s_custcolors, &customColors, @size( customColors ) );
-			config.readBin( s_text, s_find, &info.find_mode, @size( info.find_mode ) ); 
+			config.readBin( s_text, s_find, &info.find_mode, @size( info.find_mode ) );
+			
+			if( config.readBool( s_settings, "Active URL" )) then
+				mov( true, window.active_url );
+			else
+				mov( false, window.active_url );
+			endif; 
+			
+			if( info.hred ) then
+				if( window.active_url ) then
+					w.SendMessage( info.hred, w.EM_AUTOURLDETECT, true, NULL);
+					w.SendMessage( info.hred, w.EM_SETEVENTMASK, 0, w.ENM_SELCHANGE | w.ENM_LINK );
+				else
+					w.SendMessage( info.hred, w.EM_AUTOURLDETECT, false, NULL);
+					w.SendMessage( info.hred, w.EM_SETEVENTMASK, 0, w.ENM_SELCHANGE );
+				endif;
+				setFormat( info );
+			endif;
 			
 		else
-			
 			// no file exists, create one
 			// and set up with default settings.
 			
 			config.create();
 			config.writeUns( s_settings, s_tabs, DEFAULT_TAB_STOP );
 			config.writeString( s_settings, "Line Break", "CRLF" );
+			config.writeBool( s_settings, "Active URL", false );
 
 			// some hard coded defaults
 			mov( 10,window.xPos );
@@ -1189,6 +1214,7 @@ proc
 			
 			mov( color_white, window.backColor);
 			mov( color_black, window.textColor);
+			mov( false, window.active_url );
 			
 			// get default font
 			zstr.cpy( (type zstring s_fontname ), &logfont.lfFaceName );
@@ -1264,6 +1290,7 @@ proc
 			
 				// default will be insert mode
 				str.put( build_str, "Mode :Insert" );
+
 				w.SendMessage( window.hstatus, w.SB_SETTEXT, 4, build_str);
 		endswitch;
 		

@@ -46,6 +46,9 @@ type
 			// text and background colors
 			textColor	:w.COLORREF;
 			backColor	:w.COLORREF;
+			
+			// active URLs
+			active_url	:boolean;
 		endrecord;
 
 	FindMode:
@@ -279,6 +282,7 @@ storage
 	buffer		:byte[szLINEBUFFER]; @external;
 	find_range	:w.TEXTRANGE; @external;
 	return		:string; @external;
+	text_range	:w.TEXTRANGE; @external;
 
 	
 static

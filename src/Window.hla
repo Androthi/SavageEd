@@ -27,7 +27,7 @@ readonly
 
 storage
 	editstream	:w.EDITSTREAM;
-
+	
 proc
 
 	initWindow	:procedure {@noframe};
@@ -916,14 +916,14 @@ proc
 	setFont	:procedure( var inf	:EditInfo );
 		
 		var
-			cf	:w.CHARFORMAT2;
+			cf		:w.CHARFORMAT2;
+			modified	:dword;
 			
 	begin setFont;
 		pushabi;
 		mov( inf, esi );
 		w.SendMessage( editesi.hred, w.EM_GETMODIFY,0,0);
-		push( eax );
-
+		mov( eax, modified );
 		lea( eax, cf );
 		mem2.fillMem( [eax], @size( cf ), 0 );
 		mov( @size( cf ), cf.cbSize );
@@ -943,9 +943,8 @@ proc
 		w.SendMessage( info.hred, w.WM_SETFONT, editesi.hfont, true );
 		lea( eax, cf );
 		w.SendMessage( editesi.hred, w.EM_SETCHARFORMAT, w.SCF_ALL, eax );
-
-		pop	(eax);
-		w.SendMessage( editesi.hred, w.EM_SETMODIFY, eax, 0 );
+		
+		w.SendMessage( editesi.hred, w.EM_SETMODIFY, modified, 0 );
 		popabi;
 	end setFont;
 
@@ -1044,9 +1043,15 @@ proc
 		w.SetWindowLong(info.hred, w.GWL_WNDPROC, &Proc_Edit);
 		mov( eax, info.old_proc);
 		
-		w.SendMessage( info.hred, w.EM_SETEVENTMASK, 0, w.ENM_SELCHANGE	);
-		
+		if( window.active_url ) then
+			w.SendMessage( info.hred, w.EM_AUTOURLDETECT, true, NULL);
+			w.SendMessage( info.hred, w.EM_SETEVENTMASK, 0, w.ENM_SELCHANGE | w.ENM_LINK );
+		else
+			w.SendMessage( info.hred, w.EM_AUTOURLDETECT, false, NULL);
+			w.SendMessage( info.hred, w.EM_SETEVENTMASK, 0, w.ENM_SELCHANGE );
+		endif;
 		setFormat( info );
+
 		w.SetFocus( info.hred );
 	
 		// check for a filename passed as an argument and try to open that file.
@@ -1120,15 +1125,44 @@ proc
 	end Msg_Create;
 
 	Msg_Notify :procedure( hwin:dword; wparam:dword; lparam:dword );
+		var
+		//	txt	:w.TEXTMETRIC;
+		//	hdc	:dword;
+			text_range	:w.TEXTRANGE;
+			
 	begin Msg_Notify;
-		
+
 		mov( lparam, edx );
 		mov( (type w.NMHDR[EDX]).code, eax );
 			
-		if( eax = w.EN_SELCHANGE ) then
+		if( eax = w.EN_SELCHANGE ) then	
 			
+		//	w.GetDC( info.hred );
+		//	mov( eax, hdc );
+		//	mov((type dword 0), buffer[0]);
+		//	w.GetCharWidth32( hdc, w.VK_W, w.VK_X, &buffer );
+		//	dbg.put("width :", (type uns32 buffer[0]) );
+		//	dbg.separator;
+		//	dbg.dumpmem( &buffer, 16 );
+		//	w.GetTextMetrics( hdc, txt );
+		//	dbg.separator;
+		//	dbg.put("max char width :", txt.tmMaxCharWidth );
+		//	dbg.put("avg char width :", txt.tmAveCharWidth );
+		//	w.ReleaseDC( info.hred, hdc );
 			updateStatus();
 		
+		elseif( eax = w.EN_LINK ) then
+
+			if( (type w.ENLINK[edx]).msg = w.WM_LBUTTONDOWN ) then
+
+				mov( &buffer, text_range.lpstrText );
+				mov( (type w.ENLINK[edx]).chrg.cpMin, text_range.chrg.cpMin );
+				mov( (type w.ENLINK[edx]).chrg.cpMax, text_range.chrg.cpMax );
+				lea( eax, text_range );
+				w.SendMessage( info.hred, w.EM_GETTEXTRANGE, 0, eax );
+				w.ShellExecute( NULL, NULL, &buffer, NULL, NULL, 1 );  
+
+			endif;
 		endif;
 		
 		xor( eax, eax );

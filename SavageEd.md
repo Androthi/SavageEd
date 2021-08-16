@@ -41,31 +41,33 @@ Apart from the standard menu shortcuts, SavageEd has some additional hard coded 
 	
 ### Cursor Navigation Shortcuts
 		
-	- Ctrl-i	Moves the cursor up 1 line
-	- Ctrl-k	Moves the cursor down 1 line
-	- Ctrl-j	Moves the cursor left 1 character
-	- Ctrl-l	Moves the cursor rigtht 1 character
-	- Ctrl-,	Move cursor left 1 word
-	- Ctrl-.	Move cursor right 1 word
-	- Ctrl-[	Move to beginning of line, or beginning of prev line if already there
-	- Ctrl-]	Move to end of line, or end of next line if already there
-	- Ctrl-e	Delete to end of line
+	- Ctrl-i			Moves the cursor up 1 line
+	- Ctrl-k			Moves the cursor down 1 line
+	- Ctrl-j			Moves the cursor left 1 character
+	- Ctrl-l			Moves the cursor rigtht 1 character
+	- Ctrl-,			Move cursor left 1 word
+	- Ctrl-.			Move cursor right 1 word
+	- Ctrl-[			Move to beginning of line, or beginning of prev line if already there
+	- Ctrl-]			Move to end of line, or end of next line if already there
+	- Ctrl-e			Delete to end of line
+	- Ctrl-u			Uppercase the selection or character
+	- Ctrl-Shift-u		Lowercase the selection or character
 	
-	- Ctrl-Enter	Open line above cursor
-	- Shift-Enter	Open line below cursor
+	- Ctrl-Enter		Open line above cursor
+	- Shift-Enter		Open line below cursor
 	
-	- Alt-Up	Move current line up
-	- Alt-Down	Move current line down
+	- Alt-Up			Move current line up
+	- Alt-Down			Move current line down
 
-	- Ctrl-d	Delete 1 char
-	- Ctrl-w	Delete 1 word under the cursor
-	- Ctrl-Shift-w	Copy word under the cursor (word includes everything except white space)
-	- Ctrl-\	Kill line ( line is cut, goes into clipboard )
+	- Ctrl-d			Delete 1 char
+	- Ctrl-w			Delete 1 word under the cursor
+	- Ctrl-Shift-w		Copy word under the cursor (word includes everything except white space)
+	- Ctrl-\			Kill line ( line is cut, goes into clipboard )
 		
-	- Ctrl-SPC	Toggles mark. Shows M on status bar when mark is set.
-			Press again to select marked text.
+	- Ctrl-SPC			Toggles mark. Shows M on status bar when mark is set.
+						Press again to select marked text.
 	
-	- Shift-TAB		increase indent from anywhere on the line
+	- Shift-TAB			increase indent from anywhere on the line
 	- Ctrl-Shift-TAB	decrease indent from anywhere on the line
 
 ## File Menu > New Window
@@ -121,7 +123,54 @@ Further considerations:
 	Patterns searching can be slow in very large files
 	Pattern searching may have unusual effects if multiple
 	special charactes are clumped together, eg: **?*
-	
+
+
+## Edit > Insert Date/Time
+Enters the date and time at the current position.
+SavageEd allows you to customize how the date and time are displayed.
+In SavageEd.ini, the Settings section contains two keys, Date Format and
+Time Format. These allow you to enter special formatting characters.
+Eg:
+[Settings]
+Date Format=dd-MM-yyyy
+Time Format= hh:ss:tt
+
+Notice the extra space after the = sign in Time Format, this is to separate
+the time from the date. Any text may be entered for this purpose. You may
+similarly substitute any character for the dashes or colons.
+
+### Formatting Codes
+Formatting the days:
+	d    Day of the month as digits without leading zeros for single-digit days.
+	dd   Day of the month as digits with leading zeros for single-digit days.
+	ddd  Abbreviated day of the week, for example, "Mon" in English
+	dddd Day of the week, for example, "Monday" in English
+
+Formatting the months:
+	M    Month as digits without leading zeros for single-digit months.
+	MM   Month as digits with leading zeros for single-digit months.
+	MMM  Abbreviated month, for example, "Nov" in English.
+	MMMM Month, for example, "November" in English.
+ 
+Formatting the year:
+	y    Year represented only by the last digit.
+	yy   Year represented only by the last two digits. A leading zero is added for single-digit years.
+	yyyy Year represented by a full four or five digits
+
+Formatting the era:
+	g, gg	Period/era, eg "AD" 
+
+Formatting the time:
+	h	Hours with no leading zero for single-digit hours; 12-hour clock
+	hh	Hours with leading zero for single-digit hours; 12-hour clock
+	H	Hours with no leading zero for single-digit hours; 24-hour clock
+	HH	Hours with leading zero for single-digit hours; 24-hour clock
+	m	Minutes with no leading zero for single-digit minutes
+	mm	Minutes with leading zero for single-digit minutes
+	s	Seconds with no leading zero for single-digit seconds
+	ss	Seconds with leading zero for single-digit seconds
+	t	One character time marker string, such as A or P
+	tt	Multi-character time marker string, such as AM or PM
 
 ## Options > Font
 Allows you to select font, point size, effects and color.
@@ -179,7 +228,7 @@ Use with caution. There is no error checking.
 A backup file of "SavageEd.in~" is created when this option is selected. 
 
 ## Options > Line Break
-This option can only be added manually by editing the .ini file
+This option can only be changed manually by editing the .ini file
 under [Settings] section, add "Line Break=CRLF" (this is default) for
 MS/DOS Windows line breaks.
 or "Line Break=LF" for unix line breaks.
@@ -189,6 +238,18 @@ settings.
 	[Settings]
 	Line Break=CRLF
 	
+## Options > Active URL
+This options can only be changed manually by editing the .ini file
+under [Settings] section, add "Active URL=false/true" (the default is false).
+Setting this to true will highlight any URLs in your document, clicking on the URL
+will launch the default web browser and open the URL.
+
+	[Settings]
+	Active URL=false
+
+If the font size is changed while Active URL is set to true, a restart
+of SavageEd is required.
+
 ## Log files.
 If you wish to use the log feature, it is compatible to the .LOG
 feature of Notepad.exe, with an additional extension.

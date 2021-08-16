@@ -536,6 +536,18 @@ proc
 						
 						endif;
 					
+					case( w.VK_U )
+						
+						// toggle case
+						if( ctrl_down ) then
+							if( shift_down ) then
+								command_lowercase_selection();
+							else
+								command_uppercase_selection();
+							endif;
+							
+						endif;
+						
 					case( w.VK_E )
 						
 						if( ctrl_down ) then
@@ -1204,7 +1216,12 @@ proc
 			config.create();
 			config.writeUns( s_settings, s_tabs, DEFAULT_TAB_STOP );
 			config.writeString( s_settings, "Line Break", "CRLF" );
+
 			config.writeBool( s_settings, "Active URL", false );
+			mov( false, window.active_url );
+
+			config.writeString( s_settings, "Date Format", default_date_format );
+			config.writeString( s_settings, "Time Format", default_time_format );
 
 			// some hard coded defaults
 			mov( 10,window.xPos );
@@ -1214,17 +1231,29 @@ proc
 			
 			mov( color_white, window.backColor);
 			mov( color_black, window.textColor);
-			mov( false, window.active_url );
+			config.writeHex( s_text, s_background_color, window.backColor);
+			config.writeHex( s_text, s_text_color, window.textColor);
+
 			
 			// get default font
 			zstr.cpy( (type zstring s_fontname ), &logfont.lfFaceName );
-			str.cpyz( &s_fontname, build_str );
-			config.writeString( s_font, "Name", build_str );
+			config.writeString( s_font, "Name", s_fontname );
 			mov( -12, logfont.lfHeight );
 			mov( 400, logfont.lfWeight );
 			mov( 0, logfont.lfItalic );
 			mov( 49, logfont.lfPitchAndFamily );
 			mov( 400, logfont.lfWeight );
+			
+
+			config.writeInt( s_font, "Height", logfont.lfHeight );
+			config.writeInt( s_font, "Width", logfont.lfWidth );
+			config.writeInt( s_font, "Weight", logfont.lfWeight );
+			
+			movzx( logfont.lfItalic, eax );
+			config.writeInt( s_font, "Italic", eax );
+			movzx( logfont.lfPitchAndFamily, eax );
+			config.writeInt( s_font, "Pitch", eax );
+			
 			config.writeFileName( config_path );
 			
 		endif;
@@ -1368,6 +1397,90 @@ proc
 	end getInfo;
 
 //bm=editcommands
+/*
+	GetSelText :procedure( lpBuff:dword );
+	
+		// gets the selected text range for use
+		// with find
+	
+	begin GetSelText;
+	
+		mov( lpBuff, eax );
+		mov( eax, find_range.lpstrText );
+		
+		w.SendMessage( info.hred, w.EM_EXGETSEL,0, &find_range.chrg );
+		mov( find_range.chrg.cpMax,eax );
+		sub( find_range.chrg.cpMin,eax );
+		if( eax >= @elements( findbuf ) ) then
+			mov( @elements( findbuf) -1, find_range.chrg.cpMax );
+		endif;
+		
+		w.SendMessage( info.hred, w.EM_GETTEXTRANGE,0,&find_range );
+	
+	end GetSelText;
+*/	
+	command_selection_to_string	:procedure( var inf:EditInfo );
+	
+		var
+			sel_string	:string;
+			txt_range	:w.TEXTRANGE;
+	
+	begin command_selection_to_string;
+		
+		push( edi );
+		mov( inf, edi );
+		mov( editedi.cursor.end_index, eax );
+		sub( editedi.cursor.start_index, eax );
+		dbg.put("str size = ", eax );
+		str.alloc( eax );
+		mov( eax, sel_string );
+		push( (type str.strRec[eax]).maxlen );
+		pop( (type str.strRec[eax]).length );
+		mov( eax, txt_range.lpstrText );
+		lea( esi, txt_range );
+		w.SendMessage( editedi.hred, w.EM_EXGETSEL, 0, esi );
+		w.SendMessage( editedi.hred, w.EM_GETTEXTRANGE, 0, esi );
+		pop( edi );
+		mov( sel_string, eax );
+
+	end command_selection_to_string;
+
+	command_lowercase_selection	:procedure {@noframe};
+	begin command_lowercase_selection;
+		pushad();
+		getInfo( info );
+		mov( info.cursor.start_index, eax );
+		if( eax = info.cursor.end_index ) then
+			inc( info.cursor.end_index );
+			w.SendMessage( info.hred, w.EM_SETSEL, info.cursor.start_index, info.cursor.end_index );	
+		endif;
+		command_selection_to_string( info );
+		mov( eax, esi );
+		str.lower1( esi );
+		w.SendMessage( info.hred, w.EM_REPLACESEL, true, esi );
+		str.free( esi );
+		popad();
+		ret();	
+	end command_lowercase_selection;
+
+
+	command_uppercase_selection	:procedure {@noframe};
+	begin command_uppercase_selection;
+		pushad();
+		getInfo( info );
+		mov( info.cursor.start_index, eax );
+		if( eax = info.cursor.end_index ) then
+			inc( info.cursor.end_index );
+			w.SendMessage( info.hred, w.EM_SETSEL, info.cursor.start_index, info.cursor.end_index );	
+		endif;
+		command_selection_to_string( info );
+		mov( eax, esi );
+		str.upper1( esi );
+		w.SendMessage( info.hred, w.EM_REPLACESEL, true, esi );
+		str.free( esi );
+		popad();
+		ret();	
+	end command_uppercase_selection;
 
 	command_edit_ini	:procedure;
 		

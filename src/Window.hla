@@ -27,6 +27,10 @@ readonly
 
 storage
 	editstream	:w.EDITSTREAM;
+
+static
+	default_date_format :string := "MM-dd-yyyy";
+	default_time_format :string := " hh:mm:tt";	
 	
 proc
 
@@ -607,25 +611,34 @@ proc
 	command_insert_time :procedure;
 	
 		// inserts date/time at cursor
-		var systime		:w.SYSTEMTIME;
+		//var systime		:w.SYSTEMTIME;
+		
+		var
+			format	:string;
 
 	begin command_insert_time;
 	
-		w.GetSystemTime(systime);
+		mov( str.talloc(1000), format );
+		if( !config.readString( s_settings, "Date Format", format )) then
+			str.cpy( default_date_format, format ); 
+		endif;
+				
 		w.GetDateFormat(	w.LOCALE_USER_DEFAULT,
-						w.LOCALE_NOUSEROVERRIDE,
-						NULL,	// systemtime
-						NULL,	// format
+						NULL,
+						NULL,
+						format,
 						&buffer,
 						@size(buffer));
-		mov( ' ', buffer[eax-1] );
-		mov( #$0, buffer[eax] );
 		w.SendMessage(info.hred, w.EM_REPLACESEL, true, &buffer);
-		
+
+		if( !config.readString( s_settings, "Time Format", format )) then
+			str.cpy( default_time_format, format ); 
+		endif;
+
 		w.GetTimeFormat(	w.LOCALE_USER_DEFAULT,
-						w.LOCALE_NOUSEROVERRIDE,
 						NULL,
 						NULL,
+						format,
 						&buffer,
 						@size(buffer));
 		w.SendMessage(info.hred, w.EM_REPLACESEL, true, &buffer);

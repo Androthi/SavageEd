@@ -7,7 +7,7 @@
 
 readonly
 	
-	version			:string := "SavageEd v0.8.11";
+	version			:string := "SavageEd v0.9.00";
 
 type
 	// Message and dispatch table related definitions:
@@ -290,7 +290,9 @@ static
 	info		:EditInfo; @external;
 	strtabs		:string; @external;	
 	statusParts	:int32[STATUS_PARTS]; @external;
-	
+	default_date_format :string; @external;
+	default_time_format :string; @external;	
+
 proc
 	// external declarations
 	
@@ -351,8 +353,8 @@ proc
 	command_select_to_eol :procedure; @external;
 	command_move_line_up :procedure; @external;
 	command_move_line_down :procedure; @external; 
-
-
+	command_uppercase_selection :procedure; @external;
+	command_lowercase_selection	:procedure; @external;
 
 
 

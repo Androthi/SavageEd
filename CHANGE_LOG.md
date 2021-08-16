@@ -1,5 +1,11 @@
 # Change Log
 
+## 08/16/2021
+	0.9.00	feature changes:
+			- added ability to show and click on urls to open with default browser
+			- added ability to format date and time. see manual on how to use.
+			- added ctrl-u upper case selection or character
+			- added ctrl-shift-u lower case selection or character
 
 ## 07/31/2021
 	0.8.10	-shift+end no longer selects line feed character

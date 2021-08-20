@@ -1,5 +1,10 @@
 # Change Log
 
+## 08/19/2021
+	0.9.10	feature changes:
+			- mark now goes into selection mode and selection is updated real time
+			  no longer need to toggle mark again to select.
+
 ## 08/16/2021
 	0.9.00	feature changes:
 			- added ability to show and click on urls to open with default browser

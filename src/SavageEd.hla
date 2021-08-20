@@ -38,10 +38,9 @@ static
 	info		:EditInfo;
 	statusParts	:int32[STATUS_PARTS]:=[POS_LINES, POS_READONLY, POS_LINEBREAK, POS_MARK, POS_MODE];
 	strtabs		:str.strvar( w.MAX_PATH ); // user specified tabs converted to spaces
-
+	keystate	:byte[256];
 	
 proc
-
 
 	selectFont :procedure;
 
@@ -50,7 +49,7 @@ proc
 			choose_font:w.CHOOSEFONT;
 
 	begin selectFont;
-		
+				
 		mov( str.talloc( 1000 ), font_str );
 		lea( esi, choose_font );
 		mem2.fillMem( [esi], @size( choose_font ), 0 );
@@ -159,8 +158,10 @@ proc
 			
 			w.CheckMenuItem( window.hmenu, IDM_WRAP, w.MF_BYCOMMAND | w.MF_CHECKED );
 			w.SendMessage( info.hred, w.EM_SETTARGETDEVICE, NULL, 0 );
+			mov( true, info.word_wrap );
 		else
-			w.SendMessage( info.hred, w.EM_SETTARGETDEVICE, NULL, 1 );			
+			w.SendMessage( info.hred, w.EM_SETTARGETDEVICE, NULL, 1 );
+			mov( false, info.word_wrap );
 		endif;
 		
 		if( config.readBool( s_settings, s_readonly )) then
@@ -304,6 +305,7 @@ proc
 	
 	begin findNormal;
 		
+		mov( false, info.mark );
 		move( &findbuf, ft.lpstrText);
 		dbg.put("find normal : ");
 		dbg.putz( ft.lpstrText );
@@ -346,7 +348,7 @@ proc
 		cmp( (type byte findbuf[0]), 0 );
 		mov( 0, hmem );
 		je retFalse;
-		
+		mov( false, info.mark );
 		move( ft.chrg.cpMin, find_range.chrg.cpMin );
 		w.SendMessage( info.hred, w.WM_GETTEXTLENGTH, 0, 0 );
 		mov( eax, find_range.chrg.cpMax );
@@ -463,9 +465,7 @@ proc
 			ctrl_down	:boolean;
 			shift_down	:boolean;
 			alt_down	:boolean;
-			
-		
-		
+				
 	begin Proc_Edit;
 		
 		NOTE(Sevag:
@@ -501,7 +501,7 @@ proc
 				mov( false, alt_down );
 //bm=keycommands			
 			case( w.WM_KEYDOWN )
-				dbg.put("key down =>", wParam );
+				//dbg.put("key down =>", wParam );
 				mov( wParam, eax );
 				switch( eax )
 				
@@ -560,9 +560,7 @@ proc
 					case( w.VK_BSLASH )
 
 						if( ctrl_down ) then
-							
 							command_cut_line();
-							
 						endif;
 						
 					case( w.VK_F )
@@ -585,13 +583,27 @@ proc
 							command_cursor_up();
 							jmp skip_proc;
 						endif;
+					
+					case( w.VK_UP )
+						command_cursor_up();
+						jmp skip_proc;
+						
+					case( w.VK_DOWN )
+						command_cursor_down();
+						jmp skip_proc;
+						
+					case( w.VK_LEFT )
+						command_cursor_left();
+						jmp skip_proc;
+						
+					case( w.VK_RIGHT )
+						command_cursor_right();
+						jmp skip_proc;
 
 					case( w.VK_J )
 					
-						dbg.put("wParam :", wParam );
 						if( ctrl_down ) then
 							command_cursor_left();
-							mov( 0, info.saved_column_index );
 							jmp skip_proc;
 						endif;
 						
@@ -605,8 +617,8 @@ proc
 					case( w.VK_L )
 						
 						if( ctrl_down ) then
+
 							command_cursor_right();
-							mov( 0, info.saved_column_index );
 							jmp skip_proc;
 						endif;
 
@@ -725,8 +737,12 @@ proc
 							
 							// check to see if we are on line 1
 							if( info.line.number = 0 ) then
-								
+								dbg.put("line = 0/1");
 								command_move_to_bol();
+								clear_keystate();
+								w.CallWindowProc(info.old_proc, hWin, uMsg, w.VK_RETURN, lParam );
+								command_cursor_up();
+								jmp skip_proc;								
 								
 							else
 							
@@ -746,7 +762,6 @@ proc
 							if( info.line.length != eax ) then
 								command_move_to_eol();
 							endif;
-						
 						endif;
 					
 						mov( true, proc_return );
@@ -754,7 +769,6 @@ proc
 					case( w.VK_END )
 					
 						if( shift_down ) then
-							
 							command_select_to_eol();
 							jmp skip_proc;
 						endif;
@@ -780,13 +794,12 @@ proc
 
 					default
 						//dbg.put("reached default");
-						mov( 0, info.saved_column_index );
 
 				endswitch;
 			
 			case( w.WM_KEYUP )
 				
-				dbg.put("key up =>", wParam );
+				//dbg.put("key up =>", wParam );
 				mov( wParam, eax );
 				switch( eax )
 					case( w.VK_SHIFT )
@@ -846,14 +859,15 @@ proc
 				endswitch;
 				
 			case( w.WM_CHAR )
-				dbg.put("char =>", wParam );
+				//dbg.put("char =>", wParam );
 				
 				mov( wParam, eax );
 				if( ctrl_down || eax = w.VK_TAB || eax = w.VK_ESCAPE || eax = #$05 ) then
 					jmp skip_proc;
 				endif;
 				
-						
+			case( w.EN_UPDATE )
+				dbg.put(" want update " );
 			//case( w.WM_SETFOCUS )
 			
 				//dbg.put("proc edit got focus");
@@ -1147,8 +1161,6 @@ proc
 			mov( false, info.find_mode.matchcase );
 			mov( false, info.find_mode.matchpattern );
 			
-			mov( 0, info.saved_column_index );
-			
 			// config file exists, read it and
 			// apply settings as per file.
 			config.create_file( config_path );
@@ -1199,13 +1211,15 @@ proc
 			endif; 
 			
 			if( info.hred ) then
+				
 				if( window.active_url ) then
 					w.SendMessage( info.hred, w.EM_AUTOURLDETECT, true, NULL);
-					w.SendMessage( info.hred, w.EM_SETEVENTMASK, 0, w.ENM_SELCHANGE | w.ENM_LINK );
+					w.SendMessage( info.hred, w.EM_SETEVENTMASK, 0, w.ENM_SELCHANGE | w.ENM_LINK);
 				else
 					w.SendMessage( info.hred, w.EM_AUTOURLDETECT, false, NULL);
 					w.SendMessage( info.hred, w.EM_SETEVENTMASK, 0, w.ENM_SELCHANGE );
 				endif;
+				
 				setFormat( info );
 			endif;
 			
@@ -1294,7 +1308,7 @@ proc
 			w.SendMessage( window.hstatus, w.SB_SETTEXT, 1, s_b );
 		endif;
 				
-		if( info.mark.isSet ) then
+		if( info.mark ) then
 			w.SendMessage( window.hstatus, w.SB_SETTEXT, 2, s_mark );
 			
 		else
@@ -1374,18 +1388,38 @@ proc
 	
 		// collects informaiton about the edit state
 		// and stores it in the info structure
+		var	index	:uns32;
 	
 	begin getInfo;
-
+		dbg.enters("getInfo");
 		push( edi );
 		push( esi );
+		mov( 0, index );
 		mov( inf, edi );
 		lea( esi, editedi.cursor );
-		w.SendMessage( info.hred, w.EM_EXGETSEL, 0, esi );	
-		w.SendMessage( info.hred, w.EM_EXLINEFROMCHAR, 0, charrangeesi.start_index );
+		w.SendMessage( info.hred, w.EM_EXGETSEL, 0, esi );
+//		dbg.put("mark point   :", editedi.mark_point );
+//		dbg.put("start_index  :", editedi.cursor.start_index );
+//		dbg.put("end_index    :", editedi.cursor.end_index );
+		
+		// if mark is set, find the relative direction
+		if( editedi.mark ) then
+			mov( editedi.mark_point, eax );
+			if( editedi.cursor.start_index = eax ) then
+				dbg.put("using tail index");
+				mov( editedi.cursor.end_index, index );
+			else
+				dbg.put("using head index");
+				mov( editedi.cursor.start_index, index );
+			endif;
+		else
+			mov( editedi.cursor.start_index, index );
+		endif;
+			
+		w.SendMessage( info.hred, w.EM_EXLINEFROMCHAR, 0, index );
 		mov( eax, editedi.line.number );
 		getLineInfo(editedi.line);
-		mov( editedi.cursor.start_index, eax );
+		mov( index, eax );
 		sub( editedi.line.index, eax );
 		mov( eax, editedi.column_index );
 		w.SendMessage( info.hred, w.EM_GETLINECOUNT, 0, 0 );
@@ -1393,32 +1427,21 @@ proc
 
 		pop( esi );
 		pop( edi );
-
+		dbg.exits("getInfo");
 	end getInfo;
 
-//bm=editcommands
-/*
-	GetSelText :procedure( lpBuff:dword );
-	
-		// gets the selected text range for use
-		// with find
-	
-	begin GetSelText;
-	
-		mov( lpBuff, eax );
-		mov( eax, find_range.lpstrText );
-		
-		w.SendMessage( info.hred, w.EM_EXGETSEL,0, &find_range.chrg );
-		mov( find_range.chrg.cpMax,eax );
-		sub( find_range.chrg.cpMin,eax );
-		if( eax >= @elements( findbuf ) ) then
-			mov( @elements( findbuf) -1, find_range.chrg.cpMax );
+	clear_keystate	:procedure {@noframe};
+	begin clear_keystate;
+		mem2.fillMem( &keystate, @elements( keystate ), 0 );
+		if( info.mark ) then
+			mov( -1, keystate[w.VK_SHIFT] );
 		endif;
-		
-		w.SendMessage( info.hred, w.EM_GETTEXTRANGE,0,&find_range );
-	
-	end GetSelText;
-*/	
+		w.SetKeyboardState( &keystate );
+		ret();
+	end clear_keystate;
+
+//bm=editcommands
+
 	command_selection_to_string	:procedure( var inf:EditInfo );
 	
 		var
@@ -1462,7 +1485,6 @@ proc
 		popad();
 		ret();	
 	end command_lowercase_selection;
-
 
 	command_uppercase_selection	:procedure {@noframe};
 	begin command_uppercase_selection;
@@ -1546,7 +1568,6 @@ proc
 
 	end command_display_manual;
 
-
 	command_get_line	:procedure( var line_buffer:dword );
 		
 		// copy the current line in the editor to buffer
@@ -1568,7 +1589,6 @@ proc
 	
 	begin command_get_word;
 		command_get_line( &buffer );
-		//getInfo(info);
 		
 		// if we are sitting on a space, newline or tab char, don't do anything
 		mov( &buffer, edx );
@@ -1634,7 +1654,6 @@ proc
 		ret();
 	end command_delete_word;
 
-
 	command_copy_word :procedure {@noframe};
 	begin command_copy_word;
 		if( command_get_word() ) then
@@ -1643,7 +1662,6 @@ proc
 		endif;
 		ret();
 	end command_copy_word;
-
 
 	command_select_all :procedure {@noframe};
 	begin command_select_all;
@@ -1665,101 +1683,86 @@ proc
 		ret();
 	end command_cut_line;
 
-
-	command_cursor_up	:procedure;
-		
-		var
-			queryLine	:LineInfo;
-			
+	command_cursor_up	:procedure {@noframe};
 	begin command_cursor_up;
-		if( info.saved_column_index = 0 ) then
-			mov( info.column_index, eax );
-			mov( eax, info.saved_column_index );
+		
+		if( info.line.index > 0 ) then
+			clear_keystate();
+			w.CallWindowProc(info.old_proc, info.hred, w.WM_KEYDOWN, w.VK_UP, 0 );
 		endif;
-
-		// if we are at line 0, no point in doing anything);
-		if( info.line.number > 0 ) then
-			mov( info.line.number, eax);
-			dec( eax );
-			mov( eax, queryLine.number );
-			getLineInfo( queryLine ); // info of prev. line
-			mov( info.saved_column_index, eax );
-			if( queryLine.length >= eax ) then
-
-				add( queryLine.index, eax );
-				
-			else
-				mov( queryLine.length, eax );
-				add( queryLine.index, eax );
-			endif;
-			w.SendMessage( info.hred, w.EM_SETSEL, eax, eax );
-			w.SendMessage( info.hred, w.EM_SCROLLCARET, 0, 0);
-		endif;
+		ret();
 	end command_cursor_up;
 
-	command_cursor_down	:procedure;
-		
-		var
-			queryLine	:LineInfo;
-			
+	command_cursor_down	:procedure {@noframe};
 	begin command_cursor_down;
-							
-		if( info.saved_column_index = 0 ) then
-			mov( info.column_index, eax );
-			mov( eax, info.saved_column_index );
-		endif;
-	
 		mov( info.line.number, eax );
 		inc( eax );
-		if( eax < info.lines ) then
-			mov( eax, queryLine.number );
-			getLineInfo( queryLine );
-			
-			mov( info.saved_column_index, eax );
-			if( queryLine.length >= eax ) then
-				
-				add( queryLine.index, eax );
-				
-			else
-				mov( queryLine.length, eax );
-				add( queryLine.index, eax );
-			endif;
-			w.SendMessage( info.hred, w.EM_SETSEL, eax, eax );
-			w.SendMessage( info.hred, w.EM_SCROLLCARET, 0, 0);
+		if( eax = info.lines ) then
+			jmp _done;
 		endif;
+		clear_keystate();
+		w.CallWindowProc(info.old_proc, info.hred, w.WM_KEYDOWN, w.VK_DOWN, 0 );
+		_done:
+		ret();
 	end command_cursor_down;
 
 	command_cursor_left	:procedure {@noframe};
 	begin command_cursor_left;
-		
-		dbg.put("cursor_left")
-		mov( info.cursor.start_index, eax );
-		if( eax ) then
-			dec( eax );
-			w.SendMessage( info.hred, w.EM_SETSEL, eax, eax );
-			w.SendMessage( info.hred, w.EM_SCROLLCARET, 0, 0);
+		if( info.line.index = 0 && info.column_index = 0 ) then
+			jmp _done;
 		endif;
+		clear_keystate();
+		w.CallWindowProc(info.old_proc, info.hred, w.WM_KEYDOWN, w.VK_LEFT, 0 );
+		
+		_done:
 		ret();
 	end command_cursor_left;
 
-	
 	command_cursor_right	:procedure {@noframe};
 	begin command_cursor_right;
-		
-		dbg.put("cursor_right");
-		mov( info.cursor.start_index, eax );
+mov( info.line.number, eax );
 		inc( eax );
-		
-		w.SendMessage( info.hred, w.EM_SETSEL, eax, eax );
-		w.SendMessage( info.hred, w.EM_SCROLLCARET, 0, 0);
+		mov( info.column_index, ecx );
+		if( eax = info.lines && ecx = info.line.length ) then
+			jmp _done;
+		endif;
+		clear_keystate();
+		w.CallWindowProc(info.old_proc, info.hred, w.WM_KEYDOWN, w.VK_RIGHT, 0 );
+		_done:
 		ret();
 	end command_cursor_right;
 
-
 	command_move_to_bol	:procedure {@noframe};
 	begin command_move_to_bol;
-		
+		dbg.enters("command_move_to_bol");
+			dbg.put("line number :", info.line.number );
+			dbg.put("line index  :", info.line.index );
+			dbg.put("lines       :", info.lines );
+			dbg.put("col index   :", info.column_index );
 		mov( info.line.index, eax );
+		if( info.line.index = 0 && info.column_index = 0 ) then
+			jmp done;
+		endif;
+
+		if( info.column_index = 0 ) then
+			// we're at the beginning of line, go to the beginning of prev line.
+			command_cursor_left();
+			if( info.column_index > 0 ) then
+				jmp _home;
+			endif;
+		else
+			_home:
+			dbg.separator;
+			dbg.put("line number :", info.line.number );
+			dbg.put("line index  :", info.line.index );
+			dbg.put("line length :", info.line.length );
+			dbg.put("lines       :", info.lines );
+			dbg.put("col index   :", info.column_index );
+			clear_keystate();
+			w.CallWindowProc(info.old_proc, info.hred, w.WM_KEYDOWN, w.VK_HOME, 0 );
+		endif;
+			
+		/*mov( info.line.index, eax );
 		if( info.column_index = 0 && eax > 0 ) then
 			
 			// we're at the beginning of line, go to the beginning of prev line.
@@ -1767,13 +1770,34 @@ proc
 			dec (eax );
 			w.SendMessage( info.hred, w.EM_SETSEL, eax, eax );
 		endif;
-		w.SendMessage( info.hred, w.EM_SETSEL, info.line.index, info.line.index );
+		w.SendMessage( info.hred, w.EM_SETSEL, info.line.index, info.line.index ); */
+		done:
+		dbg.exits("command_move_to_bol");
 		ret();
 	end command_move_to_bol;
 
-	command_move_to_eol	:procedure {@noframe};
+	command_move_to_eol	:procedure;
 	begin command_move_to_eol;
-
+		dbg.enters("command_move_to_eol");
+			dbg.put("line number :", info.line.number );
+			dbg.put("line index  :", info.line.index );
+			dbg.put("line length :", info.line.length );
+			dbg.put("lines       :", info.lines );
+			dbg.put("col index   :", info.column_index );
+		mov( info.column_index, eax );
+		if( eax = info.line.length || ! eax ) then
+			command_cursor_right();
+			mov( info.line.length, eax );
+			if( eax && eax != info.column_index )then
+				jmp _callit;
+			endif;
+		else
+			_callit:
+			clear_keystate();
+			w.CallWindowProc(info.old_proc, info.hred, w.WM_KEYDOWN, w.VK_END, 0 );
+		endif;
+		
+		/*
 		mov( info.line.length, eax );
 		if( info.column_index = eax ) then
 			
@@ -1786,8 +1810,8 @@ proc
 		mov( info.line.length, eax );
 		add( info.line.index, eax );
 		w.SendMessage( info.hred, w.EM_SETSEL, eax, eax );
-		ret();
-
+*/
+		dbg.exits("command_move_to_eol");
 	end command_move_to_eol;
 
 	command_move_line_up :procedure {@noframe};
@@ -1839,7 +1863,6 @@ proc
 		ret();
 	end command_move_line_down;
 
-
 	command_select_to_eol :procedure {@noframe};
 	begin command_select_to_eol;
 
@@ -1847,15 +1870,13 @@ proc
 		add( info.line.index, eax );
 		w.SendMessage( info.hred, w.EM_SETSEL, info.cursor.start_index, eax );
 		ret();
-		
 	end command_select_to_eol;
-
 
 	command_toggle_mark :procedure {@noframe};
 	begin command_toggle_mark;
 		
 		dbg.put("toggle_mark");
-		
+/*		
 		if( info.mark.isSet ) then
 			
 			// close mark and set selection
@@ -1879,9 +1900,16 @@ proc
 			mov( eax, info.mark.index );
 			
 		endif;
-		
+*/		
 		// toggle mark
-		xor( 1, info.mark.isSet );
+		if( info.mark ) then
+			mov( false, info.mark );
+			mov( 0, info.mark_point );
+		else
+			mov( true, info.mark );
+			mov( info.cursor.start_index, info.mark_point );
+		endif;
+		//xor( 1, info.mark );
 		updateStatus();
 		ret();
 
@@ -2201,16 +2229,17 @@ proc
 			if( config.readBool( s_settings, s_wrap ) ) then
 
 				w.CheckMenuItem( window.hmenu, IDM_WRAP, w.MF_BYCOMMAND | w.MF_UNCHECKED );
-				mov( false, eax );
+				mov( false, info.word_wrap );
 				
 			else
 				
 				w.CheckMenuItem( window.hmenu, IDM_WRAP, w.MF_BYCOMMAND | w.MF_CHECKED );
-				mov( true, eax );
+				mov( true, info.word_wrap );
 				
 			endif;
-			config.writeBool( s_settings, s_wrap, al );
-			if( eax ) then
+			
+			config.writeBool( s_settings, s_wrap, info.word_wrap );
+			if( info.word_wrap ) then
 				w.SendMessage( info.hred, w.EM_SETTARGETDEVICE, NULL, 0 );
 			else
 				w.SendMessage( info.hred, w.EM_SETTARGETDEVICE, NULL, 1 );
@@ -2378,6 +2407,7 @@ begin SavageEd;
 
 	dbg.cls;
 	mov( false, proc_return );
+	mem2.fillMem( &keystate, @elements( keystate ), 0 );
 	initConfig();
 	initWindow();
 	mov( MODE_INSERT, info.mode );

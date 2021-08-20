@@ -1128,8 +1128,8 @@ proc
 			endif;
 			
 		endif;
-		
 		skipOpenRecent:
+		getInfo( info );
 		updateMenu();
 		updateStatus();
 		
@@ -1149,7 +1149,12 @@ proc
 		mov( (type w.NMHDR[EDX]).code, eax );
 			
 		if( eax = w.EN_SELCHANGE ) then	
-			
+		//	dbg.put("selchange");
+		//	mov( logfont.lfHeight, eax );
+		//	neg( eax );
+		//	dbg.put( "height:", (type uns32 eax ));
+		//	w.CreateCaret( info.hred, NULL, 1 , eax );
+		//	w.ShowCaret( info.hred );
 		//	w.GetDC( info.hred );
 		//	mov( eax, hdc );
 		//	mov((type dword 0), buffer[0]);
@@ -1162,6 +1167,7 @@ proc
 		//	dbg.put("max char width :", txt.tmMaxCharWidth );
 		//	dbg.put("avg char width :", txt.tmAveCharWidth );
 		//	w.ReleaseDC( info.hred, hdc );
+			
 			updateStatus();
 		
 		elseif( eax = w.EN_LINK ) then

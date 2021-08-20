@@ -65,7 +65,8 @@ Apart from the standard menu shortcuts, SavageEd has some additional hard coded 
 	- Ctrl-\			Kill line ( line is cut, goes into clipboard )
 		
 	- Ctrl-SPC			Toggles mark. Shows M on status bar when mark is set.
-						Press again to select marked text.
+						Selection will be updated in real time. Toggle mark again to cancel
+						
 	
 	- Shift-TAB			increase indent from anywhere on the line
 	- Ctrl-Shift-TAB	decrease indent from anywhere on the line

@@ -7,7 +7,7 @@
 
 readonly
 	
-	version			:string := "SavageEd v0.9.00";
+	version			:string := "SavageEd v0.9.10";
 
 type
 	// Message and dispatch table related definitions:
@@ -83,21 +83,15 @@ type
 			// selection
 			cursor				:range;
 			column_index		:uns32;
-			saved_column_index	:uns32; // stores where the cursor 'wants' to be
 			
 			// line info of cursor, has number, index and length
 			line				:LineInfo;
 			lines				:uns32;
-			mode				:byte;
 			line_break			:LineBreak;
-
-			//incremental_search	:boolean; TODO(need to add command bar )
-
-			mark:
-				record
-					index	:uns32;
-					isSet	:boolean;
-				endrecord;
+			mode				:byte;
+			mark_point			:uns32;
+			mark				:boolean;
+			word_wrap			:boolean;
 
 		endrecord;
 	
@@ -105,6 +99,7 @@ type
 		MODE_INSERT,
 		MODE_EDITINI,
 		MODE_VIEWDOCS
+
 	};
 
 	menu_items :enum {
@@ -213,10 +208,10 @@ readonly
 	config_file		:string := "SavageEd.ini";
 	
 	s_window 	:string := "Window";
-	ClassName	:string:="SavageEDClass";
-	AppName		:string:="SavageEd";
+	ClassName	:string:= "SavageEDClass";
+	AppName		:string:= "SavageEd";
 	
-	RichEditDLL		:string :="riched20.dll";
+	RichEditDLL		:string := "riched20.dll";
 	
 	// strings and error messages
 	s_recent	:string := "Recent Files";
@@ -355,7 +350,7 @@ proc
 	command_move_line_down :procedure; @external; 
 	command_uppercase_selection :procedure; @external;
 	command_lowercase_selection	:procedure; @external;
-
+	clear_keystate	:procedure; @external;
 
 
 	

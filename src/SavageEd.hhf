@@ -7,7 +7,7 @@
 
 readonly
 	
-	version			:string := "SavageEd v0.9.11";
+	version			:string := "SavageEd v0.9.12";
 
 type
 	// Message and dispatch table related definitions:
@@ -188,7 +188,7 @@ const
 
 	STATUS_BAR_HEIGHT	:= 21;
 	STATUS_PARTS		:= 5;
-	POS_LINES			:=265;
+	POS_LINES			:=300;
 	POS_READONLY		:=POS_LINES+18;
 	POS_LINEBREAK		:=POS_READONLY+18;
 	POS_MARK			:=POS_LINEBREAK+32;

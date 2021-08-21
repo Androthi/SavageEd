@@ -692,7 +692,10 @@ proc
 							// same as ctrl-left
 							// put VK_LEFT in wParam and let
 							// hred window proc handle it.
-							mov( w.VK_LEFT, wParam );
+							mov( 1, eax );
+							command_cursor_left();
+							//mov( w.VK_LEFT, wParam );
+							jmp skip_proc;
 						endif;
 						
 					case( w.VK_PERIOD )
@@ -700,7 +703,10 @@ proc
 							// same as ctrl-right
 							// put VK_RIGHT in wParam and let
 							// hred window proc handle it.
-							mov(w.VK_RIGHT, wParam );
+							mov( 1, eax );
+							command_cursor_right();
+							//mov(w.VK_RIGHT, wParam );
+							jmp skip_proc;
 						endif;
 
 					case( w.VK_TAB )
@@ -1304,8 +1310,14 @@ proc
 		inc( eax );
 		mov( info.column_index, ecx );
 		inc( ecx );
+		mov( info.cursor.end_index, edx );
+		sub( info.cursor.start_index, edx );
+		if( (type int32 edx ) < 0 ) then
+			neg( edx );
+		endif;
 		str.put( build_str, "Line: ", (type uns32 eax ), " / ", info.lines,
-				 "    Col: ", (type uns32 ecx ), "    Pos: ", info.cursor.start_index );
+				 "    Col: ", (type uns32 ecx ), "    Pos: ", info.cursor.start_index,
+				 "    Sel: ", (type uns32 edx ) );
 				
 		w.SendMessage( window.hstatus, w.SB_SETTEXT, 0, build_str );
 		

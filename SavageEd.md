@@ -275,6 +275,7 @@ The status bar shows the following information:
 Line / Total lines
 Column in current line
 Character position in document
+Selection size
 
 2nd section:
 Readonly Mode	'R'

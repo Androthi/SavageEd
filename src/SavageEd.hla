@@ -39,6 +39,10 @@ static
 	statusParts	:int32[STATUS_PARTS]:=[POS_LINES, POS_READONLY, POS_LINEBREAK, POS_MARK, POS_MODE];
 	strtabs		:str.strvar( w.MAX_PATH ); // user specified tabs converted to spaces
 	keystate	:byte[256];
+
+	ctrl_down	:boolean;
+	shift_down	:boolean;
+	alt_down	:boolean;
 	
 proc
 
@@ -461,11 +465,7 @@ proc
 		// this is the subclassed window procedure of the edit control
 		// here we will intercept key messages and pass down only
 		// the ones we want the edit control to receive.
-		static
-			ctrl_down	:boolean;
-			shift_down	:boolean;
-			alt_down	:boolean;
-				
+
 	begin Proc_Edit;
 		
 		NOTE(Sevag:
@@ -585,24 +585,30 @@ proc
 						endif;
 					
 					case( w.VK_UP )
+
+						movzx( ctrl_down, eax );
 						command_cursor_up();
 						jmp skip_proc;
 						
 					case( w.VK_DOWN )
+						movzx( ctrl_down, eax );
 						command_cursor_down();
 						jmp skip_proc;
 						
 					case( w.VK_LEFT )
+						movzx( ctrl_down, eax );
 						command_cursor_left();
 						jmp skip_proc;
 						
 					case( w.VK_RIGHT )
+						movzx( ctrl_down, eax );
 						command_cursor_right();
 						jmp skip_proc;
 
 					case( w.VK_J )
 					
 						if( ctrl_down ) then
+							xor( eax, eax );
 							command_cursor_left();
 							jmp skip_proc;
 						endif;
@@ -610,6 +616,7 @@ proc
 					case( w.VK_K )
 						
 						if( ctrl_down) then
+							xor( eax, eax );
 							command_cursor_down();
 							jmp skip_proc;
 						endif;
@@ -617,7 +624,7 @@ proc
 					case( w.VK_L )
 						
 						if( ctrl_down ) then
-
+							xor( eax, eax );
 							command_cursor_right();
 							jmp skip_proc;
 						endif;
@@ -739,6 +746,7 @@ proc
 							if( info.line.number = 0 ) then
 								dbg.put("line = 0/1");
 								command_move_to_bol();
+								xor( eax, eax );
 								clear_keystate();
 								w.CallWindowProc(info.old_proc, hWin, uMsg, w.VK_RETURN, lParam );
 								command_cursor_up();
@@ -789,7 +797,7 @@ proc
 					//	mov( true, info.incremental_search );
 
 					case( w.VK_ESCAPE )
-
+						dbg.put("esc");
 						w.SendMessage( window.hwnd, w.WM_CLOSE, 0, 0 );
 
 					default
@@ -1431,10 +1439,21 @@ proc
 	end getInfo;
 
 	clear_keystate	:procedure {@noframe};
+		
+		// on entry, eax will contain state of control key
+		// 0 = up, 1 = down
+	
 	begin clear_keystate;
+		dbg.put("entry eax :", eax );
+		push( eax );
 		mem2.fillMem( &keystate, @elements( keystate ), 0 );
-		if( info.mark ) then
+		if( info.mark || shift_down ) then
 			mov( -1, keystate[w.VK_SHIFT] );
+		endif;
+		pop( eax );
+		if( eax ) then
+			dbg.put("setting control down");
+			mov( -1, keystate[w.VK_CONTROL] );
 		endif;
 		w.SetKeyboardState( &keystate );
 		ret();
@@ -1684,6 +1703,8 @@ proc
 	end command_cut_line;
 
 	command_cursor_up	:procedure {@noframe};
+		// on entry, eax will contain desired state of control key
+		// 0 = up, 1 = down
 	begin command_cursor_up;
 		
 		if( info.line.index > 0 ) then
@@ -1694,10 +1715,13 @@ proc
 	end command_cursor_up;
 
 	command_cursor_down	:procedure {@noframe};
+		// on entry, eax will contain desired state of control key
+		// 0 = up, 1 = down
 	begin command_cursor_down;
-		mov( info.line.number, eax );
-		inc( eax );
-		if( eax = info.lines ) then
+		
+		mov( info.line.number, ecx );
+		inc( ecx );
+		if( ecx = info.lines ) then
 			jmp _done;
 		endif;
 		clear_keystate();
@@ -1707,11 +1731,17 @@ proc
 	end command_cursor_down;
 
 	command_cursor_left	:procedure {@noframe};
+		// on entry, eax will contain desired state of control key
+		// 0 = up, 1 = down
 	begin command_cursor_left;
+		dbg.put("entry eax :", eax );
+		push( eax );
 		if( info.line.index = 0 && info.column_index = 0 ) then
 			jmp _done;
 		endif;
+		pop( eax );
 		clear_keystate();
+
 		w.CallWindowProc(info.old_proc, info.hred, w.WM_KEYDOWN, w.VK_LEFT, 0 );
 		
 		_done:
@@ -1719,11 +1749,14 @@ proc
 	end command_cursor_left;
 
 	command_cursor_right	:procedure {@noframe};
+		// on entry, eax will contain desired state of control key
+		// 0 = up, 1 = down
 	begin command_cursor_right;
-mov( info.line.number, eax );
-		inc( eax );
-		mov( info.column_index, ecx );
-		if( eax = info.lines && ecx = info.line.length ) then
+		
+		mov( info.line.number, ecx );
+		inc( ecx );
+		mov( info.column_index, edx );
+		if( ecx = info.lines && edx = info.line.length ) then
 			jmp _done;
 		endif;
 		clear_keystate();
@@ -1752,12 +1785,13 @@ mov( info.line.number, eax );
 			endif;
 		else
 			_home:
-			dbg.separator;
-			dbg.put("line number :", info.line.number );
-			dbg.put("line index  :", info.line.index );
-			dbg.put("line length :", info.line.length );
-			dbg.put("lines       :", info.lines );
-			dbg.put("col index   :", info.column_index );
+//			dbg.separator;
+//			dbg.put("line number :", info.line.number );
+//			dbg.put("line index  :", info.line.index );
+//			dbg.put("line length :", info.line.length );
+//			dbg.put("lines       :", info.lines );
+//			dbg.put("col index   :", info.column_index );
+			xor( eax, eax );
 			clear_keystate();
 			w.CallWindowProc(info.old_proc, info.hred, w.WM_KEYDOWN, w.VK_HOME, 0 );
 		endif;
@@ -1793,6 +1827,7 @@ mov( info.line.number, eax );
 			endif;
 		else
 			_callit:
+			xor( eax, eax );
 			clear_keystate();
 			w.CallWindowProc(info.old_proc, info.hred, w.WM_KEYDOWN, w.VK_END, 0 );
 		endif;
@@ -1876,31 +1911,6 @@ mov( info.line.number, eax );
 	begin command_toggle_mark;
 		
 		dbg.put("toggle_mark");
-/*		
-		if( info.mark.isSet ) then
-			
-			// close mark and set selection
-			// find the start and end of the selection
-			
-			mov( info.mark.index, eax );
-			if( eax < info.cursor.start_index ) then
-				push( info.cursor.start_index );
-				mov( eax, info.cursor.start_index );
-				pop( info.cursor.end_index );
-			else
-				mov( eax, info.cursor.end_index );
-			endif;
-			
-			w.SendMessage( info.hred, w.EM_EXSETSEL, 0, &info.cursor );
-
-		else
-			
-			// start a mark
-			mov( info.cursor.start_index, eax );
-			mov( eax, info.mark.index );
-			
-		endif;
-*/		
 		// toggle mark
 		if( info.mark ) then
 			mov( false, info.mark );

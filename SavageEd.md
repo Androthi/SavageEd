@@ -299,6 +299,9 @@ sevag.krikorian@gmail.com
 
 https://sites.google.com/view/androth/home/high-level-assembly
 
+https://github.com/Androthi
+
+https://twitter.com/androth4
 
 ## Requirements and further notes:
 

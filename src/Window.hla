@@ -188,10 +188,9 @@ proc
 			w.SendMessage( window.hstatus, w.WM_SIZE, 0, 0 );
 
 		endif;
+		
 		w.MoveWindow( info.hred, 0, rect.top, rect.right, height, true );
-		
 		xor( eax, eax );
-		
 	end Msg_Size;
 		
 	Msg_SetFocus :procedure( hwin:dword; wparam:dword; lparam:dword );
@@ -199,10 +198,8 @@ proc
 		// set window focus to active editor control
 	
 	begin Msg_SetFocus;
-		
 		w.SetFocus( info.hred );
 		xor( eax, eax );
-		
 	end Msg_SetFocus;
 
 
@@ -1048,8 +1045,8 @@ proc
 		endif;
 		// create edit window
 		w.CreateWindowEx( w.WS_EX_CLIENTEDGE, s_resedClass, NULL,
-					edit_style, 0, 0, 0, 0, window.hwnd, window.hcontextmenu, window.hinst, NULL );
-		
+					edit_style, 0, 0, 0, 0, window.hwnd,
+					window.hcontextmenu, window.hinst, NULL );
 		mov( eax, info.hred );
 				
 		// subclass the edit control

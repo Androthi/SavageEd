@@ -343,12 +343,17 @@ proc
 		var
 			hmem	:hide.memory;
 			build_str:string;
+			start_pos	:dword;
+			end_pos		:dword;
 			
 	
 	begin findPattern;
 		dbg.enters( "findPattern" );
 		
 		mov( str.talloc( 1000 ), build_str );
+		lea( eax, start_pos );
+		lea( ebx, end_pos );
+		w.SendMessage( info.hred, w.EM_GETSEL, eax, ebx );
 		cmp( (type byte findbuf[0]), 0 );
 		mov( 0, hmem );
 		je retFalse;
@@ -376,7 +381,7 @@ proc
 		mov( esi, eax ); 
 		sub( hmem, eax );
 		add( eax, ft.chrg.cpMin );
-		move( ft.chrg.cpMin, fres );
+		mov( ft.chrg.cpMin, fres );
 		mov( edi, eax );
 		sub( esi, eax );
 		push( ft.chrg.cpMin );
@@ -388,8 +393,7 @@ proc
 		jmp done;
 		
 		retFalse:
-			dbg.put("not found");
-			w.SendMessage( info.hred, w.EM_SETSEL, 0, 0 );
+			w.SendMessage( info.hred, w.EM_SETSEL, start_pos, end_pos );
 			mov( 0, ft.chrg.cpMin );
 			mov( -1, fres );
 			
@@ -904,7 +908,7 @@ proc
 	Proc_FindDlg :procedure( lParam:dword; wParam:dword; uMsg:uns32; hWin:dword );
 	
 		// opens find dialog
-	
+
 	begin	Proc_FindDlg;
 		pushabi;
 		mov(uMsg,eax);
@@ -1060,10 +1064,12 @@ proc
 						w.SendDlgItemMessage(hWin, ebx, w.WM_GETTEXT, @elements(findbuf)-1, &findbuf);
 						mov	(-1, fres);
 						
-						getFindMode();
-						findNormal( eax );
-						if( fres != -1 ) then
-							updateStatus();
+						if( ! w.IsDlgButtonChecked(hWin, IDC_CHK_PATTERN) ) then
+							getFindMode();
+							findNormal( eax );
+							if( fres != -1 ) then
+								updateStatus();
+							endif;
 						endif;
 
 						

@@ -1,7 +1,9 @@
 # Change Log
 ## 08/21/2021
-	0.9.12	feature changes:
+	0.9.13	feature changes:
 			- status bar now shows selection size
+			internal changes:
+			- made pattern find more stable
 
 ## 08/19/2021
 	0.9.10	feature changes:

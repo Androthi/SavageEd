@@ -788,8 +788,15 @@ proc
 					
 						if( shift_down ) then
 							command_select_to_eol();
-							jmp skip_proc;
+						else
+							command_move_to_eol();
 						endif;
+						jmp skip_proc;
+						
+					case( w.VK_HOME )
+					
+						command_move_to_bol();
+						jmp skip_proc;
 					
 					case( w.VK_SPACE )
 						
@@ -1753,11 +1760,11 @@ proc
 		// 0 = up, 1 = down
 	begin command_cursor_left;
 		dbg.put("entry eax :", eax );
-		push( eax );
+		mov( eax, ecx );
 		if( info.line.index = 0 && info.column_index = 0 ) then
 			jmp _done;
 		endif;
-		pop( eax );
+		mov( ecx, eax );
 		clear_keystate();
 
 		w.CallWindowProc(info.old_proc, info.hred, w.WM_KEYDOWN, w.VK_LEFT, 0 );
@@ -1803,26 +1810,10 @@ proc
 			endif;
 		else
 			_home:
-//			dbg.separator;
-//			dbg.put("line number :", info.line.number );
-//			dbg.put("line index  :", info.line.index );
-//			dbg.put("line length :", info.line.length );
-//			dbg.put("lines       :", info.lines );
-//			dbg.put("col index   :", info.column_index );
 			xor( eax, eax );
 			clear_keystate();
 			w.CallWindowProc(info.old_proc, info.hred, w.WM_KEYDOWN, w.VK_HOME, 0 );
 		endif;
-			
-		/*mov( info.line.index, eax );
-		if( info.column_index = 0 && eax > 0 ) then
-			
-			// we're at the beginning of line, go to the beginning of prev line.
-			
-			dec (eax );
-			w.SendMessage( info.hred, w.EM_SETSEL, eax, eax );
-		endif;
-		w.SendMessage( info.hred, w.EM_SETSEL, info.line.index, info.line.index ); */
 		done:
 		dbg.exits("command_move_to_bol");
 		ret();
@@ -1849,21 +1840,6 @@ proc
 			clear_keystate();
 			w.CallWindowProc(info.old_proc, info.hred, w.WM_KEYDOWN, w.VK_END, 0 );
 		endif;
-		
-		/*
-		mov( info.line.length, eax );
-		if( info.column_index = eax ) then
-			
-			// we're at the end of line, go to the end of next line.
-			add( info.line.index, eax );
-			inc( eax ); // go over the carriage return
-			w.SendMessage( info.hred, w.EM_SETSEL, eax, eax );
-
-		endif;
-		mov( info.line.length, eax );
-		add( info.line.index, eax );
-		w.SendMessage( info.hred, w.EM_SETSEL, eax, eax );
-*/
 		dbg.exits("command_move_to_eol");
 	end command_move_to_eol;
 
@@ -2466,3 +2442,11 @@ begin SavageEd;
 	_exit:
 
 end SavageEd;
+
+
+//			dbg.separator;
+//			dbg.put("line number :", info.line.number );
+//			dbg.put("line index  :", info.line.index );
+//			dbg.put("line length :", info.line.length );
+//			dbg.put("lines       :", info.lines );
+//			dbg.put("col index   :", info.column_index );

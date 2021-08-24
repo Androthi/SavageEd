@@ -7,7 +7,7 @@
 
 readonly
 	
-	version			:string := "SavageEd v0.9.13";
+	version			:string := "SavageEd v0.9.14";
 
 type
 	// Message and dispatch table related definitions:

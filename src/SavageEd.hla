@@ -774,6 +774,7 @@ proc
 						elseif( shift_down ) then
 							
 							do_shift:
+							mov( false, shift_down );
 							//open line below
 							// if we are not at eol, then move to eol
 							mov( info.column_index, eax );
@@ -1822,11 +1823,6 @@ proc
 	command_move_to_eol	:procedure;
 	begin command_move_to_eol;
 		dbg.enters("command_move_to_eol");
-			dbg.put("line number :", info.line.number );
-			dbg.put("line index  :", info.line.index );
-			dbg.put("line length :", info.line.length );
-			dbg.put("lines       :", info.lines );
-			dbg.put("col index   :", info.column_index );
 		mov( info.column_index, eax );
 		if( eax = info.line.length || ! eax ) then
 			command_cursor_right();

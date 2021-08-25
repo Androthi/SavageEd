@@ -584,13 +584,14 @@ proc
 					case( w.VK_I )
 						
 						if( ctrl_down ) then
+							xor( eax, eax );
 							command_cursor_up();
 							jmp skip_proc;
 						endif;
 					
 					case( w.VK_UP )
 
-						movzx( ctrl_down, eax );
+						xor( eax, eax );
 						command_cursor_up();
 						jmp skip_proc;
 						
@@ -765,6 +766,8 @@ proc
 							else
 							
 								// open line above
+								dbg.put("cursor up");
+								xor( eax, eax );
 								command_cursor_up();
 								getInfo(info);
 								jmp do_shift;

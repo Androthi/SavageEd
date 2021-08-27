@@ -128,7 +128,11 @@ Further considerations:
 
 ## Edit > Insert Date/Time
 Enters the date and time at the current position.
+
 SavageEd allows you to customize how the date and time are displayed.
+The menu options Edit->Set Date Format and Edit->Set Time Format open
+a text entry dialog that allows you to change the date/time format.
+
 In SavageEd.ini, the Settings section contains two keys, Date Format and
 Time Format. These allow you to enter special formatting characters.
 Eg:
@@ -172,6 +176,7 @@ Formatting the time:
 	ss	Seconds with leading zero for single-digit seconds
 	t	One character time marker string, such as A or P
 	tt	Multi-character time marker string, such as AM or PM
+
 
 ## Options > Font
 Allows you to select font, point size, effects and color.
@@ -221,26 +226,13 @@ Enters a number of white spaces indicated by the tab spacing number, default 4, 
 ## Options > Auto Indent
 Automatically indents the cursor to the previous line whitespace. Not reccommended to mix spaces and tabs as there is no check for this edge case.
 
-## Options > Edit Options
-Opens SavageEd.ini and allows you to edit it directly instead of using menu items.
-Opening this file will set SavageEd into Edit Configuration mode, if you modify and
-change this file, the configuration will be reloaded and new options are in effect.
-Use with caution. There is no error checking.
-A backup file of "SavageEd.in~" is created when this option is selected. 
-
 ## Options > Line Break
-This option can only be changed manually by editing the .ini file
-under [Settings] section, add "Line Break=CRLF" (this is default) for
-MS/DOS Windows line breaks.
-or "Line Break=LF" for unix line breaks.
-If SavageEd generates the 1st .ini file, this will already be included in the
-settings.
+Line breaks default to MS/DOS style of CRLF, you can select the LF option to force
+SavageEd to save documents with LF line breaks.
 	
-	[Settings]
-	Line Break=CRLF
-	
-## Options > Active URL
-This options can only be changed manually by editing the .ini file
+## Options > Active URLs
+Toggles displaying URLs as active links. Setting it on requires a document reload.
+This options can be changed manually by editing the .ini file
 under [Settings] section, add "Active URL=false/true" (the default is false).
 Setting this to true will highlight any URLs in your document, clicking on the URL
 will launch the default web browser and open the URL.
@@ -248,8 +240,33 @@ will launch the default web browser and open the URL.
 	[Settings]
 	Active URL=false
 
-If the font size is changed while Active URL is set to true, a restart
-of SavageEd is required.
+If the font size is changed while Active URL is set to true, a document reload 
+is required.
+
+## Options > Set Default Extension...
+SavageEd defaults to no extension, with the expectation that you will type in
+filen names exactly as you want them saved.
+You may however set a default extension. When opening a SaveAs dialog on an Untitled
+document, your default extension will be used as a pattern and the filename will attach
+that extension if none is supplied in the file name.
+
+When entering default extensions, be sure to include the dot. Returning an empty string
+will reset to default behavior.
+
+Eg.
+.txt
+
+You can also directly edit the config file:
+[Settings]
+Default Extension=.txt
+
+## Options > Edit Options
+Opens SavageEd.ini and allows you to edit it directly instead of using menu items.
+Opening this file will set SavageEd into Edit Configuration mode, if you modify and
+change this file, the configuration will be reloaded and new options are in effect.
+Use with caution. There is no error checking.
+A backup file of "SavageEd.in~" is created when this option is selected. 
+
 
 ## Log files.
 If you wish to use the log feature, it is compatible to the .LOG

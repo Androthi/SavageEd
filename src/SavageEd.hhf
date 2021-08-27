@@ -7,7 +7,7 @@
 
 readonly
 	
-	version			:string := "SavageEd v0.9.15";
+	version			:string := "SavageEd v0.9.20";
 
 type
 	// Message and dispatch table related definitions:
@@ -47,8 +47,6 @@ type
 			textColor	:w.COLORREF;
 			backColor	:w.COLORREF;
 			
-			// active URLs
-			active_url	:boolean;
 		endrecord;
 
 	FindMode:
@@ -123,7 +121,7 @@ type
 		IDM_FINDPREV,
 		IDM_REPLACE,
 		IDM_EDIT_GOTO,
-		IDM_TIME,
+		IDM_DATE_TIME,
 		IDM_FONT,
 		IDM_BACKGROUND,
 		IDM_FORGROUND, 
@@ -141,7 +139,17 @@ type
 		IDM_VIEW_STATUS,
 		IDM_ABOUT,
 		IDM_DOCUMENTS,
-		IDM_EDITINI
+		IDM_EDITINI,
+		IDM_CRLF,
+		IDM_LF,
+		IDM_ACTIVE_URL,
+		IDM_DATE_FORMAT,
+		IDM_TIME_FORMAT,
+		IDM_DEFAULT_EXT,
+		IDM_TO_UPPER,
+		IDM_TO_LOWER,
+		IDM_INCREASE_INDENT,
+		IDM_DECREASE_INDENT
 	};
 
 	rect_t:
@@ -202,62 +210,6 @@ const
 	
 	szLINEBUFFER	:= 3000;	
 	
-readonly
-
-	// this is the main configuration file name
-	config_file		:string := "SavageEd.ini";
-	
-	s_window 	:string := "Window";
-	ClassName	:string:= "SavageEDClass";
-	AppName		:string:= "SavageEd";
-	
-	RichEditDLL		:string := "riched20.dll";
-	
-	// strings and error messages
-	s_recent	:string := "Recent Files";
-	s_settings	:string := "Settings";
-	s_tabs		:string := "Tabs";
-	s_tabsasspace:string	:= "Tabs as Spaces";
-	s_font		:string := "Font";
-	s_find		:string := "Find";
-	s_text		:string := "Text";
-	s_background_color	:string := "Background Color";
-	s_text_color		:string := "Text Color";
-	s_custcolors:string := "Custom Colors";
-	s_openrecent:string := "Open Recent";
-	s_rememberpos :string := "Remember Position";
-	s_wrap		:string := "Word Wrap";
-	s_autosave	:string := "Auto Save";
-	s_autoindent:string := "Auto Indent";
-	s_topwindow	:string := "Top Window";
-	s_status	:string := "show status";
-	s_clearexit	:string := "Clear On Exit";
-	s_recentnew	:string := "New Recent Window";
-	s_readonly	:string := "Read Only";
-	s_resedClass:string := "RichEdit20A";
-	s_untitled	:string := "Untitled";
-	s_txtext	:string := ".txt";
-	s_fontname	:string := "Courier New";
-	s_nl		:string := nl;
-	s_r			:string := "R";
-	s_b			:string := " ";
-	s_mark		:string := "M";
-	s_empty		:string := "";
-	s_lf		:string := "LF";
-	s_crlf		:string := "CRLF";
-	s_inputlinen:string := "Enter Line Number";
-	s_inputtab	:string := "Enter tab spacing in number of characters";
-	
-	s_document		:string := "SavageEd.md";	
-	s_missingDLL	:string := "Could not open Riched20.dll";
-	s_missingDocs	:string := "Missing Documents: SavageEd.md";
-	s_nosave		:string := "Could Not Save File";
-	s_noopen		:string := "Unable to open file";
-	s_notemp		:string := "Unable to create temporary file";
-	s_savechanges	:string := "Save changes to ";
-	s_savetitle		:string := "Save As: Extension Is Not Assumed";
-	
-	curdir			:byte := '.';	// '.' = curdir
 
 
 const
@@ -279,6 +231,62 @@ storage
 	return		:string; @external;
 	text_range	:w.TEXTRANGE; @external;
 
+readonly;
+// this is the main configuration file name
+	config_file		:string; @external;
+	
+	s_window 	:string;@external;
+	ClassName	:string; @external;
+	AppName		:string; @external;
+	
+	RichEditDLL		:string; @external;
+	
+	// strings and error messages
+	s_recent	:string; @external;
+	s_settings	:string; @external;
+	s_tabs		:string; @external;
+	s_tabsasspace:string; @external;
+	s_font		:string; @external;
+	s_find		:string; @external;
+	s_text		:string;  @external;
+	s_background_color :string; @external;
+	s_text_color:string; @external;
+	s_custcolors:string; @external;
+	s_openrecent:string; @external;
+	s_rememberpos :string; @external;
+	s_wrap		:string; @external;
+	s_autosave	:string; @external;
+	s_autoindent:string; @external;
+	s_topwindow	:string; @external;
+	s_status	:string; @external;
+	s_clearexit	:string; @external;
+	s_recentnew	:string; @external;
+	s_readonly	:string; @external;
+	s_resedClass:string; @external;
+	s_untitled	:string; @external;
+	s_txtext	:string; @external;
+	s_fontname	:string; @external;
+	s_nl		:string; @external;
+	s_r			:string; @external;
+	s_b			:string; @external;
+	s_mark		:string; @external;
+	s_empty		:string; @external;
+	s_lf		:string; @external;
+	s_crlf		:string; @external;
+	s_inputlinen:string; @external;
+	s_inputtab	:string; @external;
+	
+	s_document		:string; @external;	
+	s_missingDLL	:string; @external;
+	s_missingDocs	:string; @external;
+	s_nosave		:string; @external;
+	s_noopen		:string; @external;
+	s_notemp		:string; @external;
+	s_savechanges	:string; @external;
+	//s_savetitle		:string := "Save As: Extension Is Not Assumed";
+	s_savetitle		:string; @external;
+	
+	curdir			:byte; @external;
 	
 static
 	// temp, move into list, and attach list to window record
@@ -286,7 +294,8 @@ static
 	strtabs		:string; @external;	
 	statusParts	:int32[STATUS_PARTS]; @external;
 	default_date_format :string; @external;
-	default_time_format :string; @external;	
+	default_time_format :string; @external;
+	default_extension	:string; @external;	
 
 proc
 	// external declarations
@@ -351,7 +360,7 @@ proc
 	command_uppercase_selection :procedure; @external;
 	command_lowercase_selection	:procedure; @external;
 	clear_keystate	:procedure; @external;
-
+	updateActiveURL :procedure; @external;
 
 	
 	

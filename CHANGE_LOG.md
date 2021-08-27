@@ -1,4 +1,19 @@
 # Change Log
+
+## 08/27/2021
+	0.9.20	feature changes:
+			- added option for settings Default Extension=
+			  allows setting the default extension that SavageEd appends to
+			  filenames that don't have extensions from SaveAs dialog.
+			- Choosing SaveAs on an Untitled document will insert "*<default_extension>" as
+			  a filter to the dialog
+			- added menu option to change CRLF/LF line breaks
+			- added menu option to toggle Active URLs (activating requires document reload)
+			- added menu option to change default extension
+			- added menu options to set date and time formats  
+			- added menu for edit - case to upper, case to lower.
+			- added menu for edit increase and decrease indent
+
 ## 08/21/2021
 	0.9.13	feature changes:
 			- status bar now shows selection size

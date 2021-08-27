@@ -90,7 +90,6 @@ proc
 		endif;
 	end selectFont;
 	
-	
 	selectColor :procedure { @returns("EAX") };
 		
 		var cc	:w.CHOOSECOLOR;
@@ -116,6 +115,15 @@ proc
 			or( 1, eax );
 		endif;
 	end selectColor;
+
+	saveConfig	:procedure;
+		var	config_path:string;
+	begin saveConfig;
+		mov( str.talloc(1000), config_path);
+		getConfigPath( config_path );
+		config.writeFileName( config_path );
+	end saveConfig;
+
 
 	updateMenu :procedure;	
 	
@@ -221,6 +229,20 @@ proc
 			
 		endif;
 		
+		config.readString( s_settings, "Line Break", build_str );
+		if( str.eq( build_str, "CRLF" ))then
+			w.CheckMenuItem( window.hmenu, IDM_CRLF, w.MF_BYCOMMAND | w.MF_CHECKED );
+			w.CheckMenuItem( window.hmenu, IDM_LF, w.MF_BYCOMMAND | w.MF_UNCHECKED );
+		else
+			w.CheckMenuItem( window.hmenu, IDM_CRLF, w.MF_BYCOMMAND | w.MF_UNCHECKED );
+			w.CheckMenuItem( window.hmenu, IDM_LF, w.MF_BYCOMMAND | w.MF_CHECKED );
+		endif;
+		
+		if( config.readBool( s_settings, "Active URL" )) then
+			w.CheckMenuItem( window.hmenu, IDM_ACTIVE_URL, w.MF_BYCOMMAND | w.MF_CHECKED );
+		else
+			w.CheckMenuItem( window.hmenu, IDM_ACTIVE_URL, w.MF_BYCOMMAND | w.MF_UNCHECKED );
+		endif;
 		w.DrawMenuBar( window.hwnd );
 		
 		//dbg.put("/updateMenu");
@@ -687,7 +709,7 @@ proc
 						Msg_Command( window.hwnd, IDM_WRAP,0 );
 
 					case( w.VK_F5 )
-						Msg_Command( window.hwnd, IDM_TIME,0 );
+						Msg_Command( window.hwnd, IDM_DATE_TIME,0 );
 						
 					case( w.VK_F6 )
 						Msg_Command( window.hwnd, IDM_READONLY,0 );
@@ -1183,6 +1205,7 @@ proc
 		
 		mov( str.talloc(400), config_path );
 		mov( str.talloc(1000), build_str );
+		str.cpy( s_empty, default_extension );
 		getConfigPath( config_path );
 		if( filesys.exists( config_path ) ) then
 			
@@ -1235,15 +1258,12 @@ proc
 			config.readBin( s_text, s_custcolors, &customColors, @size( customColors ) );
 			config.readBin( s_text, s_find, &info.find_mode, @size( info.find_mode ) );
 			
-			if( config.readBool( s_settings, "Active URL" )) then
-				mov( true, window.active_url );
-			else
-				mov( false, window.active_url );
-			endif; 
+			if( config.readString(s_settings, "Default Extension", build_str )) then
+				str.cpy( build_str, default_extension );
+			endif;
 			
 			if( info.hred ) then
-				
-				if( window.active_url ) then
+				if( config.readBool( s_settings, "Active URL" )) then
 					w.SendMessage( info.hred, w.EM_AUTOURLDETECT, true, NULL);
 					w.SendMessage( info.hred, w.EM_SETEVENTMASK, 0, w.ENM_SELCHANGE | w.ENM_LINK);
 				else
@@ -1263,10 +1283,9 @@ proc
 			config.writeString( s_settings, "Line Break", "CRLF" );
 
 			config.writeBool( s_settings, "Active URL", false );
-			mov( false, window.active_url );
-
 			config.writeString( s_settings, "Date Format", default_date_format );
 			config.writeString( s_settings, "Time Format", default_time_format );
+			config.writeString( s_settings, "Default Extension", default_extension );
 
 			// some hard coded defaults
 			mov( 10,window.xPos );
@@ -1428,7 +1447,7 @@ proc
 		var	index	:uns32;
 	
 	begin getInfo;
-		dbg.enters("getInfo");
+		//dbg.enters("getInfo");
 		push( edi );
 		push( esi );
 		mov( 0, index );
@@ -1464,7 +1483,7 @@ proc
 
 		pop( esi );
 		pop( edi );
-		dbg.exits("getInfo");
+		//dbg.exits("getInfo");
 	end getInfo;
 
 	clear_keystate	:procedure {@noframe};
@@ -2023,6 +2042,11 @@ proc
 	Msg_Command :procedure( hwin:dword; wparam:dword; lparam:dword );
 	
 		// handle menu commands
+		readonly
+			s_set_date_format :string := "Set Date Format";
+			s_set_time_format :string := "Set Time Format";
+			s_set_default_extension :string := "Set Default Extension";
+			
 	
 	begin Msg_Command;
 		mov	(wparam,eax);
@@ -2158,7 +2182,7 @@ proc
 				
 			endif;
 			
-		case( IDM_TIME )
+		case( IDM_DATE_TIME )
 	
 			command_insert_time();
 			
@@ -2217,6 +2241,76 @@ proc
 			
 			config.writeBool( s_settings, s_autoindent, al );
 		
+		case( IDM_CRLF )
+			config.writeString( s_settings, "Line Break", "CRLF" );
+			w.CheckMenuItem( window.hmenu, IDM_CRLF, w.MF_BYCOMMAND | w.MF_CHECKED );
+			w.CheckMenuItem( window.hmenu, IDM_LF, w.MF_BYCOMMAND | w.MF_UNCHECKED );
+			
+		case( IDM_LF )
+			config.writeString( s_settings, "Line Break", "LF" );
+			w.CheckMenuItem( window.hmenu, IDM_CRLF, w.MF_BYCOMMAND | w.MF_UNCHECKED );
+			w.CheckMenuItem( window.hmenu, IDM_LF, w.MF_BYCOMMAND | w.MF_CHECKED );
+			
+		case( IDM_ACTIVE_URL ) 
+			
+			if( config.readBool( s_settings, "Active URL" )) then
+				w.CheckMenuItem( window.hmenu, IDM_ACTIVE_URL, w.MF_BYCOMMAND | w.MF_UNCHECKED );
+				config.writeBool( s_settings, "Active URL", false );
+				updateActiveURL();
+			else
+				getConfirm();
+				if( ! eax ) then
+					w.CheckMenuItem( window.hmenu, IDM_ACTIVE_URL, w.MF_BYCOMMAND | w.MF_CHECKED );
+					config.writeBool( s_settings, "Active URL", true );
+					saveFile( info.filepath, false );
+					updateActiveURL();
+					loadFile( info.filepath );
+				endif;
+			endif;
+			
+		case( IDM_DATE_FORMAT )
+			w.DialogBoxParam( window.hinst, val ID_INPUT, hwin, &Proc_Input, s_set_date_format );
+			if( return > 0 ) then
+				dbg.put("query :", return );
+				config.writeString( s_settings, "Date Format", return ); 
+				str.free( return );
+				mov( 0, return );
+			endif;
+
+		case( IDM_TIME_FORMAT )
+			w.DialogBoxParam( window.hinst, val ID_INPUT, hwin, &Proc_Input, s_set_time_format );
+			if( return > 0 ) then
+				dbg.put("query :", return );
+				config.writeString( s_settings, "Time Format", return ); 
+				str.free( return );
+				mov( 0, return );
+			endif;
+		
+		case( IDM_INCREASE_INDENT )
+			command_increase_indent();
+		
+		case( IDM_DECREASE_INDENT )
+			command_reduce_indent();
+		
+		case( IDM_DEFAULT_EXT )
+			w.DialogBoxParam( window.hinst, val ID_INPUT, hwin, &Proc_Input, s_set_default_extension );
+			if( return > 0 ) then
+				dbg.put("query :", return );
+				str.cpy( return, default_extension ); 
+				str.free( return );
+				mov( 0, return );
+			else
+				str.cpy( s_empty, default_extension );
+			endif;
+			
+			config.writeString( s_settings, "Default Extension", default_extension );
+
+		case( IDM_TO_UPPER )
+			command_uppercase_selection();
+					
+		case( IDM_TO_LOWER )
+			command_lowercase_selection();
+
 		case( IDM_EDITINI )
 			
 			dbg.put("edit the ini file");
@@ -2402,6 +2496,7 @@ proc
 			endif;
 		endswitch;
 		
+		updateStatus();
 		xor( eax, eax );
 
 	end Msg_Command;

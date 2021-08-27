@@ -8,6 +8,8 @@ unit Window_unit;
 
 readonly
 
+	
+
 	// main window message table
 //bm=window_commands	
 	message_table	:MsgProcPtr_t; @nostorage;
@@ -25,12 +27,70 @@ readonly
 			// add more messages here
 			MsgProcPtr_t:[ 0, NULL ];	// This marks the end of the list.
 
+readonly
+// this is the main configuration file name
+	config_file		:string := "SavageEd.ini";
+	
+	s_window 	:string := "Window";
+	ClassName	:string:= "SavageEDClass";
+	AppName		:string:= "SavageEd";
+	
+	RichEditDLL		:string := "riched20.dll";
+	
+	// strings and error messages
+	s_recent	:string := "Recent Files";
+	s_settings	:string := "Settings";
+	s_tabs		:string := "Tabs";
+	s_tabsasspace:string	:= "Tabs as Spaces";
+	s_font		:string := "Font";
+	s_find		:string := "Find";
+	s_text		:string := "Text";
+	s_background_color	:string := "Background Color";
+	s_text_color		:string := "Text Color";
+	s_custcolors:string := "Custom Colors";
+	s_openrecent:string := "Open Recent";
+	s_rememberpos :string := "Remember Position";
+	s_wrap		:string := "Word Wrap";
+	s_autosave	:string := "Auto Save";
+	s_autoindent:string := "Auto Indent";
+	s_topwindow	:string := "Top Window";
+	s_status	:string := "show status";
+	s_clearexit	:string := "Clear On Exit";
+	s_recentnew	:string := "New Recent Window";
+	s_readonly	:string := "Read Only";
+	s_resedClass:string := "RichEdit20A";
+	s_untitled	:string := "Untitled";
+	s_txtext	:string := ".txt";
+	s_fontname	:string := "Courier New";
+	s_nl		:string := nl;
+	s_r			:string := "R";
+	s_b			:string := " ";
+	s_mark		:string := "M";
+	s_empty		:string := "";
+	s_lf		:string := "LF";
+	s_crlf		:string := "CRLF";
+	s_inputlinen:string := "Enter Line Number";
+	s_inputtab	:string := "Enter tab spacing in number of characters";
+	
+	s_document		:string := "SavageEd.md";	
+	s_missingDLL	:string := "Could not open Riched20.dll";
+	s_missingDocs	:string := "Missing Documents: SavageEd.md";
+	s_nosave		:string := "Could Not Save File";
+	s_noopen		:string := "Unable to open file";
+	s_notemp		:string := "Unable to create temporary file";
+	s_savechanges	:string := "Save changes to ";
+	//s_savetitle		:string := "Save As: Extension Is Not Assumed";
+	s_savetitle		:string := "Save As:";
+	
+	curdir			:byte := '.';	// '.' = curdir
+
 storage
 	editstream	:w.EDITSTREAM;
 
 static
 	default_date_format :string := "MM-dd-yyyy";
-	default_time_format :string := " hh:mm:tt";	
+	default_time_format :string := " hh:mm:tt";
+	default_extension	:str.strvar(w.MAX_PATH);	//.string := "";
 	
 proc
 
@@ -477,8 +537,11 @@ proc
 		
 		getFileName();
 		if(eax) then
-			
 			str.cpyz( &buffer, info.filepath );
+			if( ! filesys.hasExtension(info.filepath) ) then
+				str.cat( default_extension, info.filepath);
+			endif;
+			
 			saveFile( info.filepath, false );
 			if(eax) then
 			 	// reset FileName to untitled
@@ -563,9 +626,12 @@ proc
 		// copies the current filename into buffer
 		var
 			ofn	:w.OPENFILENAME;
+			build_str	:string;
 			
 	
 	begin getFileName;
+		
+		mov( str.talloc(1000), build_str );
 		lea( ofn, eax );
 		mem2.fillMem( [eax], @size( ofn ), 0 );
 		mov( @size( ofn ), ofn.lStructSize );
@@ -574,7 +640,12 @@ proc
 		mov( &curdir, eax );
 		mov( eax, ofn.lpstrInitialDir );
 		
-		zstr.cpy( (type zstring info.filepath ), &buffer );
+		if( str.eq( info.filepath, s_untitled ) ) then
+			str.put( build_str, '*', default_extension );
+			zstr.cpy( (type zstring build_str ), &buffer );
+		else
+			zstr.cpy( (type zstring info.filepath ), &buffer );
+		endif;
 		mov( &buffer, eax );
 		mov( eax, ofn.lpstrFile );
 		mov( s_savetitle, eax );
@@ -764,7 +835,8 @@ proc
 			options_menu 	:dword;
 			view_menu 		:dword;
 			help_menu		:dword;
-			s_recent_menu 	:dword;
+			recent_menu 	:dword;
+			line_break_menu	:dword;
 			build_str		:string;
 			
 	begin AddMenus;
@@ -777,7 +849,8 @@ proc
 		mov( w.CreateMenu(), options_menu);
 		mov( w.CreateMenu(), view_menu);
 		mov( w.CreateMenu(), help_menu);
-		mov( w.CreatePopupMenu(), s_recent_menu );
+		mov( w.CreatePopupMenu(), recent_menu );
+		mov( w.CreatePopupMenu(), line_break_menu );
 		
 		//
 		//	File Menu
@@ -808,12 +881,19 @@ proc
 		w.AppendMenu( edit_menu, w.MF_STRING, IDM_PASTE, "&Paste	Ctrl+V");
 		w.AppendMenu( edit_menu, w.MF_STRING, IDM_SELECTALL, "Select &All	Ctrl+A");
 		w.AppendMenu( edit_menu, w.MF_SEPARATOR, NULL, NULL);
+		w.AppendMenu( edit_menu, w.MF_STRING, IDM_TO_UPPER, "To Upper Case	Ctrl+U");
+		w.AppendMenu( edit_menu, w.MF_STRING, IDM_TO_LOWER, "To Lower Case	Shift+Ctrl+U");
+		w.AppendMenu( edit_menu, w.MF_STRING, IDM_INCREASE_INDENT, "Increase Line Indent	Shift+Tab");
+		w.AppendMenu( edit_menu, w.MF_STRING, IDM_DECREASE_INDENT, "Decrease Line Indent	Shift+Ctrl+Tab");
+		w.AppendMenu( edit_menu, w.MF_SEPARATOR, NULL, NULL);
 		w.AppendMenu( edit_menu, w.MF_STRING, IDM_FIND, "&Find / Replace	Ctrl+F");
 		w.AppendMenu( edit_menu, w.MF_STRING, IDM_FINDNEXT, "Find &Next	F3");
 		w.AppendMenu( edit_menu, w.MF_STRING, IDM_FINDPREV, "Find &Previous	Ctrl+F3");
 		w.AppendMenu( edit_menu, w.MF_STRING, IDM_EDIT_GOTO, "&Goto Line	Ctrl+G");
 		w.AppendMenu( edit_menu, w.MF_SEPARATOR, NULL, NULL);
-		w.AppendMenu( edit_menu, w.MF_STRING, IDM_TIME, "&Insert Date/Time	F5");
+		w.AppendMenu( edit_menu, w.MF_STRING, IDM_DATE_TIME, "&Insert Date/Time	F5");
+		w.AppendMenu( edit_menu, w.MF_STRING, IDM_DATE_FORMAT, "Set Date Format...");
+		w.AppendMenu( edit_menu, w.MF_STRING, IDM_TIME_FORMAT, "Set Time Format...");
 		w.AppendMenu( window.hmenu, w.MF_POPUP, edit_menu, "&Edit");
 
 		//
@@ -829,11 +909,17 @@ proc
 		w.AppendMenu( options_menu, w.MF_STRING, IDM_SETTAB, "&Set Tabs...");
 		w.AppendMenu( options_menu, w.MF_STRING, IDM_TAB_AS_SPACE, "Tabs As &Spaces");
 		w.AppendMenu( options_menu, w.MF_STRING, IDM_AUTOINDENT, "Auto &Indent");
-		w.AppendMenu( options_menu, w.MF_STRING | w.MF_POPUP, s_recent_menu, "Recent File Options");
-			w.AppendMenu( s_recent_menu, w.MF_STRING, IDM_RECENTNEW, "Open in New Window");
-			w.AppendMenu( s_recent_menu, w.MF_STRING, IDM_CLEAREXIT, "Clear History on Exit");
-			w.AppendMenu( s_recent_menu, w.MF_STRING, IDM_OPENRECENT, "Open Most Recent");
-			w.AppendMenu( s_recent_menu, w.MF_STRING, IDM_REMEMBERPOS, "Remember Position");
+		w.AppendMenu( options_menu, w.MF_STRING | w.MF_POPUP, recent_menu, "Recent File Options");
+			w.AppendMenu( recent_menu, w.MF_STRING, IDM_RECENTNEW, "Open in New Window");
+			w.AppendMenu( recent_menu, w.MF_STRING, IDM_CLEAREXIT, "Clear History on Exit");
+			w.AppendMenu( recent_menu, w.MF_STRING, IDM_OPENRECENT, "Open Most Recent");
+			w.AppendMenu( recent_menu, w.MF_STRING, IDM_REMEMBERPOS, "Remember Position");
+		w.AppendMenu( options_menu, w.MF_SEPARATOR, NULL, NULL);
+		w.AppendMenu( options_menu, w.MF_STRING, IDM_ACTIVE_URL, "Active URLs");
+		w.AppendMenu( options_menu, w.MF_STRING | w.MF_POPUP, line_break_menu, "Line Break");
+			w.AppendMenu( line_break_menu, w.MF_STRING, IDM_CRLF, "CRLF");
+			w.AppendMenu( line_break_menu, w.MF_STRING, IDM_LF, "LF");
+		w.AppendMenu( options_menu, w.MF_STRING, IDM_DEFAULT_EXT, "Set Default Extension...");
 		w.AppendMenu( options_menu, w.MF_SEPARATOR, NULL, NULL);
 		w.AppendMenu( options_menu, w.MF_STRING, IDM_EDITINI, "Edit &Options");
 		w.AppendMenu( window.hmenu, w.MF_POPUP, options_menu, "&Options");
@@ -1004,6 +1090,17 @@ proc
 		w.SendMessage( editesi.hred, w.EM_SETMARGINS, w.EC_LEFTMARGIN | w.EC_RIGHTMARGIN, 5<<16 | 5 );
 	end setFormat;
 	
+	updateActiveURL :procedure;
+	begin updateActiveURL;
+		if( config.readBool( s_settings, "Active URL" ) ) then
+			w.SendMessage( info.hred, w.EM_AUTOURLDETECT, true, NULL);
+			w.SendMessage( info.hred, w.EM_SETEVENTMASK, 0, w.ENM_SELCHANGE | w.ENM_LINK );
+		else
+			w.SendMessage( info.hred, w.EM_AUTOURLDETECT, false, NULL);
+			w.SendMessage( info.hred, w.EM_SETEVENTMASK, 0, w.ENM_SELCHANGE );
+		endif;
+		setFormat( info );		
+	end updateActiveURL;
 	
 	Msg_Create :procedure( hwin:dword; wParam:dword; lparam:dword );
 	
@@ -1053,17 +1150,9 @@ proc
 		w.SetWindowLong(info.hred, w.GWL_WNDPROC, &Proc_Edit);
 		mov( eax, info.old_proc);
 		
-		if( window.active_url ) then
-			w.SendMessage( info.hred, w.EM_AUTOURLDETECT, true, NULL);
-			w.SendMessage( info.hred, w.EM_SETEVENTMASK, 0, w.ENM_SELCHANGE | w.ENM_LINK );
-		else
-			w.SendMessage( info.hred, w.EM_AUTOURLDETECT, false, NULL);
-			w.SendMessage( info.hred, w.EM_SETEVENTMASK, 0, w.ENM_SELCHANGE );
-		endif;
-		setFormat( info );
-
+		updateActiveURL();
 		w.SetFocus( info.hred );
-	
+
 		// check for a filename passed as an argument and try to open that file.
 		// if file doesn't exist, start new document with that filename.
 		arg.c();

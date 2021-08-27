@@ -1,6 +1,8 @@
 # Change Log
 
 ## 08/27/2021
+	0.9.21	- fixed a mouse behavior issue when in marked selection mode
+			- any insert change should now deactivate marked selection mode as it should
 	0.9.20	feature changes:
 			- added option for settings Default Extension=
 			  allows setting the default extension that SavageEd appends to

@@ -1094,10 +1094,10 @@ proc
 	begin updateActiveURL;
 		if( config.readBool( s_settings, "Active URL" ) ) then
 			w.SendMessage( info.hred, w.EM_AUTOURLDETECT, true, NULL);
-			w.SendMessage( info.hred, w.EM_SETEVENTMASK, 0, w.ENM_SELCHANGE | w.ENM_LINK );
+			w.SendMessage( info.hred, w.EM_SETEVENTMASK, 0, w.ENM_SELCHANGE | w.ENM_MOUSEEVENTS | w.ENM_LINK );
 		else
 			w.SendMessage( info.hred, w.EM_AUTOURLDETECT, false, NULL);
-			w.SendMessage( info.hred, w.EM_SETEVENTMASK, 0, w.ENM_SELCHANGE );
+			w.SendMessage( info.hred, w.EM_SETEVENTMASK, 0, w.ENM_SELCHANGE | w.ENM_MOUSEEVENTS );
 		endif;
 		setFormat( info );		
 	end updateActiveURL;
@@ -1257,9 +1257,7 @@ proc
 			updateStatus();
 		
 		elseif( eax = w.EN_LINK ) then
-
 			if( (type w.ENLINK[edx]).msg = w.WM_LBUTTONDOWN ) then
-
 				mov( &buffer, text_range.lpstrText );
 				mov( (type w.ENLINK[edx]).chrg.cpMin, text_range.chrg.cpMin );
 				mov( (type w.ENLINK[edx]).chrg.cpMax, text_range.chrg.cpMax );
@@ -1267,6 +1265,20 @@ proc
 				w.SendMessage( info.hred, w.EM_GETTEXTRANGE, 0, eax );
 				w.ShellExecute( NULL, NULL, &buffer, NULL, NULL, 1 );  
 
+			endif;
+			
+		elseif( eax = w.EN_MSGFILTER ) then
+			if( (type w.MSGFILTER[EDX]).msg = w.WM_LBUTTONDOWN ) then
+				mov( shift_down, dl );
+				if( info.mark ) then
+					mov( true, shift_down );
+				else
+					mov( false, shift_down );
+				endif;
+				xor( eax, eax ); // clear ctrl_down
+				clear_keystate();
+				mov( dl, shift_down );
+				updateStatus();
 			endif;
 		endif;
 		

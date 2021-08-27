@@ -278,6 +278,7 @@ proc
 			// to the file
 			w.SendMessage( info.hred, w.EM_EMPTYUNDOBUFFER, 0, 0 );
 			mov( MODE_INSERT, info.mode );
+			mov( false, info.mark );
 			or( 1, eax );
 			
 		anyexception
@@ -541,70 +542,61 @@ proc
 						jmp skip_proc;
 	
 					case( w.VK_W )
-						
-						// delete word under cursor
 						if( ctrl_down ) then
-							
 							if( shift_down ) then
 								command_copy_word();
 							else
 								command_delete_word();
 							endif;
+							jmp skip_proc;
 						endif;
-
+					
 					case( w.VK_D )
-
 						if( ctrl_down ) then
-							
 							inc( info.cursor.end_index );
 							w.SendMessage( info.hred, w.EM_EXSETSEL, 0, &info.cursor );
 							w.SendMessage( info.hred, w.EM_REPLACESEL,true, s_empty );
-						
+							jmp skip_proc;
 						endif;
 					
 					case( w.VK_U )
-						
-						// toggle case
 						if( ctrl_down ) then
 							if( shift_down ) then
 								command_lowercase_selection();
 							else
 								command_uppercase_selection();
 							endif;
-							
+							jmp skip_proc;
 						endif;
 						
 					case( w.VK_E )
-						
 						if( ctrl_down ) then
-							
 							command_select_to_eol();
 							w.SendMessage( info.hred, w.EM_REPLACESEL,true, s_empty );
 							jmp skip_proc;
 						endif;
 					
 					case( w.VK_BSLASH )
-
 						if( ctrl_down ) then
 							command_cut_line();
+							jmp skip_proc;
 						endif;
-						
+					
 					case( w.VK_F )
-			
 						if( ctrl_down ) then
 							Msg_Command( window.hwnd, IDM_FIND,0 );
 							mov( false, ctrl_down );
+							jmp skip_proc;
 						endif;
-
+					
 					case( w.VK_G )
-
 						if( ctrl_down ) then
 							Msg_Command( window.hwnd, IDM_EDIT_GOTO,0 );
 							mov( false, ctrl_down );
+							jmp skip_proc;
 						endif;
-
+					
 					case( w.VK_I )
-						
 						if( ctrl_down ) then
 							xor( eax, eax );
 							command_cursor_up();
@@ -612,7 +604,6 @@ proc
 						endif;
 					
 					case( w.VK_UP )
-
 						xor( eax, eax );
 						command_cursor_up();
 						jmp skip_proc;
@@ -633,7 +624,6 @@ proc
 						jmp skip_proc;
 
 					case( w.VK_J )
-					
 						if( ctrl_down ) then
 							xor( eax, eax );
 							command_cursor_left();
@@ -641,7 +631,6 @@ proc
 						endif;
 						
 					case( w.VK_K )
-						
 						if( ctrl_down) then
 							xor( eax, eax );
 							command_cursor_down();
@@ -649,7 +638,6 @@ proc
 						endif;
 
 					case( w.VK_L )
-						
 						if( ctrl_down ) then
 							xor( eax, eax );
 							command_cursor_right();
@@ -657,7 +645,6 @@ proc
 						endif;
 
 					case( w.VK_LBRACKET )
-					
 						if( ctrl_down ) then
 							command_move_to_bol();
 							jmp skip_proc;
@@ -673,30 +660,37 @@ proc
 						if( ctrl_down ) then
 							Msg_Command( window.hwnd, IDM_NEW, 0 );
 							mov( false, ctrl_down );  
+							jmp skip_proc;
 						endif;
 
 					case( w.VK_O )
 						if( ctrl_down ) then
 							Msg_Command( window.hwnd, IDM_OPEN,0 );
 							mov( false, ctrl_down );
+							jmp skip_proc;
 						endif;	
 
 					case( w.VK_S )
-						if( ctrl_down && shift_down ) then
-							Msg_Command( window.hwnd, IDM_SAVEAS,0 );
-						elseif( ctrl_down ) then
-							Msg_Command( window.hwnd, IDM_SAVE,0 );
+						if( ctrl_down ) then
+							if( shift_down ) then
+								Msg_Command( window.hwnd, IDM_SAVEAS,0 );
+							else
+								Msg_Command( window.hwnd, IDM_SAVE,0 );
+							endif;
+							mov( false, ctrl_down );
+							jmp skip_proc;
 						endif;
-						mov( false, ctrl_down );
-
+					
 					case( w.VK_T )
 						if( ctrl_down ) then
 							Msg_Command( window.hwnd, IDM_PEG,0 );
+							jmp skip_proc;
 						endif;
 
 					case( w.VK_F2 )
 						Msg_Command( window.hwnd, IDM_AUTO,0 );
 						mov( false, ctrl_down );
+						jmp skip_proc;
 
 					case( w.VK_F3 )
 						if( ctrl_down ) then
@@ -704,58 +698,50 @@ proc
 						else
 							Msg_Command( window.hwnd, IDM_FINDNEXT,0 );
 						endif;
+						jmp skip_proc;
 						
 					case( w.VK_F4 )
 						Msg_Command( window.hwnd, IDM_WRAP,0 );
+						jmp skip_proc;
 
 					case( w.VK_F5 )
+						mov( false, info.mark );
 						Msg_Command( window.hwnd, IDM_DATE_TIME,0 );
+						jmp skip_proc;
 						
 					case( w.VK_F6 )
 						Msg_Command( window.hwnd, IDM_READONLY,0 );
+						jmp skip_proc;
 
 					case( w.VK_COMMA )
 						if( ctrl_down ) then
-							// same as ctrl-left
-							// put VK_LEFT in wParam and let
-							// hred window proc handle it.
-							mov( 1, eax );
+							movzx( ctrl_down, eax );
 							command_cursor_left();
-							//mov( w.VK_LEFT, wParam );
 							jmp skip_proc;
 						endif;
 						
 					case( w.VK_PERIOD )
 						if( ctrl_down ) then
-							// same as ctrl-right
-							// put VK_RIGHT in wParam and let
-							// hred window proc handle it.
-							mov( 1, eax );
+							movzx( ctrl_down, eax );
 							command_cursor_right();
-							//mov(w.VK_RIGHT, wParam );
 							jmp skip_proc;
 						endif;
 
 					case( w.VK_TAB )
-						
 						if( shift_down ) then
 							if( ctrl_down ) then
-								
 								command_reduce_indent();							
-								jmp skip_proc;
 							else
 								command_increase_indent();
-								jmp skip_proc;
 							endif;
+							jmp skip_proc;
 						
 						elseif( config.readBool( s_settings, s_tabsasspace )) then
-							dbg.put("tabs :", strtabs );
 							w.SendMessage( info.hred, w.EM_REPLACESEL,true, strtabs );
 							jmp skip_proc;
 							
 						else
 							// it's a normal tab, let hred handle it
-							dbg.put("tab.....");
 							mov( w.WM_CHAR, uMsg );
 							mov( w.VK_TAB, wParam );
 						endif;
@@ -777,23 +763,20 @@ proc
 							
 							// check to see if we are on line 1
 							if( info.line.number = 0 ) then
-								dbg.put("line = 0/1");
 								command_move_to_bol();
 								xor( eax, eax );
 								clear_keystate();
 								w.CallWindowProc(info.old_proc, hWin, uMsg, w.VK_RETURN, lParam );
+								xor( eax, eax );
 								command_cursor_up();
 								jmp skip_proc;								
 								
 							else
-							
 								// open line above
-								dbg.put("cursor up");
 								xor( eax, eax );
 								command_cursor_up();
 								getInfo(info);
 								jmp do_shift;
-							
 							endif;
 						
 						elseif( shift_down ) then
@@ -811,7 +794,6 @@ proc
 						mov( true, proc_return );
 					
 					case( w.VK_END )
-					
 						if( shift_down ) then
 							command_select_to_eol();
 						else
@@ -831,22 +813,17 @@ proc
 							command_toggle_mark();
 							jmp skip_proc;
 						endif;
-						
-
-					TODO( need to add command bar )
-					//case( w.VK_SLASH )
-						
-						// experimental : do incremental search
-					//	mov( true, info.incremental_search );
 
 					case( w.VK_ESCAPE )
 						dbg.put("esc");
 						w.SendMessage( window.hwnd, w.WM_CLOSE, 0, 0 );
+						jmp skip_proc;
 
 					default
 						//dbg.put("reached default");
 
 				endswitch;
+				mov( false, info.mark ); // any other key will clear the selection.
 			
 			case( w.WM_KEYUP )
 				
@@ -917,15 +894,6 @@ proc
 					jmp skip_proc;
 				endif;
 				
-			case( w.EN_UPDATE )
-				dbg.put(" want update " );
-			//case( w.WM_SETFOCUS )
-			
-				//dbg.put("proc edit got focus");
-				//w.CreateCaret( info.hred, 0, 10, 20 );
-				//w.ShowCaret( info.hred );
-				//jmp skip_proc;
-
 		endswitch;
 			
 		// pass control to the default edit window proc
@@ -1265,10 +1233,10 @@ proc
 			if( info.hred ) then
 				if( config.readBool( s_settings, "Active URL" )) then
 					w.SendMessage( info.hred, w.EM_AUTOURLDETECT, true, NULL);
-					w.SendMessage( info.hred, w.EM_SETEVENTMASK, 0, w.ENM_SELCHANGE | w.ENM_LINK);
+					w.SendMessage( info.hred, w.EM_SETEVENTMASK, 0, w.ENM_SELCHANGE | w.ENM_MOUSEEVENTS | w.ENM_LINK);
 				else
 					w.SendMessage( info.hred, w.EM_AUTOURLDETECT, false, NULL);
-					w.SendMessage( info.hred, w.EM_SETEVENTMASK, 0, w.ENM_SELCHANGE );
+					w.SendMessage( info.hred, w.EM_SETEVENTMASK, 0, w.ENM_SELCHANGE | w.ENM_MOUSEEVENTS );
 				endif;
 				
 				setFormat( info );
@@ -1754,7 +1722,6 @@ proc
 		// on entry, eax will contain desired state of control key
 		// 0 = up, 1 = down
 	begin command_cursor_up;
-		
 		if( info.line.index > 0 ) then
 			clear_keystate();
 			w.CallWindowProc(info.old_proc, info.hred, w.WM_KEYDOWN, w.VK_UP, 0 );
@@ -2061,6 +2028,7 @@ proc
 				w.SetWindowText( info.hred, 0 );		// clear edit window
 				str.cpy( s_untitled, info.filepath );
 				mov( MODE_INSERT, info.mode );
+				mov( false, info.mark );
 				updateStatus();
 				
 			endif;

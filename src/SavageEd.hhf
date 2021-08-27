@@ -7,7 +7,7 @@
 
 readonly
 	
-	version			:string := "SavageEd v0.9.20";
+	version			:string := "SavageEd v0.9.21";
 
 type
 	// Message and dispatch table related definitions:
@@ -295,7 +295,9 @@ static
 	statusParts	:int32[STATUS_PARTS]; @external;
 	default_date_format :string; @external;
 	default_time_format :string; @external;
-	default_extension	:string; @external;	
+	default_extension	:string; @external;
+	shift_down	:boolean; @external;
+	ctrl_down	:boolean; @external;
 
 proc
 	// external declarations

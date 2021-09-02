@@ -1,8 +1,15 @@
 # Change Log
 
-## 08/27/2021
-	0.9.21	- fixed a mouse behavior issue when in marked selection mode
+## 09/01/2021
+	0.9.30	- case changing options now maintain selection, and single action case
+			  changes no longer advance cursor.
+			- fixed ctrl-HOME and ctrl-END to navigate to top and bottom of document
+			- fixed Recent Files menu, now updates as soon as you save a new file
+			- added copy word and delete word to edit menu
+			- fixed a mouse behavior issue when in marked selection mode
 			- any insert change should now deactivate marked selection mode as it should
+
+## 08/27/2021
 	0.9.20	feature changes:
 			- added option for settings Default Extension=
 			  allows setting the default extension that SavageEd appends to

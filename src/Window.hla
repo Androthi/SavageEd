@@ -880,6 +880,9 @@ proc
 		w.AppendMenu( edit_menu, w.MF_STRING, IDM_COPY, "C&opy	Ctrl+C");
 		w.AppendMenu( edit_menu, w.MF_STRING, IDM_PASTE, "&Paste	Ctrl+V");
 		w.AppendMenu( edit_menu, w.MF_STRING, IDM_SELECTALL, "Select &All	Ctrl+A");
+		w.AppendMenu( edit_menu, w.MF_STRING, IDM_COPY_WORD, "Copy Word	Shift+Ctrl+W");
+		w.AppendMenu( edit_menu, w.MF_STRING, IDM_DELETE_WORD, "Delete Word	Ctrl+W");
+		w.AppendMenu( edit_menu, w.MF_STRING, IDM_KILL_LINE, "Kill Line	Ctrl+\");
 		w.AppendMenu( edit_menu, w.MF_SEPARATOR, NULL, NULL);
 		w.AppendMenu( edit_menu, w.MF_STRING, IDM_TO_UPPER, "To Upper Case	Ctrl+U");
 		w.AppendMenu( edit_menu, w.MF_STRING, IDM_TO_LOWER, "To Lower Case	Shift+Ctrl+U");
@@ -1372,6 +1375,7 @@ proc
 			config.deleteItem( s_recent, 20 );
 			
 		endif;
+		updateMenu();
 		ret();
 	end updateRecentLog;
 

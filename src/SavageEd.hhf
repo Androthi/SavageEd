@@ -7,7 +7,7 @@
 
 readonly
 	
-	version			:string := "SavageEd v0.9.21";
+	version			:string := "SavageEd v0.9.30";
 
 type
 	// Message and dispatch table related definitions:
@@ -149,7 +149,10 @@ type
 		IDM_TO_UPPER,
 		IDM_TO_LOWER,
 		IDM_INCREASE_INDENT,
-		IDM_DECREASE_INDENT
+		IDM_DECREASE_INDENT,
+		IDM_COPY_WORD,
+		IDM_DELETE_WORD,
+		IDM_KILL_LINE
 	};
 
 	rect_t:

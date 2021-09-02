@@ -794,16 +794,28 @@ proc
 						mov( true, proc_return );
 					
 					case( w.VK_END )
-						if( shift_down ) then
-							command_select_to_eol();
-						else
-							command_move_to_eol();
+						if( ! ctrl_down ) then
+							if( shift_down ) then
+								command_select_to_eol();
+							else
+								command_move_to_eol();
+							endif;
+							jmp skip_proc;
 						endif;
+						or( 1, eax );
+						clear_keystate();
+						w.CallWindowProc(info.old_proc, info.hred, w.WM_KEYDOWN, w.VK_END, 0 );
 						jmp skip_proc;
 						
 					case( w.VK_HOME )
 					
-						command_move_to_bol();
+						if( !ctrl_down ) then
+							command_move_to_bol();
+							jmp skip_proc;
+						endif;
+						or( 1, eax );
+						clear_keystate();
+						w.CallWindowProc(info.old_proc, info.hred, w.WM_KEYDOWN, w.VK_HOME, 0 );
 						jmp skip_proc;
 					
 					case( w.VK_SPACE )
@@ -1503,11 +1515,17 @@ proc
 
 	end command_selection_to_string;
 
-	command_lowercase_selection	:procedure {@noframe};
+	command_lowercase_selection	:procedure;
+		var
+			start_index	:dword;
+			end_index	:dword;
 	begin command_lowercase_selection;
 		pushad();
 		getInfo( info );
 		mov( info.cursor.start_index, eax );
+		mov( eax, start_index );
+		mov( info.cursor.end_index, end_index );
+
 		if( eax = info.cursor.end_index ) then
 			inc( info.cursor.end_index );
 			w.SendMessage( info.hred, w.EM_SETSEL, info.cursor.start_index, info.cursor.end_index );	
@@ -1517,15 +1535,20 @@ proc
 		str.lower1( esi );
 		w.SendMessage( info.hred, w.EM_REPLACESEL, true, esi );
 		str.free( esi );
+		w.SendMessage( info.hred, w.EM_SETSEL, start_index, end_index );
 		popad();
-		ret();	
 	end command_lowercase_selection;
 
-	command_uppercase_selection	:procedure {@noframe};
+	command_uppercase_selection	:procedure;
+		var
+			start_index	:dword;
+			end_index	:dword;
 	begin command_uppercase_selection;
 		pushad();
 		getInfo( info );
 		mov( info.cursor.start_index, eax );
+		mov( eax, start_index );
+		mov( info.cursor.end_index, end_index );
 		if( eax = info.cursor.end_index ) then
 			inc( info.cursor.end_index );
 			w.SendMessage( info.hred, w.EM_SETSEL, info.cursor.start_index, info.cursor.end_index );	
@@ -1535,8 +1558,8 @@ proc
 		str.upper1( esi );
 		w.SendMessage( info.hred, w.EM_REPLACESEL, true, esi );
 		str.free( esi );
+		w.SendMessage( info.hred, w.EM_SETSEL, start_index, end_index );
 		popad();
-		ret();	
 	end command_uppercase_selection;
 
 	command_edit_ini	:procedure;
@@ -2076,9 +2099,17 @@ proc
 			w.SendMessage(info.hred, w.WM_PASTE,0,0);
 			w.SendMessage(info.hred, w.EM_SETMODIFY, true,0); 	
 			
-		case( IDM_SELECTALL )
-			
+		case( IDM_SELECTALL )	
 			command_select_all();
+			
+		case( IDM_COPY_WORD )
+			command_copy_word();
+			
+		case( IDM_DELETE_WORD )
+			command_delete_word();
+			
+		case( IDM_KILL_LINE )
+			command_cut_line();
 			
 		case( IDM_UNDO )
 		

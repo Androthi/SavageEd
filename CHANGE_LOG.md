@@ -1,5 +1,12 @@
 # Change Log
 
+## 09/04/2021
+	0.9.31	- added special codes to find dialog
+			  while in special codes mode, 
+			  entering \n will find/replace line break characters
+			  entering \t will find/replace tab characters
+			  entering special codes find mode disables incremental find
+
 ## 09/01/2021
 	0.9.30	- case changing options now maintain selection, and single action case
 			  changes no longer advance cursor.

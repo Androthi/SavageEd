@@ -98,7 +98,7 @@ There is a built in quick find feature:
 Pressing F3 without opening find/replace
 dialog will find the next instance of the selected word, or the last word that was searched.
 
-## SavageEd has a pattern finding feature which behaves somewhat different
+### SavageEd has a pattern finding feature which behaves somewhat different
 from standard find/replace.  Some things to consider:
 	To search for patterns, select the "Match Pattern" check box.
 	Pattern searches only works in the 'down' direction
@@ -119,12 +119,20 @@ For example typing in the Find box:
 	- c*e	find the next 'c' character and match every character until the following 'e'
 	- c?t	find the next 'c' character, match any one character and a 't'
 		eg: finds "cat" "cot" "cut"
-	
+
 Further considerations:
 	Patterns searching can be slow in very large files
 	Pattern searching may have unusual effects if multiple
 	special charactes are clumped together, eg: **?*
 
+### Special Codes
+Find dialog has a Special Codes checkbox. Activating this mode will deactivate
+incremental find. You can enter special codes with a backslach '\' followed by
+a code in the find and replace fields.
+
+Codes:
+\n line break characters
+\t tab characters
 
 ## Edit > Insert Date/Time
 Enters the date and time at the current position.

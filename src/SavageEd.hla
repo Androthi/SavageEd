@@ -336,6 +336,8 @@ proc
 		move( &findbuf, ft.lpstrText);
 		dbg.put("find normal : ");
 		dbg.putz( ft.lpstrText );
+		dbg.dumpmem( ft.lpstrText, 10 );
+
 		w.SendMessage( info.hred, w.EM_FINDTEXTEX, opts, &ft );
 		mov( eax, fres );
 		if(eax != -1) then
@@ -485,6 +487,39 @@ proc
 		popabi;
 		ret();
 	end Find;
+
+	expand_codes	:procedure( buf_addr:dword );
+	begin expand_codes;
+		//dbg.enters("expand_codes");
+		pushad();
+		mov( buf_addr, esi );
+		mov( esi, edi );
+		forever
+			mov( [esi], al );
+			breakif( !al );
+			if( al = '\' ) then
+				inc( esi );
+				mov( [esi], al );
+				breakif( !al );
+				if( al = 'n' ) then
+					mov( $0d, (type byte[edi] ));
+					inc( esi );
+				elseif( al = 't' ) then
+					mov( $09, (type byte[edi] ));
+					inc( esi );
+				endif;
+				inc( edi );
+			else
+				mov( al, [edi] );
+				inc( esi );
+				inc( edi );
+			endif;
+		endfor;
+		mov( 0, (type byte[edi] ));
+		dbg.dumpmem( buf_addr, 10 );
+		popad();
+		//dbg.exits("expand_codes");
+	end expand_codes;
 
 
 	Proc_Edit	:procedure( lParam:dword; wParam:dword; uMsg:uns32; hWin:dword );
@@ -916,8 +951,6 @@ proc
 		
 	end Proc_Edit;
 
-
-
 	Proc_FindDlg :procedure( lParam:dword; wParam:dword; uMsg:uns32; hWin:dword );
 	
 		// opens find dialog
@@ -947,6 +980,10 @@ proc
 				w.CheckDlgButton(hWin,IDC_CHK_PATTERN,w.BST_CHECKED);
 			endif;
 			
+			if( info.find_mode.specialcodes ) then
+				w.CheckDlgButton( hWin,IDC_CHK_SPECIAL, w.BST_CHECKED );
+			endif;
+			
 			if( info.find_mode.down ) then
 				mov( IDC_RBN_DOWN, edx );
 			else
@@ -960,35 +997,34 @@ proc
 			shr	(16,edx);
 			and	($ffff,eax);
 			if (edx = w.BN_CLICKED) then
-				
 				if(eax = w.IDOK) then
-					
-					Find();
-					w.SetFocus(window.hfind);
-					
-				elseif(eax = w.IDCANCEL) then
-				
-					w.SendMessage( hWin, w.WM_CLOSE, NULL, NULL );
-					
-				elseif(eax = IDC_BTN_REPLACE) then
-					
-					if (fres!=-1) then
-					
-						w.SendMessage(info.hred,w.EM_EXGETSEL,0,&ft.chrg);
-						w.SendMessage(info.hred,w.EM_REPLACESEL,true, &replacebuf);
-						zstr.len( &replacebuf );
-						w.lstrlen( &replacebuf ); 
-						add(eax,ft.chrg.cpMin);
-						mov(ft.chrg.cpMin,eax);
-						mov(eax,ft.chrg.cpMax);
-						w.SendMessage(info.hred,w.EM_EXSETSEL,0,&ft.chrg);
-						
+					if( info.find_mode.specialcodes ) then
+						expand_codes( &findbuf );
 					endif;
 					Find();
 					w.SetFocus(window.hfind);
+					
+				elseif( eax = w.IDCANCEL ) then
+					w.SendMessage( hWin, w.WM_CLOSE, NULL, NULL );
+					
+				elseif( eax = IDC_BTN_REPLACE ) then
+					if( info.find_mode.specialcodes ) then
+						expand_codes( &findbuf );
+						expand_codes( &replacebuf );
+					endif;
+					if( fres!=-1 ) then
+						w.SendMessage( info.hred, w.EM_EXGETSEL, 0, &ft.chrg );
+						w.SendMessage( info.hred, w.EM_REPLACESEL, true, &replacebuf );
+						zstr.len( &replacebuf );
+						add( eax, ft.chrg.cpMin );
+						mov( ft.chrg.cpMin, eax );
+						mov( eax, ft.chrg.cpMax );
+						w.SendMessage( info.hred, w.EM_EXSETSEL, 0, &ft.chrg );
+					endif;
+					Find();
+					w.SetFocus( window.hfind );
 	
 				elseif (eax = IDC_BTN_REPLACEALL) then
-					
 					mov( true, info.find_mode.down );
 					push( info.cursor.start_index );
 					w.SendMessage (info.hred, w.EM_EXGETSEL, 0, &info.cursor);
@@ -996,76 +1032,65 @@ proc
 					w.SendMessage (info.hred, w.EM_SETSEL, 0, 0);
 					Find();
 					while (fres!=-1) do
-						w.SendMessage(hWin, w.WM_COMMAND, IDC_BTN_REPLACE,0);
+						w.SendMessage( hWin, w.WM_COMMAND, IDC_BTN_REPLACE, 0 );
 					endwhile;
 					pop( info.cursor.start_index );
-					w.SendMessage (info.hred, w.EM_SETSEL, info.cursor.start_index, info.cursor.start_index);
-					w.LockWindowUpdate(NULL);
-					w.SetFocus(window.hfind);
+					w.SendMessage( info.hred, w.EM_SETSEL, info.cursor.start_index, info.cursor.start_index );
+					w.LockWindowUpdate( NULL );
+					w.SetFocus( window.hfind );
 					
 				elseif (eax = IDC_RBN_DOWN) then
-					
 					mov( true, info.find_mode.down );
 					mov	(-1,fres);
 					
 				elseif (eax = IDC_RBN_UP) then
-					
 					mov( false, info.find_mode.down );
 					mov( false, info.find_mode.matchpattern );
 					w.CheckDlgButton( hWin, IDC_CHK_PATTERN, w.BST_UNCHECKED );
 					mov	(-1, fres);
 					
 				elseif (eax = IDC_CHK_MATCHCASE) then
-					
 					w.IsDlgButtonChecked(hWin, IDC_CHK_MATCHCASE);
 					if (eax) then
 						mov( true, info.find_mode.matchcase );
-						
 					else
-						
 						mov( false, info.find_mode.matchcase );
-						
 					endif;
 					mov	(-1, fres);
 					
 				elseif (eax = IDC_CHK_WHOLEWORD) then
-					
 					w.IsDlgButtonChecked(hWin, IDC_CHK_WHOLEWORD);
 					if (eax) then
-						
-						//or	(w.FR_WHOLEWORD, fr);
 						mov( true, info.find_mode.wholeword );
 						mov( false, info.find_mode.matchpattern );
 						w.CheckDlgButton( hWin, IDC_CHK_PATTERN, w.BST_UNCHECKED );
-						
 					else
-						
-						//and(! w.FR_WHOLEWORD,fr);
 						mov( false, info.find_mode.wholeword );
-						
 					endif;
 					mov	(-1,fres);
 					
 				elseif( eax = IDC_CHK_PATTERN ) then
-					
-					w.IsDlgButtonChecked(hWin, IDC_CHK_PATTERN);
+					w.IsDlgButtonChecked( hWin, IDC_CHK_PATTERN );
 					if (eax) then
 						
 						mov( false, info.find_mode.wholeword );
 						mov( true, info.find_mode.matchpattern );
 						w.CheckDlgButton( hWin, IDC_CHK_WHOLEWORD, w.BST_UNCHECKED );
 						w.CheckRadioButton( hWin, IDC_RBN_DOWN, IDC_RBN_UP, IDC_RBN_DOWN );
-						
 					else
-						
 						mov( false, info.find_mode.matchpattern );
-						
 					endif;
 					mov	(-1,fres);
-
+					
+				elseif( eax = IDC_CHK_SPECIAL ) then
+					w.IsDlgButtonChecked( hWin, IDC_CHK_SPECIAL );
+					if( eax ) then
+						mov( true, info.find_mode.specialcodes );
+					else
+						mov( false, info.find_mode.specialcodes );
+					endif;
 				endif;
-	
-	
+				
 			elseif( edx = w.EN_UPDATE ) then
 	
 				push( ebx );
@@ -1077,7 +1102,12 @@ proc
 						w.SendDlgItemMessage(hWin, ebx, w.WM_GETTEXT, @elements(findbuf)-1, &findbuf);
 						mov	(-1, fres);
 						
-						if( ! w.IsDlgButtonChecked(hWin, IDC_CHK_PATTERN) ) then
+						if( ! w.IsDlgButtonChecked( hWin, IDC_CHK_PATTERN ) &&
+							! w.IsDlgButtonChecked( hWin, IDC_CHK_SPECIAL )) then
+							
+							// incremental find only works in normal mode
+							// since special and pattern mode require special parsing
+							
 							getFindMode();
 							findNormal( eax );
 							if( fres != -1 ) then

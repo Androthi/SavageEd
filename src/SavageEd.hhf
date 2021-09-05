@@ -7,7 +7,7 @@
 
 readonly
 	
-	version			:string := "SavageEd v0.9.30";
+	version			:string := "SavageEd v0.9.31";
 
 type
 	// Message and dispatch table related definitions:
@@ -55,6 +55,7 @@ type
 			wholeword	:boolean;
 			matchcase	:boolean;
 			matchpattern:boolean;
+			specialcodes:boolean;
 		endrecord;
 			
 	LineInfo:
@@ -187,6 +188,7 @@ const
 	IDC_RBN_UP              := 2006;
 	IDC_RBN_DOWN            := 2005;
 	IDC_CHK_PATTERN         := 2009;
+	IDC_CHK_SPECIAL			:= 2010;
 	ID_ABOUT                := 6000;
 	ID_ABOUTGRP             := 1001;
 	ID_INPUT                := 3000;

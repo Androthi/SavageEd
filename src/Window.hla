@@ -91,6 +91,7 @@ static
 	default_date_format :string := "MM-dd-yyyy";
 	default_time_format :string := " hh:mm:tt";
 	default_extension	:str.strvar(w.MAX_PATH);	//.string := "";
+	input	:InputInfo;
 	
 proc
 
@@ -1021,7 +1022,7 @@ proc
 	begin setFont;
 		pushabi;
 		mov( inf, esi );
-		w.SendMessage( editesi.hred, w.EM_GETMODIFY,0,0);
+		w.SendMessage( editesi.hred, w.EM_GETMODIFY, 0, 0 );
 		mov( eax, modified );
 		lea( eax, cf );
 		mem2.fillMem( [eax], @size( cf ), 0 );
@@ -1042,23 +1043,24 @@ proc
 		w.SendMessage( info.hred, w.WM_SETFONT, editesi.hfont, true );
 		lea( eax, cf );
 		w.SendMessage( editesi.hred, w.EM_SETCHARFORMAT, w.SCF_ALL, eax );
-		
 		w.SendMessage( editesi.hred, w.EM_SETMODIFY, modified, 0 );
+		setTabs( info );
 		popabi;
 	end setFont;
 
 	setTabs	:procedure (var inf:EditInfo);
 	begin setTabs;
 		pushabi;
-		
 		w.GetDialogBaseUnits();
-		movzx( ax, ecx );		
+		movzx( ax, ecx );
+		config.readUns( s_settings, s_tabs );
 		mul( ecx );
 		shr( 1, eax );
-		
+		//dbg.put("tab distance :", (type uns32 eax));
 		mov( inf, esi );
 		mov( eax, editesi.tabs );
 		lea( eax, editesi.tabs );
+		// this is typically 4*the desired tab spaces
 		w.SendMessage(editesi.hred, w.EM_SETTABSTOPS, 1, eax );
 		
 		// fill the tabs as spaces string
@@ -1073,7 +1075,6 @@ proc
 		dbg.put("strtabs :", strtabs );
 		popabi;
 	end setTabs;
-
 
 	setFormat :procedure( var inf :EditInfo );
 		
@@ -1399,8 +1400,8 @@ proc
 				if( eax = w.IDOK ) then
 					
 					w.GetDlgItemTextA( hWin, IDC_EDT_INPUT, buffer, @size(buffer) );
-					str.a_cpyz( &buffer );
-					mov( eax, return );
+					str.cpyz( &buffer, input.return );
+					mov( input.return, return );
 					
 					w.SendMessage( hWin, w.WM_DESTROY, 0, 0 );
 					
@@ -1423,12 +1424,17 @@ proc
 			
 		elseif( eax = w.WM_INITDIALOG ) then
 			
+			str.cpy( s_empty, input.return );
 			if( lParam ) then
 				w.SetWindowText( hWin, lParam );
 			endif;
 			
 			w.GetDlgItem( hWin, IDC_EDT_INPUT );
-			w.SetFocus( eax );
+			mov( eax, edx );
+			if( str.length( input.initial) > 0 ) then
+				w.SetWindowText( edx, input.initial );
+			endif;
+			w.SetFocus( edx );
 			
 		endif;
 		

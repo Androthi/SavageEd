@@ -7,7 +7,7 @@
 
 readonly
 	
-	version			:string := "SavageEd v0.9.31";
+	version			:string := "SavageEd v0.9.33";
 
 type
 	// Message and dispatch table related definitions:
@@ -69,6 +69,12 @@ type
 		CRLF,
 		LF
 	};
+	
+	InputInfo:
+		record
+			initial	:string;
+			return	:string;
+		endrecord;
 	
 	EditInfo:
 		record
@@ -303,6 +309,7 @@ static
 	default_extension	:string; @external;
 	shift_down	:boolean; @external;
 	ctrl_down	:boolean; @external;
+	input		:InputInfo; @external;
 
 proc
 	// external declarations

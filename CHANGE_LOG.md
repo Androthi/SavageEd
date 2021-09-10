@@ -1,5 +1,9 @@
 # Change Log
 
+## 09/09/2021
+	0.9.33	- input dialog now shows current value of object being changed
+			- fixed tab stops not using proper value
+
 ## 09/04/2021
 	0.9.31	- added special codes to find dialog
 			  while in special codes mode, 

@@ -23,7 +23,7 @@ storage
 	replacebuf		:byte[300];
 	ft				:w.FINDTEXTEX;
 	fres			:int32;
-	return			:string;	// returned from Proc_Input, caller must free string
+	return			:string;	// returned from some dialogs. Doesn't need to be string type.
 	proc_return		:boolean;	// hack needed to ignore a rogue WM_KEYUP being sent from the syetem after startup from commandline or by a keypress 
 
 	customColors:dword[16];
@@ -1216,6 +1216,8 @@ proc
 		mov( str.talloc(400), config_path );
 		mov( str.talloc(1000), build_str );
 		str.cpy( s_empty, default_extension );
+		mov( str.alloc( 500 ), input.return );
+		mov( str.alloc( 500 ), input.initial);
 		getConfigPath( config_path );
 		if( filesys.exists( config_path ) ) then
 			
@@ -1230,6 +1232,7 @@ proc
 			config.create_file( config_path );
 			config.readUns( s_window, "xPos" );
 			mov( eax,window.xPos );
+
 			config.readUns( s_window, "yPos" );
 			mov( eax,window.yPos );
 			config.readUns( s_window, "width" );
@@ -1413,10 +1416,14 @@ proc
 		// opens dialog to set tab width
 	
 	begin setTabWidth;
+		
+		config.readUns( s_settings, s_tabs );
+		dbg.put("tabs :", eax );
+		str.put( input.initial, (type uns32 eax) ); 
 		w.DialogBoxParam( window.hinst, val ID_INPUT, window.hwnd, &Proc_Input, s_inputtab );
 		if( return > 0 ) then
 			try
-				conv.strTou32( return, 0 );
+				conv.strTou32( input.return, 0 );
 				
 			anyexception
 				xor( eax, eax );
@@ -2185,13 +2192,15 @@ proc
 			
 		case( IDM_EDIT_GOTO )
 			
+			str.cpy( s_empty, input.initial );
 			w.DialogBoxParam( window.hinst, val ID_INPUT, hwin, &Proc_Input, s_inputlinen );
 			if( return > 0 ) then
 				
-				dbg.put("query :", return );
+				dbg.put("query :", input.return );
 				
 				try
-					conv.strTou32( return, 0 );
+					//conv.strTou32( return, 0 );
+					conv.strTou32( input.return, 0 );
 					dec(eax);
 					w.SendMessage( info.hred, w.EM_LINEINDEX, eax, 0 );
 					w.SendMessage( info.hred, w.EM_SETSEL, eax, eax );
@@ -2201,13 +2210,10 @@ proc
 					
 					str.init( &buffer, 100 );
 					mov( eax, edi );
-					str.put( (type string edi), "Can't go to line ", return );
+					str.put( (type string edi), "Can't go to line ", input.return );
 					Error( edi, true );
 					
 				endtry;
-					
-				str.free( return );
-				mov( 0, return );
 				
 			endif;
 			
@@ -2298,21 +2304,19 @@ proc
 			endif;
 			
 		case( IDM_DATE_FORMAT )
+			config.readString( s_settings, "Date Format", input.initial );
 			w.DialogBoxParam( window.hinst, val ID_INPUT, hwin, &Proc_Input, s_set_date_format );
 			if( return > 0 ) then
-				dbg.put("query :", return );
-				config.writeString( s_settings, "Date Format", return ); 
-				str.free( return );
-				mov( 0, return );
+				dbg.put("query :", input.return );
+				config.writeString( s_settings, "Date Format", input.return );
 			endif;
 
 		case( IDM_TIME_FORMAT )
+			config.readString( s_settings, "Time Format", input.initial );
 			w.DialogBoxParam( window.hinst, val ID_INPUT, hwin, &Proc_Input, s_set_time_format );
 			if( return > 0 ) then
-				dbg.put("query :", return );
-				config.writeString( s_settings, "Time Format", return ); 
-				str.free( return );
-				mov( 0, return );
+				dbg.put("query :", input.return );
+				config.writeString( s_settings, "Time Format", return );
 			endif;
 		
 		case( IDM_INCREASE_INDENT )
@@ -2322,12 +2326,11 @@ proc
 			command_reduce_indent();
 		
 		case( IDM_DEFAULT_EXT )
+			config.readString( s_settings, "Default Extension", input.initial );
 			w.DialogBoxParam( window.hinst, val ID_INPUT, hwin, &Proc_Input, s_set_default_extension );
 			if( return > 0 ) then
-				dbg.put("query :", return );
-				str.cpy( return, default_extension ); 
-				str.free( return );
-				mov( 0, return );
+				dbg.put("query :", input.return );
+				str.cpy( input.return, default_extension ); 
 			else
 				str.cpy( s_empty, default_extension );
 			endif;

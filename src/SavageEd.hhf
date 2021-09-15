@@ -5,9 +5,7 @@
 	#includeonce("hide\dbgwin.hhf")
 	#includeonce("w32\shell32.hhf" )
 
-readonly
-	
-	version			:string := "SavageEd v0.9.33";
+
 
 type
 	// Message and dispatch table related definitions:
@@ -189,6 +187,7 @@ const
 	IDC_REPLACETEXT         := 2002;
 	IDC_BTN_REPLACE         := 2007;
 	IDC_BTN_REPLACEALL      := 2008;
+	IDC_BTN_REPLACESEL		:= 2011;
 	IDC_CHK_MATCHCASE       := 2003;
 	IDC_CHK_WHOLEWORD       := 2004;
 	IDC_RBN_UP              := 2006;
@@ -221,6 +220,7 @@ const
 	
 	szLINEBUFFER	:= 3000;	
 	
+	MINUS_ONE		:= $FFFF_FFFF;
 
 
 const
@@ -298,6 +298,7 @@ readonly;
 	s_savetitle		:string; @external;
 	
 	curdir			:byte; @external;
+	version			:string; @external;
 	
 static
 	// temp, move into list, and attach list to window record

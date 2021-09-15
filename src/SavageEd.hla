@@ -6,6 +6,10 @@ program SavageEd;
 	?@nostackalign := true;
 
 readonly
+
+	version			:string := "SavageEd v0.9.35";
+	
+	
 	// WM_COMMAND message table, wparam items go here
 	command_table	:MsgProcPtr_t; @nostorage;
 		MsgProcPtr_t
@@ -447,8 +451,7 @@ proc
 		ret();
 	end getFindMode;
 
-	
-	Find :procedure {@noframe};
+	Find :procedure( with_index:uns32 );
 	
 		// looks for selection
 		// searches for text based on user settings
@@ -466,7 +469,8 @@ proc
 				// currently selected text
 				mov( eax, ft.chrg.cpMin );
 			endif;
-			mov( -1, ft.chrg.cpMax );
+			
+			mov( with_index, ft.chrg.cpMax );
 
 		else
 
@@ -485,7 +489,6 @@ proc
 			
 		endif;
 		popabi;
-		ret();
 	end Find;
 
 	expand_codes	:procedure( buf_addr:dword );
@@ -954,6 +957,9 @@ proc
 	Proc_FindDlg :procedure( lParam:dword; wParam:dword; uMsg:uns32; hWin:dword );
 	
 		// opens find dialog
+		var
+			cursor	:range;
+			
 
 	begin	Proc_FindDlg;
 		pushabi;
@@ -1001,7 +1007,7 @@ proc
 					if( info.find_mode.specialcodes ) then
 						expand_codes( &findbuf );
 					endif;
-					Find();
+					Find( MINUS_ONE );
 					w.SetFocus(window.hfind);
 					
 				elseif( eax = w.IDCANCEL ) then
@@ -1021,21 +1027,46 @@ proc
 						mov( eax, ft.chrg.cpMax );
 						w.SendMessage( info.hred, w.EM_EXSETSEL, 0, &ft.chrg );
 					endif;
-					Find();
+					Find( MINUS_ONE );
 					w.SetFocus( window.hfind );
 	
-				elseif (eax = IDC_BTN_REPLACEALL) then
+				elseif( eax = IDC_BTN_REPLACEALL ) then
 					mov( true, info.find_mode.down );
 					push( info.cursor.start_index );
-					w.SendMessage (info.hred, w.EM_EXGETSEL, 0, &info.cursor);
-					w.LockWindowUpdate(info.hred);
-					w.SendMessage (info.hred, w.EM_SETSEL, 0, 0);
-					Find();
+					w.SendMessage( info.hred, w.EM_EXGETSEL, 0, &info.cursor );
+					w.SendMessage( info.hred, w.EM_SETSEL, info.cursor.start_index, info.cursor.start_index );
+					w.LockWindowUpdate( info.hred );
+					Find( MINUS_ONE );
 					while (fres!=-1) do
 						w.SendMessage( hWin, w.WM_COMMAND, IDC_BTN_REPLACE, 0 );
 					endwhile;
 					pop( info.cursor.start_index );
 					w.SendMessage( info.hred, w.EM_SETSEL, info.cursor.start_index, info.cursor.start_index );
+					w.LockWindowUpdate( NULL );
+					w.SetFocus( window.hfind );
+					
+				elseif( eax = IDC_BTN_REPLACESEL ) then
+					if( info.find_mode.specialcodes ) then
+						expand_codes( &findbuf );
+						expand_codes( &replacebuf );
+					endif;
+					mov( true, info.find_mode.down );
+					push( info.cursor.start_index );
+					lea( esi, cursor );
+					w.SendMessage( info.hred, w.EM_EXGETSEL, 0, esi );
+					w.LockWindowUpdate( info.hred );
+					w.SendMessage( info.hred, w.EM_SETSEL, cursor.start_index, cursor.start_index );
+					Find( cursor.end_index );
+					while (fres!=-1) do
+						w.SendMessage( info.hred, w.EM_EXGETSEL, 0, &ft.chrg );
+						dbg.put("found, replacing with :");
+						dbg.putz( &replacebuf );
+						w.SendMessage( info.hred, w.EM_REPLACESEL, true, &replacebuf );
+						Find( cursor.end_index );
+					endwhile;
+					pop( info.cursor.start_index );
+					w.SendMessage( info.hred, w.EM_SETSEL, info.cursor.start_index, info.cursor.start_index );
+					w.SendMessage( info.hred, w.EM_SCROLLCARET, 0, 0 );
 					w.LockWindowUpdate( NULL );
 					w.SetFocus( window.hfind );
 					
@@ -1509,7 +1540,6 @@ proc
 		// 0 = up, 1 = down
 	
 	begin clear_keystate;
-		dbg.put("entry eax :", eax );
 		push( eax );
 		mem2.fillMem( &keystate, @elements( keystate ), 0 );
 		if( info.mark || shift_down ) then
@@ -2174,7 +2204,7 @@ proc
 			mov( findbuf[0], al );
 			test(al,al);
 			if (@nz) then
-				Find(); //(w.FR_DOWN);
+				Find( MINUS_ONE );
 			endif;
 			
 		case(IDM_FINDPREV )
@@ -2187,7 +2217,7 @@ proc
 			mov (findbuf[0], al);
 			test(al,al);
 			if (@nz) then
-				Find(); //(0);
+				Find( MINUS_ONE );
 			endif;
 			
 		case( IDM_EDIT_GOTO )

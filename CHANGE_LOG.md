@@ -1,5 +1,10 @@
 # Change Log
 
+#3 09.15.2921
+	0.9.35	- added Replace Sel to Find dialog. Clicking this scopes the replace all to
+			  the currently selected block of text.
+			- fixed bug in Replace All that was ignoring any selected text.
+
 ## 09/09/2021
 	0.9.33	- input dialog now shows current value of object being changed
 			- fixed tab stops not using proper value

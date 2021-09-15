@@ -98,6 +98,8 @@ There is a built in quick find feature:
 Pressing F3 without opening find/replace
 dialog will find the next instance of the selected word, or the last word that was searched.
 
+Clicking 'Replace Sel' will run a 'Replace All' command with the scope of the currently selected text.
+
 ### SavageEd has a pattern finding feature which behaves somewhat different
 from standard find/replace.  Some things to consider:
 	To search for patterns, select the "Match Pattern" check box.

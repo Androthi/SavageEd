@@ -735,8 +735,6 @@ proc
 		ret();
 		
 	end JumpLog;
-	
-
 
 	Cmd_File_Quit :procedure( hwin:dword; wparam:dword; lparam:dword );
 	begin Cmd_File_Quit;
@@ -744,7 +742,6 @@ proc
 		w.SendMessage (hwin, w.WM_CLOSE, 0, 0 );
 		
 	end Cmd_File_Quit;
-
 
 	checkLog :procedure{ @noframe };
 
@@ -792,7 +789,6 @@ proc
 	
 	end GetSelText;
 	
-
 	AboutDlgProc :procedure( lParam:dword; wParam:dword; uMsg:uns32; hDlg:dword);
 	
 		// opens a window to display version number

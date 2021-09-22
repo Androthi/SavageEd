@@ -7,7 +7,7 @@ program SavageEd;
 
 readonly
 
-	version			:string := "SavageEd v0.9.35";
+	version			:string := "SavageEd v0.10.00";
 	
 	
 	// WM_COMMAND message table, wparam items go here
@@ -2256,7 +2256,7 @@ proc
 			selectFont();
 			w.SetFocus(info.hred);
 			
-		case( IDM_FORGROUND )
+		case( IDM_FOREGROUND )
 			
 			if( selectColor() )  then
 				move( return, window.textColor );

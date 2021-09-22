@@ -901,7 +901,7 @@ proc
 		//
 
 		w.AppendMenu( options_menu, w.MF_STRING, IDM_FONT, "&Font...");
-		w.AppendMenu( options_menu, w.MF_STRING, IDM_FORGROUND, "&Forground Color...");
+		w.AppendMenu( options_menu, w.MF_STRING, IDM_FOREGROUND, "&Foreground Color...");
 		w.AppendMenu( options_menu, w.MF_STRING, IDM_BACKGROUND, "&Background Color...");
 		w.AppendMenu( options_menu, w.MF_SEPARATOR, NULL, NULL);
 		w.AppendMenu( options_menu, w.MF_STRING, IDM_AUTO, "&Autosave	F2");
@@ -1170,6 +1170,13 @@ proc
 				str.cpyz( &buffer, build_str );
 				loadFile( build_str );
 				if (eax) then
+					if( config.readBool( s_settings, s_rememberpos )) then
+						config.readUns( s_settings, "Start Position");
+						mov( eax, info.cursor.start_index );
+						mov( eax, info.cursor.end_index );
+						w.SendMessage( info.hred, w.EM_EXSETSEL, 0, &info.cursor );
+						w.SendMessage( info.hred,w.EM_SCROLLCARET,0,0 );
+					endif;
 					jmp skipOpenRecent;
 				endif;
 			else

@@ -1,6 +1,11 @@
 # Change Log
 
-#3 09.15.2921
+## 09/22/2021
+	0.10.00	- remember position now works if file name to open is entered on command line.
+			- fixed foreground spelling error
+			- v0.10.00 finalized
+
+## 09/15/2021
 	0.9.35	- added Replace Sel to Find dialog. Clicking this scopes the replace all to
 			  the currently selected block of text.
 			- fixed bug in Replace All that was ignoring any selected text.

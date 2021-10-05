@@ -5,11 +5,14 @@
 	#includeonce("hide\dbgwin.hhf")
 	#includeonce("w32\shell32.hhf" )
 
-
+//bm=typeconsts
+const
+	typeConsts( edit, Edit_Node, edi, esi, ebx)
+	typeConsts( charrange, range, esi )
+	typeConsts( config, tConfig, esi )
 
 type
 	// Message and dispatch table related definitions:
-		  
 	MsgProc_t:	procedure( hwin:dword; wParam:dword; lParam:dword );
 	
 	MsgProcPtr_t:
@@ -24,28 +27,10 @@ type
 			end_index	:uns32;
 		endrecord;
 
-	wnd_settings:
-		record
-			hinst		:dword;
-			hwnd		:dword;
-			hmenu		:dword;
-			hstatus		:dword;
-			hsubmenu	:dword;
-			hcontextmenu:dword;
-			hfind		:dword;
-			habout		:dword;
-			hredDLL		:dword;
-			msg			:w.MSG;
-			xPos		:uns32;
-			yPos		:uns32;
-			width		:uns32;
-			height		:uns32;
-
-			// text and background colors
-			textColor	:w.COLORREF;
-			backColor	:w.COLORREF;
-			
-		endrecord;
+	LineBreak: enum {
+		CRLF,
+		LF
+	};
 
 	FindMode:
 		record
@@ -55,34 +40,26 @@ type
 			matchpattern:boolean;
 			specialcodes:boolean;
 		endrecord;
-			
+	
 	LineInfo:
 		record
 			number	:uns32;
 			index	:uns32;
 			length	:uns32;
 		endrecord;
-	
-	LineBreak: enum {
-		CRLF,
-		LF
-	};
-	
+
 	InputInfo:
 		record
 			initial	:string;
 			return	:string;
 		endrecord;
 	
-	EditInfo:
-		record
+	Edit_Node:
+		record inherits (baseNode_t)
 			filepath:string;
 			old_proc:dword; // original window proc of edit control
 			hred	:dword;
-			hfont	:dword;
-			tabs	:uns32; // tabs in edit control size
-			find_mode	:FindMode;
-						
+			
 			// selection
 			cursor				:range;
 			column_index		:uns32;
@@ -90,13 +67,12 @@ type
 			// line info of cursor, has number, index and length
 			line				:LineInfo;
 			lines				:uns32;
-			line_break			:LineBreak;
-			mode				:byte;
 			mark_point			:uns32;
 			mark				:boolean;
 			word_wrap			:boolean;
-
+			mode				:byte;
 		endrecord;
+	
 	
 	edit_mode	:enum {
 		MODE_INSERT,
@@ -104,6 +80,33 @@ type
 		MODE_VIEWDOCS
 
 	};
+
+	wnd_settings:
+		record
+			hinst		:dword;
+			hwnd		:dword;
+			hmenu		:dword;
+			hstatus		:dword;
+			hsubmenu	:dword;
+			hcontextmenu:dword;
+			hfind		:dword;
+			hfont		:dword;
+			habout		:dword;
+			hredDLL		:dword;
+			buffer_focus:pointer to Edit_Node;
+			msg			:w.MSG;
+			xPos		:uns32;
+			yPos		:uns32;
+			width		:uns32;
+			height		:uns32;
+			line_break	:LineBreak;
+			find_mode	:FindMode;
+			tabs		:uns32;
+
+			// text and background colors
+			textColor	:w.COLORREF;
+			backColor	:w.COLORREF;
+		endrecord;
 
 	menu_items :enum {
 		IDM_NEW,
@@ -127,6 +130,8 @@ type
 		IDM_REPLACE,
 		IDM_EDIT_GOTO,
 		IDM_DATE_TIME,
+		IDM_DATE,
+		IDM_TIME,
 		IDM_FONT,
 		IDM_BACKGROUND,
 		IDM_FOREGROUND, 
@@ -222,13 +227,6 @@ const
 	
 	MINUS_ONE		:= $FFFF_FFFF;
 
-
-const
-	
-	typeConsts( edit, EditInfo, edi, esi)
-	typeConsts( charrange, range, esi )
-	typeConsts( config, tConfig, esi )
-
 storage
 	window		:wnd_settings; @external;
 	
@@ -302,7 +300,7 @@ readonly;
 	
 static
 	// temp, move into list, and attach list to window record
-	info		:EditInfo; @external;
+	info		:Edit_Node; @external;
 	strtabs		:string; @external;	
 	statusParts	:int32[STATUS_PARTS]; @external;
 	default_date_format :string; @external;
@@ -320,7 +318,7 @@ proc
 	Msg_Command :procedure( hwin:dword; wparam:dword; lparam:dword ); @external;
 	loadFile :procedure( filename:string ); @external;
 	updateRecentLog :procedure; @external;
-	getInfo :procedure ( var inf:EditInfo); @external;
+	getInfo :procedure ( var inf:Edit_Node); @external;
 	getConfigPath :procedure( s:string ); @external;
 	command_copy_word :procedure; @external;
 	command_delete_word :procedure; @external;
@@ -358,29 +356,25 @@ proc
 	setText :procedure( hfile:dword ); @external;
 	Cmd_File_Quit :procedure( hwin:dword; wparam:dword; lparam:dword ); @external;
 	checkLog :procedure; @external;
+	command_insert_date_time :procedure; @external;
+	command_insert_date :procedure; @external;
 	command_insert_time :procedure; @external;
 	GetSelText :procedure( lpBuff:dword ); @external;
 	AboutDlgProc :procedure( lParam:dword; wParam:dword; uMsg:uns32; hDlg:dword); @external;
 	AddMenus :procedure; @external;
-	setFormat :procedure( var inf :EditInfo ); @external;
+	setFormat :procedure( var inf :Edit_Node ); @external;
 	Proc_Edit	:procedure( lParam:dword; wParam:dword; uMsg:uns32; hWin:dword ); @external;
 	newInstance :procedure( filename:string ); @external;
 	openRecent :procedure(id:dword); @external;
 	Proc_Input :procedure( lParam:dword; wParam:dword; uMsg:uns32; hWin:dword ); @external;
-	setFont	:procedure( var inf	:EditInfo ); @external;
-	setTabs	:procedure (var inf:EditInfo); @external;
+	setFont	:procedure( var inf	:Edit_Node ); @external;
+	setTabs	:procedure (var inf:Edit_Node); @external;
 	command_select_to_eol :procedure; @external;
 	command_move_line_up :procedure; @external;
 	command_move_line_down :procedure; @external; 
 	command_uppercase_selection :procedure; @external;
 	command_lowercase_selection	:procedure; @external;
 	clear_keystate	:procedure; @external;
-	updateActiveURL :procedure; @external;
+	updateActiveURL :procedure( var inf :Edit_Node); @external;
 
-	
-	
-		
-	
-	
-	
 	

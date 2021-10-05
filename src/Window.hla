@@ -35,7 +35,7 @@ readonly
 	ClassName	:string:= "SavageEDClass";
 	AppName		:string:= "SavageEd";
 	
-	RichEditDLL		:string := "riched20.dll";
+	RichEditDLL		:string := "riched32.dll";
 	
 	// strings and error messages
 	s_recent	:string := "Recent Files";
@@ -73,7 +73,7 @@ readonly
 	s_inputtab	:string := "Enter tab spacing in number of characters";
 	
 	s_document		:string := "SavageEd.md";	
-	s_missingDLL	:string := "Could not open Riched20.dll";
+	s_missingDLL	:string := "Could not open Riched32.dll";
 	s_missingDocs	:string := "Missing Documents: SavageEd.md";
 	s_nosave		:string := "Could Not Save File";
 	s_noopen		:string := "Unable to open file";
@@ -293,7 +293,7 @@ proc
 		config.writeUns( s_window, "yPos", window.yPos );
 		config.writeUns( s_window, "width", window.width );
 		config.writeUns( s_window, "height", window.height );
-		config.writeBin( s_text, s_find, &info.find_mode, @size( info.find_mode ) );
+		config.writeBin( s_text, s_find, &window.find_mode, @size( window.find_mode ) );
 		
 		config.writeUns( s_settings, "Start Position", info.cursor.start_index );
 		
@@ -361,7 +361,7 @@ proc
 	
 	begin StreamOutProc;
 		
-		if( info.line_break = LF ) then
+		if( window.line_break = LF ) then
 			
 			// user request LF linebreaks, begin hacky stuff
 			// i'll note all the hacky stuff i do. 
@@ -676,43 +676,55 @@ proc
 		
 		endif;
 	end setText;
-	
-	command_insert_time :procedure;
-	
-		// inserts date/time at cursor
-		//var systime		:w.SYSTEMTIME;
 		
-		var
-			format	:string;
-
+	command_insert_time :procedure;
+		// inserts time with formatted string at cursor
+		var format :string;
+			
 	begin command_insert_time;
-	
+		mov( str.talloc(1000), format );
+		if( !config.readString( s_settings, "Time Format", format )) then
+			str.cpy( default_time_format, format ); 
+		endif;
+
+		w.GetTimeFormat(w.LOCALE_USER_DEFAULT,
+						NULL,
+						NULL,
+						format,
+						&buffer,
+						@size(buffer));
+		w.SendMessage(info.hred, w.EM_REPLACESEL, true, &buffer);		
+	end command_insert_time;
+
+	command_insert_date :procedure;
+		// inserts date with formatted string at cursor
+		var format :string;
+			
+	begin command_insert_date;
 		mov( str.talloc(1000), format );
 		if( !config.readString( s_settings, "Date Format", format )) then
 			str.cpy( default_date_format, format ); 
 		endif;
 				
-		w.GetDateFormat(	w.LOCALE_USER_DEFAULT,
+		w.GetDateFormat(w.LOCALE_USER_DEFAULT,
 						NULL,
 						NULL,
 						format,
 						&buffer,
 						@size(buffer));
 		w.SendMessage(info.hred, w.EM_REPLACESEL, true, &buffer);
-
-		if( !config.readString( s_settings, "Time Format", format )) then
-			str.cpy( default_time_format, format ); 
-		endif;
-
-		w.GetTimeFormat(	w.LOCALE_USER_DEFAULT,
-						NULL,
-						NULL,
-						format,
-						&buffer,
-						@size(buffer));
-		w.SendMessage(info.hred, w.EM_REPLACESEL, true, &buffer);
+	end command_insert_date;
 	
-	end command_insert_time;
+	command_insert_date_time :procedure;
+	
+		// inserts date/time at cursor
+
+	begin command_insert_date_time;
+	
+		command_insert_date();
+		command_insert_time();
+	
+	end command_insert_date_time;
 	
 	JumpLog :procedure 
 		
@@ -834,6 +846,7 @@ proc
 			help_menu		:dword;
 			recent_menu 	:dword;
 			line_break_menu	:dword;
+			date_time_menu	:dword;
 			build_str		:string;
 			
 	begin AddMenus;
@@ -847,6 +860,7 @@ proc
 		mov( w.CreateMenu(), view_menu);
 		mov( w.CreateMenu(), help_menu);
 		mov( w.CreatePopupMenu(), recent_menu );
+		mov( w.CreatePopupMenu(), date_time_menu );
 		mov( w.CreatePopupMenu(), line_break_menu );
 		
 		//
@@ -891,9 +905,12 @@ proc
 		w.AppendMenu( edit_menu, w.MF_STRING, IDM_FINDPREV, "Find &Previous	Ctrl+F3");
 		w.AppendMenu( edit_menu, w.MF_STRING, IDM_EDIT_GOTO, "&Goto Line	Ctrl+G");
 		w.AppendMenu( edit_menu, w.MF_SEPARATOR, NULL, NULL);
-		w.AppendMenu( edit_menu, w.MF_STRING, IDM_DATE_TIME, "&Insert Date/Time	F5");
-		w.AppendMenu( edit_menu, w.MF_STRING, IDM_DATE_FORMAT, "Set Date Format...");
-		w.AppendMenu( edit_menu, w.MF_STRING, IDM_TIME_FORMAT, "Set Time Format...");
+		w.AppendMenu( edit_menu, w.MF_STRING | w.MF_POPUP, date_time_menu, "Date/Time" );
+			w.AppendMenu( date_time_menu, w.MF_STRING, IDM_DATE_TIME, "&Insert Date/Time	F5");
+			w.AppendMenu( date_time_menu, w.MF_STRING, IDM_DATE, "Insert &Date	Shift+F5");
+			w.AppendMenu( date_time_menu, w.MF_STRING, IDM_TIME, "Insert &Time	Ctrl+F5");
+			w.AppendMenu( date_time_menu, w.MF_STRING, IDM_DATE_FORMAT, "Set Date Format...");
+			w.AppendMenu( date_time_menu, w.MF_STRING, IDM_TIME_FORMAT, "Set Time Format...");
 		w.AppendMenu( window.hmenu, w.MF_POPUP, edit_menu, "&Edit");
 
 		//
@@ -1009,7 +1026,7 @@ proc
 		
 	end Msg_Context;
 
-	setFont	:procedure( var inf	:EditInfo );
+	setFont	:procedure( var inf	:Edit_Node );
 		
 		var
 			cf		:w.CHARFORMAT2;
@@ -1036,15 +1053,15 @@ proc
 		mov( eax, cf.yHeight );
 		push( window.textColor );
 		pop( cf.crTextColor );
-		w.SendMessage( info.hred, w.WM_SETFONT, editesi.hfont, true );
+		w.SendMessage( editesi.hred, w.WM_SETFONT, window.hfont, true );
 		lea( eax, cf );
 		w.SendMessage( editesi.hred, w.EM_SETCHARFORMAT, w.SCF_ALL, eax );
 		w.SendMessage( editesi.hred, w.EM_SETMODIFY, modified, 0 );
-		setTabs( info );
+		setTabs( inf );
 		popabi;
 	end setFont;
 
-	setTabs	:procedure (var inf:EditInfo);
+	setTabs	:procedure (var inf:Edit_Node);
 	begin setTabs;
 		pushabi;
 		w.GetDialogBaseUnits();
@@ -1054,10 +1071,9 @@ proc
 		shr( 1, eax );
 		//dbg.put("tab distance :", (type uns32 eax));
 		mov( inf, esi );
-		mov( eax, editesi.tabs );
-		lea( eax, editesi.tabs );
+		mov( eax, window.tabs );
 		// this is typically 4*the desired tab spaces
-		w.SendMessage(editesi.hred, w.EM_SETTABSTOPS, 1, eax );
+		w.SendMessage(editesi.hred, w.EM_SETTABSTOPS, 1, &window.tabs );
 		
 		// fill the tabs as spaces string
 		str.cpy( "", strtabs );
@@ -1072,7 +1088,7 @@ proc
 		popabi;
 	end setTabs;
 
-	setFormat :procedure( var inf :EditInfo );
+	setFormat :procedure( var inf :Edit_Node );
 		
 		// initializes a new edit buffer
 		// call function to set background and foreground colors, font and margins
@@ -1090,16 +1106,19 @@ proc
 		w.SendMessage( editesi.hred, w.EM_SETMARGINS, w.EC_LEFTMARGIN | w.EC_RIGHTMARGIN, 5<<16 | 5 );
 	end setFormat;
 	
-	updateActiveURL :procedure;
+	updateActiveURL :procedure( var inf :Edit_Node);
 	begin updateActiveURL;
+		pushabi;
+		mov( inf, ebx );
 		if( config.readBool( s_settings, "Active URL" ) ) then
-			w.SendMessage( info.hred, w.EM_AUTOURLDETECT, true, NULL);
-			w.SendMessage( info.hred, w.EM_SETEVENTMASK, 0, w.ENM_SELCHANGE | w.ENM_MOUSEEVENTS | w.ENM_LINK );
+			w.SendMessage( editebx.hred, w.EM_AUTOURLDETECT, true, NULL);
+			w.SendMessage( editebx.hred, w.EM_SETEVENTMASK, 0, w.ENM_SELCHANGE | w.ENM_MOUSEEVENTS | w.ENM_LINK );
 		else
-			w.SendMessage( info.hred, w.EM_AUTOURLDETECT, false, NULL);
-			w.SendMessage( info.hred, w.EM_SETEVENTMASK, 0, w.ENM_SELCHANGE | w.ENM_MOUSEEVENTS );
+			w.SendMessage( editebx.hred, w.EM_AUTOURLDETECT, false, NULL);
+			w.SendMessage( editebx.hred, w.EM_SETEVENTMASK, 0, w.ENM_SELCHANGE | w.ENM_MOUSEEVENTS );
 		endif;
-		setFormat( info );		
+		setFormat( inf );
+		popabi;
 	end updateActiveURL;
 	
 	Msg_Create :procedure( hwin:dword; wParam:dword; lparam:dword );
@@ -1150,7 +1169,7 @@ proc
 		w.SetWindowLong(info.hred, w.GWL_WNDPROC, &Proc_Edit);
 		mov( eax, info.old_proc);
 		
-		updateActiveURL();
+		updateActiveURL( info );
 		w.SetFocus( info.hred );
 
 		// check for a filename passed as an argument and try to open that file.
@@ -1175,7 +1194,6 @@ proc
 						mov( eax, info.cursor.start_index );
 						mov( eax, info.cursor.end_index );
 						w.SendMessage( info.hred, w.EM_EXSETSEL, 0, &info.cursor );
-						w.SendMessage( info.hred,w.EM_SCROLLCARET,0,0 );
 					endif;
 					jmp skipOpenRecent;
 				endif;
@@ -1215,7 +1233,6 @@ proc
 					mov( eax, info.cursor.start_index );
 					mov( eax, info.cursor.end_index );
 					w.SendMessage( info.hred, w.EM_EXSETSEL, 0, &info.cursor );
-					w.SendMessage( info.hred,w.EM_SCROLLCARET,0,0 );
 				endif;
 				
 			endif;

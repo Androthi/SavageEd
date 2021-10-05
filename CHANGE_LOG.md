@@ -1,5 +1,15 @@
 # Change Log
 
+## 10/05/2021
+	0.10.05 Feature changes:
+			- Date/Time now has a submenu, with separate options to display only date, or only time.
+			Internal changes:
+			- experimental: is now using richedit 3.x rather than richedit 2.x
+			- now requires hidelib v1.72.01 to build
+			- started transition of 'info' into a discreet default buffer. Future access of info
+			  should be done through the pointer window.buffer_focus, as that will be guaranteed
+			  (once the transition is complete) to always contain the buffer currently in focus.
+
 ## 09/22/2021
 	0.10.00	- remember position now works if file name to open is entered on command line.
 			- fixed foreground spelling error
@@ -204,7 +214,7 @@
 	0.3.0	- new versioning system
 			- fixed window drifting
 ## 11/27/2010
-	0.02.00 - fixed Save As not renameing properly
+	0.02.00 - fixed Save As not renaming properly
 	        - added Set Tabs option
 	0.01.00 - first public beta release of SavageEd
 

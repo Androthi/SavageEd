@@ -7,17 +7,7 @@ program SavageEd;
 
 readonly
 
-	version			:string := "SavageEd v0.10.00";
-	
-	
-	// WM_COMMAND message table, wparam items go here
-	command_table	:MsgProcPtr_t; @nostorage;
-		MsgProcPtr_t
-			MsgProcPtr_t:[ IDM_QUIT,	&Cmd_File_Quit	],
-			
-			// add more commands here
-			MsgProcPtr_t:[ 0,				NULL			];
-
+	version			:string := "SavageEd v0.10.05";
 
 storage
 	logfont			:w.LOGFONT;
@@ -27,8 +17,7 @@ storage
 	replacebuf		:byte[300];
 	ft				:w.FINDTEXTEX;
 	fres			:int32;
-	return			:string;	// returned from some dialogs. Doesn't need to be string type.
-	proc_return		:boolean;	// hack needed to ignore a rogue WM_KEYUP being sent from the syetem after startup from commandline or by a keypress 
+	return			:string;	// returned from some dialogs. Doesn't need to be string type. 
 
 	customColors:dword[16];
 	find_range	:w.TEXTRANGE;
@@ -36,17 +25,27 @@ storage
 	config		:tConfig;
 	window		:wnd_settings;
 	align(4);
+	
+	proc_return		:boolean;	// hack needed to ignore a rogue WM_KEYUP being sent from the syetem after startup from commandline or by a keypress
+	align(4);
 
 static
-	Align(4);
-	info		:EditInfo;
+	align(4);
+	info		:Edit_Node;
 	statusParts	:int32[STATUS_PARTS]:=[POS_LINES, POS_READONLY, POS_LINEBREAK, POS_MARK, POS_MODE];
 	strtabs		:str.strvar( w.MAX_PATH ); // user specified tabs converted to spaces
+	
+	BufferList	:tBaseList;
+	
+	align(4);
 	keystate	:byte[256];
 
+	align(4);
 	ctrl_down	:boolean;
 	shift_down	:boolean;
 	alt_down	:boolean;
+	
+	align(4);
 	
 proc
 
@@ -71,12 +70,12 @@ proc
 		w._ChooseFont(choose_font);
 		if (eax) then
 
-			w.DeleteObject(info.hfont);
+			w.DeleteObject(window.hfont);
 			w.CreateFontIndirect(logfont);
-			mov( eax, info.hfont );
+			mov( eax, window.hfont );
 			push( choose_font.rgbColors );
 			pop( window.textColor );
-			setFont( info );
+			setFont( window.buffer_focus );
 			config.writeHex( s_text, s_background_color, window.backColor);
 			config.writeHex( s_text, s_text_color, window.textColor);
 
@@ -169,15 +168,17 @@ proc
 		w.GetSubMenu( eax, 0 );
 		w.ModifyMenu( eax, 8, w.MF_BYPOSITION | w.MF_POPUP| w.MF_ENABLED,
 					window.hsubmenu, s_recent );
-	
+		
+		mov( window.buffer_focus, ebx );
+		
 		if( config.readBool( s_settings, s_wrap )) then
 			
 			w.CheckMenuItem( window.hmenu, IDM_WRAP, w.MF_BYCOMMAND | w.MF_CHECKED );
-			w.SendMessage( info.hred, w.EM_SETTARGETDEVICE, NULL, 0 );
-			mov( true, info.word_wrap );
+			w.SendMessage( editebx.hred, w.EM_SETTARGETDEVICE, NULL, 0 );
+			mov( true, editebx.word_wrap );
 		else
 			w.SendMessage( info.hred, w.EM_SETTARGETDEVICE, NULL, 1 );
-			mov( false, info.word_wrap );
+			mov( false, editebx.word_wrap );
 		endif;
 		
 		if( config.readBool( s_settings, s_readonly )) then
@@ -353,7 +354,7 @@ proc
 
 			// done search, reset and start searching from top
 			// or bottom
-			if( info.find_mode.down ) then
+			if( window.find_mode.down ) then
 				w.SendMessage( info.hred, w.EM_SETSEL, 0, 0 );
 				mov( 0, ft.chrg.cpMin );
 				
@@ -400,7 +401,7 @@ proc
 		w.SendMessage( info.hred, w.EM_GETTEXTRANGE, 0, &find_range );
 		mov( hmem, esi );
 		str.cpyz( &findbuf, build_str );
-		scan.pfind( build_str, info.find_mode.matchcase );
+		scan.pfind( build_str, window.find_mode.matchcase );
 		jnc retFalse;
 		
 		// we found the pattern...
@@ -439,13 +440,13 @@ proc
 	getFindMode :procedure {@noframe};
 	begin getFindMode;
 		xor( eax, eax );
-		if( info.find_mode.down ) then
+		if( window.find_mode.down ) then
 			or( w.FR_DOWN, eax );
 		endif;
-		if( info.find_mode.matchcase ) then
+		if( window.find_mode.matchcase ) then
 			or( w.FR_MATCHCASE, eax );
 		endif;
-		if( info.find_mode.wholeword ) then
+		if( window.find_mode.wholeword ) then
 			or( w.FR_WHOLEWORD, eax );
 		endif;
 		ret();
@@ -461,7 +462,7 @@ proc
 		dbg.put("find");
 		w.SendMessage(info.hred, w.EM_EXGETSEL,0, &ft.chrg);
 		
-		if( info.find_mode.down ) then
+		if( window.find_mode.down ) then
 			
 			mov( ft.chrg.cpMax, eax );
 			if( eax != ft.chrg.cpMin ) then
@@ -479,7 +480,7 @@ proc
 		endif;
 		
 		getFindMode();
-		if( info.find_mode.matchpattern ) then
+		if( window.find_mode.matchpattern ) then
 			
 			findPattern( eax );
 			
@@ -744,7 +745,14 @@ proc
 
 					case( w.VK_F5 )
 						mov( false, info.mark );
-						Msg_Command( window.hwnd, IDM_DATE_TIME,0 );
+						if( shift_down ) then
+							Msg_Command( window.hwnd, IDM_DATE, 0 );
+						elseif( ctrl_down ) then
+							Msg_Command( window.hwnd, IDM_TIME, 0 );
+						else
+							Msg_Command( window.hwnd, IDM_DATE_TIME, 0 );
+						endif;
+							
 						jmp skip_proc;
 						
 					case( w.VK_F6 )
@@ -894,7 +902,7 @@ proc
 						if( proc_return ) then
 							if( config.readBool( s_settings, s_autoindent ) ) then
 	
-								w.SendMessage( info.hred, w.EM_LINEFROMCHAR, -1, 0);
+								w.SendMessage( info.hred, w.EM_EXLINEFROMCHAR, 0, info.cursor.start_index);
 								dec( eax );
 								mov( szLINEBUFFER-1, (type word buffer[0]));
 								w.SendMessage( info.hred, w.EM_GETLINE, eax, &buffer );
@@ -974,23 +982,23 @@ proc
 			w.SendDlgItemMessage(hWin,IDC_REPLACETEXT,w.EM_LIMITTEXT, @elements(replacebuf)-1, 0);
 			w.SendDlgItemMessage(hWin,IDC_REPLACETEXT,w.WM_SETTEXT,0, &replacebuf);
 			
-			if( info.find_mode.matchcase ) then
+			if( window.find_mode.matchcase ) then
 				w.CheckDlgButton(hWin,IDC_CHK_MATCHCASE,w.BST_CHECKED);
 			endif;
 			
-			if( info.find_mode.wholeword ) then
+			if( window.find_mode.wholeword ) then
 				w.CheckDlgButton(hWin,IDC_CHK_WHOLEWORD,w.BST_CHECKED);
 			endif;
 			
-			if( info.find_mode.matchpattern ) then
+			if( window.find_mode.matchpattern ) then
 				w.CheckDlgButton(hWin,IDC_CHK_PATTERN,w.BST_CHECKED);
 			endif;
 			
-			if( info.find_mode.specialcodes ) then
+			if( window.find_mode.specialcodes ) then
 				w.CheckDlgButton( hWin,IDC_CHK_SPECIAL, w.BST_CHECKED );
 			endif;
 			
-			if( info.find_mode.down ) then
+			if( window.find_mode.down ) then
 				mov( IDC_RBN_DOWN, edx );
 			else
 				mov( IDC_RBN_UP, edx );
@@ -1004,7 +1012,7 @@ proc
 			and	($ffff,eax);
 			if (edx = w.BN_CLICKED) then
 				if(eax = w.IDOK) then
-					if( info.find_mode.specialcodes ) then
+					if( window.find_mode.specialcodes ) then
 						expand_codes( &findbuf );
 					endif;
 					Find( MINUS_ONE );
@@ -1014,7 +1022,7 @@ proc
 					w.SendMessage( hWin, w.WM_CLOSE, NULL, NULL );
 					
 				elseif( eax = IDC_BTN_REPLACE ) then
-					if( info.find_mode.specialcodes ) then
+					if( window.find_mode.specialcodes ) then
 						expand_codes( &findbuf );
 						expand_codes( &replacebuf );
 					endif;
@@ -1031,7 +1039,7 @@ proc
 					w.SetFocus( window.hfind );
 	
 				elseif( eax = IDC_BTN_REPLACEALL ) then
-					mov( true, info.find_mode.down );
+					mov( true, window.find_mode.down );
 					push( info.cursor.start_index );
 					w.SendMessage( info.hred, w.EM_EXGETSEL, 0, &info.cursor );
 					w.SendMessage( info.hred, w.EM_SETSEL, info.cursor.start_index, info.cursor.start_index );
@@ -1046,11 +1054,11 @@ proc
 					w.SetFocus( window.hfind );
 					
 				elseif( eax = IDC_BTN_REPLACESEL ) then
-					if( info.find_mode.specialcodes ) then
+					if( window.find_mode.specialcodes ) then
 						expand_codes( &findbuf );
 						expand_codes( &replacebuf );
 					endif;
-					mov( true, info.find_mode.down );
+					mov( true, window.find_mode.down );
 					push( info.cursor.start_index );
 					lea( esi, cursor );
 					w.SendMessage( info.hred, w.EM_EXGETSEL, 0, esi );
@@ -1071,32 +1079,32 @@ proc
 					w.SetFocus( window.hfind );
 					
 				elseif (eax = IDC_RBN_DOWN) then
-					mov( true, info.find_mode.down );
+					mov( true, window.find_mode.down );
 					mov	(-1,fres);
 					
 				elseif (eax = IDC_RBN_UP) then
-					mov( false, info.find_mode.down );
-					mov( false, info.find_mode.matchpattern );
+					mov( false, window.find_mode.down );
+					mov( false, window.find_mode.matchpattern );
 					w.CheckDlgButton( hWin, IDC_CHK_PATTERN, w.BST_UNCHECKED );
 					mov	(-1, fres);
 					
 				elseif (eax = IDC_CHK_MATCHCASE) then
 					w.IsDlgButtonChecked(hWin, IDC_CHK_MATCHCASE);
 					if (eax) then
-						mov( true, info.find_mode.matchcase );
+						mov( true, window.find_mode.matchcase );
 					else
-						mov( false, info.find_mode.matchcase );
+						mov( false, window.find_mode.matchcase );
 					endif;
 					mov	(-1, fres);
 					
 				elseif (eax = IDC_CHK_WHOLEWORD) then
 					w.IsDlgButtonChecked(hWin, IDC_CHK_WHOLEWORD);
 					if (eax) then
-						mov( true, info.find_mode.wholeword );
-						mov( false, info.find_mode.matchpattern );
+						mov( true, window.find_mode.wholeword );
+						mov( false, window.find_mode.matchpattern );
 						w.CheckDlgButton( hWin, IDC_CHK_PATTERN, w.BST_UNCHECKED );
 					else
-						mov( false, info.find_mode.wholeword );
+						mov( false, window.find_mode.wholeword );
 					endif;
 					mov	(-1,fres);
 					
@@ -1104,21 +1112,21 @@ proc
 					w.IsDlgButtonChecked( hWin, IDC_CHK_PATTERN );
 					if (eax) then
 						
-						mov( false, info.find_mode.wholeword );
-						mov( true, info.find_mode.matchpattern );
+						mov( false, window.find_mode.wholeword );
+						mov( true, window.find_mode.matchpattern );
 						w.CheckDlgButton( hWin, IDC_CHK_WHOLEWORD, w.BST_UNCHECKED );
 						w.CheckRadioButton( hWin, IDC_RBN_DOWN, IDC_RBN_UP, IDC_RBN_DOWN );
 					else
-						mov( false, info.find_mode.matchpattern );
+						mov( false, window.find_mode.matchpattern );
 					endif;
 					mov	(-1,fres);
 					
 				elseif( eax = IDC_CHK_SPECIAL ) then
 					w.IsDlgButtonChecked( hWin, IDC_CHK_SPECIAL );
 					if( eax ) then
-						mov( true, info.find_mode.specialcodes );
+						mov( true, window.find_mode.specialcodes );
 					else
-						mov( false, info.find_mode.specialcodes );
+						mov( false, window.find_mode.specialcodes );
 					endif;
 				endif;
 				
@@ -1174,8 +1182,7 @@ proc
 		endif;
 		mov	(true, eax);
 		popabi;
-	end Proc_FindDlg;	
-
+	end Proc_FindDlg;
 
 	getConfigPath :procedure( s:string );
 	
@@ -1253,10 +1260,10 @@ proc
 		if( filesys.exists( config_path ) ) then
 			
 			// set default find mode
-			mov( false, info.find_mode.down );
-			mov( false, info.find_mode.wholeword );
-			mov( false, info.find_mode.matchcase );
-			mov( false, info.find_mode.matchpattern );
+			mov( false, window.find_mode.down );
+			mov( false, window.find_mode.wholeword );
+			mov( false, window.find_mode.matchcase );
+			mov( false, window.find_mode.matchpattern );
 			
 			// config file exists, read it and
 			// apply settings as per file.
@@ -1294,13 +1301,13 @@ proc
 			
 			config.readString( s_settings, "Line Break", build_str );
 			if( str.eq( build_str, "LF" )) then
-				mov( LF, info.line_break );
+				mov( LF, window.line_break );
 			else
-				mov( CRLF, info.line_break );
+				mov( CRLF, window.line_break );
 			endif;
 
 			config.readBin( s_text, s_custcolors, &customColors, @size( customColors ) );
-			config.readBin( s_text, s_find, &info.find_mode, @size( info.find_mode ) );
+			config.readBin( s_text, s_find, &window.find_mode, @size( window.find_mode ) );
 			
 			if( config.readString(s_settings, "Default Extension", build_str )) then
 				str.cpy( build_str, default_extension );
@@ -1367,7 +1374,7 @@ proc
 		endif;
 		
 		w.CreateFontIndirect( &logfont );
-		mov( eax, info.hfont );
+		mov( eax, window.hfont );
 		
 	dbg.exits("initConfig");
 	end initConfig;
@@ -1488,7 +1495,7 @@ proc
 	end getLineInfo;
 
 	
-	getInfo: procedure ( var inf:EditInfo );
+	getInfo: procedure ( var inf:Edit_Node );
 	
 		// collects informaiton about the edit state
 		// and stores it in the info structure
@@ -1502,10 +1509,7 @@ proc
 		mov( inf, edi );
 		lea( esi, editedi.cursor );
 		w.SendMessage( info.hred, w.EM_EXGETSEL, 0, esi );
-//		dbg.put("mark point   :", editedi.mark_point );
-//		dbg.put("start_index  :", editedi.cursor.start_index );
-//		dbg.put("end_index    :", editedi.cursor.end_index );
-		
+
 		// if mark is set, find the relative direction
 		if( editedi.mark ) then
 			mov( editedi.mark_point, eax );
@@ -1520,13 +1524,13 @@ proc
 			mov( editedi.cursor.start_index, index );
 		endif;
 			
-		w.SendMessage( info.hred, w.EM_EXLINEFROMCHAR, 0, index );
+		w.SendMessage( editedi.hred, w.EM_EXLINEFROMCHAR, 0, index );
 		mov( eax, editedi.line.number );
 		getLineInfo(editedi.line);
 		mov( index, eax );
 		sub( editedi.line.index, eax );
 		mov( eax, editedi.column_index );
-		w.SendMessage( info.hred, w.EM_GETLINECOUNT, 0, 0 );
+		w.SendMessage( editedi.hred, w.EM_GETLINECOUNT, 0, 0 );
 		mov( eax, editedi.lines );
 
 		pop( esi );
@@ -1556,7 +1560,7 @@ proc
 
 //bm=editcommands
 
-	command_selection_to_string	:procedure( var inf:EditInfo );
+	command_selection_to_string	:procedure( var inf:Edit_Node );
 	
 		var
 			sel_string	:string;
@@ -2196,7 +2200,7 @@ proc
 		
 		case( IDM_FINDNEXT )
 			
-			mov( true, info.find_mode.down );
+			mov( true, window.find_mode.down );
 			
 			if (! window.hfind) then
 				GetSelText(&findbuf);
@@ -2209,7 +2213,7 @@ proc
 			
 		case(IDM_FINDPREV )
 			
-			mov( false, info.find_mode.down );
+			mov( false, window.find_mode.down );
 			
 			if (! window.hfind) then
 				GetSelText(&findbuf);
@@ -2248,7 +2252,12 @@ proc
 			endif;
 			
 		case( IDM_DATE_TIME )
-	
+			command_insert_date_time();
+			
+		case( IDM_DATE )
+			command_insert_date();
+		
+		case( IDM_TIME )
 			command_insert_time();
 			
 		case( IDM_FONT )
@@ -2321,14 +2330,14 @@ proc
 			if( config.readBool( s_settings, "Active URL" )) then
 				w.CheckMenuItem( window.hmenu, IDM_ACTIVE_URL, w.MF_BYCOMMAND | w.MF_UNCHECKED );
 				config.writeBool( s_settings, "Active URL", false );
-				updateActiveURL();
+				updateActiveURL( info );
 			else
 				getConfirm();
 				if( ! eax ) then
 					w.CheckMenuItem( window.hmenu, IDM_ACTIVE_URL, w.MF_BYCOMMAND | w.MF_CHECKED );
 					config.writeBool( s_settings, "Active URL", true );
 					saveFile( info.filepath, false );
-					updateActiveURL();
+					updateActiveURL( info );
 					loadFile( info.filepath );
 				endif;
 			endif;
@@ -2568,8 +2577,19 @@ begin SavageEd;
 	dbg.cls;
 	mov( false, proc_return );
 	mem2.fillMem( &keystate, @elements( keystate ), 0 );
+	
+	// NOTE: This is the initial implementation of the buffer list. currently it holds
+	//	  only one buffer, which is identified as 'info'
+		
+	// TODO: migrate all cases where 'info' is used to use window.buffer_focus instead,
+	//	  window.buffer_focus will always contain the current buffer in focus.
+	BufferList.create();
+	BufferList.append( (type baseNode_t info) );
+	mov( &info, window.buffer_focus );
+
 	initConfig();
-	initWindow();
+	initWindow();	
+
 	mov( MODE_INSERT, info.mode );
 	cmp( eax, 0 );
 	je _exit;
@@ -2589,9 +2609,10 @@ begin SavageEd;
 	// unnecessary, but helpful to know what needs to be freed in case
 	// we decide to move things around later
 	w.DestroyWindow( info.hred );
-	w.DeleteObject( info.hfont );
+	w.DeleteObject( window.hfont );
 	w.FreeLibrary(window.hredDLL);
 	str.free( info.filepath );
+	BufferList.destroy();
 
 	mov( window.msg.wParam, eax );
 

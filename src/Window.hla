@@ -1026,6 +1026,7 @@ proc
 		
 	end Msg_Context;
 
+	NOTE( "now that we are using window.buffer_focus, do we really need to pass Edit_Node ?" )
 	setFont	:procedure( var inf	:Edit_Node );
 		
 		var
@@ -1060,7 +1061,8 @@ proc
 		setTabs( inf );
 		popabi;
 	end setFont;
-
+	
+	NOTE( "now that we are using window.buffer_focus, do we really need to pass Edit_Node ?" )
 	setTabs	:procedure (var inf:Edit_Node);
 	begin setTabs;
 		pushabi;
@@ -1088,6 +1090,7 @@ proc
 		popabi;
 	end setTabs;
 
+	NOTE( "now that we are using window.buffer_focus, do we really need to pass Edit_Node ?" )
 	setFormat :procedure( var inf :Edit_Node );
 		
 		// initializes a new edit buffer
@@ -1106,6 +1109,7 @@ proc
 		w.SendMessage( editesi.hred, w.EM_SETMARGINS, w.EC_LEFTMARGIN | w.EC_RIGHTMARGIN, 5<<16 | 5 );
 	end setFormat;
 	
+	NOTE( "now that we are using window.buffer_focus, do we really need to pass Edit_Node ?" )
 	updateActiveURL :procedure( var inf :Edit_Node);
 	begin updateActiveURL;
 		pushabi;
@@ -1134,12 +1138,13 @@ proc
 		
 	begin Msg_Create;
 		
+		TODO( "this should create a new Edit_Node object and add it to the list" )
 		mov( str.talloc( 1000 ), build_str );
-		mov(hwin, eax);
-		mov(eax, window.hwnd);
+		mov( hwin, eax );
+		mov( eax, window.hwnd );
 		w.CreateMenu();
-		mov(eax, window.hmenu);
-		w.SetMenu(window.hwnd, window.hmenu);
+		mov( eax, window.hmenu );
+		w.SetMenu( window.hwnd, window.hmenu );
 		AddMenus();
 		w.GetSubMenu( window.hmenu, 1 );
 		mov( eax, window.hcontextmenu );
@@ -1257,6 +1262,7 @@ proc
 
 		mov( lparam, edx );
 		mov( (type w.NMHDR[EDX]).code, eax );
+		mov( window.buffer_focus, ebx );
 			
 		if( eax = w.EN_SELCHANGE ) then	
 		//	dbg.put("selchange");
@@ -1286,7 +1292,7 @@ proc
 				mov( (type w.ENLINK[edx]).chrg.cpMin, text_range.chrg.cpMin );
 				mov( (type w.ENLINK[edx]).chrg.cpMax, text_range.chrg.cpMax );
 				lea( eax, text_range );
-				w.SendMessage( info.hred, w.EM_GETTEXTRANGE, 0, eax );
+				w.SendMessage( editebx.hred, w.EM_GETTEXTRANGE, 0, eax );
 				w.ShellExecute( NULL, NULL, &buffer, NULL, NULL, 1 );  
 
 			endif;
@@ -1294,7 +1300,7 @@ proc
 		elseif( eax = w.EN_MSGFILTER ) then
 			if( (type w.MSGFILTER[EDX]).msg = w.WM_LBUTTONDOWN ) then
 				mov( shift_down, dl );
-				if( info.mark ) then
+				if( editebx.mark ) then
 					mov( true, shift_down );
 				else
 					mov( false, shift_down );
@@ -1383,13 +1389,14 @@ proc
 	
 	begin updateRecentLog;
 		dbg.put("updateRecentLog");
-		if( config.findItem ( s_recent, info.filepath ) <> -1 ) then
+		mov( window.buffer_focus, ebx );
+		if( config.findItem ( s_recent, editebx.filepath ) <> -1 ) then
 			
 			config.deleteItem ("Recent Files", eax);
 			
 		endif;
 		
-		config.insertItem( s_recent, 0, info.filepath );
+		config.insertItem( s_recent, 0, editebx.filepath );
 		
 		if( config.getItemCount( s_recent ) > 20) then
 			

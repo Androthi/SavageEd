@@ -7,7 +7,7 @@
 
 //bm=typeconsts
 const
-	typeConsts( edit, Edit_Node, edi, esi, ebx)
+	typeConsts( edit, Edit_Node, edi, esi, ebx, edx)
 	typeConsts( charrange, range, esi )
 	typeConsts( config, tConfig, esi )
 

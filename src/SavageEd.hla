@@ -7,7 +7,7 @@ program SavageEd;
 
 readonly
 
-	version			:string := "SavageEd v0.10.05";
+	version			:string := "SavageEd v0.10.16";
 
 storage
 	logfont			:w.LOGFONT;
@@ -26,7 +26,7 @@ storage
 	window		:wnd_settings;
 	align(4);
 	
-	proc_return		:boolean;	// hack needed to ignore a rogue WM_KEYUP being sent from the syetem after startup from commandline or by a keypress
+	proc_return		:boolean;	// hack needed to ignore a rogue WM_KEYUP being sent from the system after startup from commandline or by a keypress
 	align(4);
 
 static
@@ -177,7 +177,7 @@ proc
 			w.SendMessage( editebx.hred, w.EM_SETTARGETDEVICE, NULL, 0 );
 			mov( true, editebx.word_wrap );
 		else
-			w.SendMessage( info.hred, w.EM_SETTARGETDEVICE, NULL, 1 );
+			w.SendMessage( editebx.hred, w.EM_SETTARGETDEVICE, NULL, 1 );
 			mov( false, editebx.word_wrap );
 		endif;
 		
@@ -267,23 +267,21 @@ proc
 		
 		mov( str.talloc( 1000 ), extract_str );
 		try
-			
 			fileio.open( filename, fileio.r );
 			mov( eax, hfile );
 			setText( hfile );
 			fileio.close( hfile );
-			str.cpy( filename, info.filepath );
-
-			dbg.put("filename = ", filename );
+			mov( window.buffer_focus, ebx );
+			str.cpy( filename, editebx.filepath );
 			filesys.extractExt( filename, extract_str );
 			checkLog();
 			updateRecentLog();
 
 			// clear the undo buffer since we probably made some formatting and alterations
 			// to the file
-			w.SendMessage( info.hred, w.EM_EMPTYUNDOBUFFER, 0, 0 );
-			mov( MODE_INSERT, info.mode );
-			mov( false, info.mark );
+			w.SendMessage( editebx.hred, w.EM_EMPTYUNDOBUFFER, 0, 0 );
+			mov( MODE_INSERT, editebx.mode );
+			mov( false, editebx.mark );
 			or( 1, eax );
 			
 		anyexception
@@ -307,6 +305,9 @@ proc
 				
 	begin fileOpen;
 	
+		NOTE( "a new version of this procedure will be needed to create a new edit list item"
+			  "once multi-buffers and tab bar are implemented" )
+	
 		mov( str.talloc( 1000 ), file_name );
 		lea( eax, ofn );
 		mem2.fillMem( [eax], @size( ofn ), 0 );
@@ -323,11 +324,10 @@ proc
 		
 		mov( w.OFN_PATHMUSTEXIST | w.OFN_FILEMUSTEXIST | w.OFN_LONGNAMES,ofn.Flags );
 		w.GetOpenFileName( ofn );
-			if( eax ) then
-				str.cpyz( &buffer, file_name );
-				loadFile( file_name );
-			endif;
-		w.SetFocus( info.hred );
+		if( eax ) then
+			str.cpyz( &buffer, file_name );
+			loadFile( file_name );
+		endif;
 
 	end fileOpen;
 		
@@ -337,30 +337,31 @@ proc
 	
 	begin findNormal;
 		
-		mov( false, info.mark );
+		mov( window.buffer_focus, ebx );
+		mov( false, editebx.mark );
 		move( &findbuf, ft.lpstrText);
 		dbg.put("find normal : ");
 		dbg.putz( ft.lpstrText );
 		dbg.dumpmem( ft.lpstrText, 10 );
 
-		w.SendMessage( info.hred, w.EM_FINDTEXTEX, opts, &ft );
+		w.SendMessage( editebx.hred, w.EM_FINDTEXTEX, opts, &ft );
 		mov( eax, fres );
 		if(eax != -1) then
 	
-			w.SendMessage( info.hred, w.EM_EXSETSEL, 0, &ft.chrgText );
-			w.SendMessage( info.hred,w.EM_SCROLLCARET,0,0 );
+			w.SendMessage( editebx.hred, w.EM_EXSETSEL, 0, &ft.chrgText );
+			w.SendMessage( editebx.hred,w.EM_SCROLLCARET,0,0 );
 	
 		else
 
 			// done search, reset and start searching from top
 			// or bottom
 			if( window.find_mode.down ) then
-				w.SendMessage( info.hred, w.EM_SETSEL, 0, 0 );
+				w.SendMessage( editebx.hred, w.EM_SETSEL, 0, 0 );
 				mov( 0, ft.chrg.cpMin );
 				
 			else
-				w.SendMessage( info.hred, w.WM_GETTEXTLENGTH, 0, 0 );
-				w.SendMessage( info.hred, w.EM_SETSEL, eax, eax );
+				w.SendMessage( editebx.hred, w.WM_GETTEXTLENGTH, 0, 0 );
+				w.SendMessage( editebx.hred, w.EM_SETSEL, eax, eax );
 			endif;
 		endif;
 		
@@ -382,14 +383,15 @@ proc
 		
 		mov( str.talloc( 1000 ), build_str );
 		lea( eax, start_pos );
-		lea( ebx, end_pos );
-		w.SendMessage( info.hred, w.EM_GETSEL, eax, ebx );
+		lea( ecx, end_pos );
+		mov( window.buffer_focus, ebx );
+		w.SendMessage( editebx.hred, w.EM_GETSEL, eax, ecx );
 		cmp( (type byte findbuf[0]), 0 );
 		mov( 0, hmem );
 		je retFalse;
-		mov( false, info.mark );
+		mov( false, editebx.mark );
 		move( ft.chrg.cpMin, find_range.chrg.cpMin );
-		w.SendMessage( info.hred, w.WM_GETTEXTLENGTH, 0, 0 );
+		w.SendMessage( editebx.hred, w.WM_GETTEXTLENGTH, 0, 0 );
 		mov( eax, find_range.chrg.cpMax );
 		sub( ft.chrg.cpMin, eax );
 		
@@ -398,9 +400,10 @@ proc
 		mov( eax, hmem );
 		mov( eax, find_range.lpstrText );
 		
-		w.SendMessage( info.hred, w.EM_GETTEXTRANGE, 0, &find_range );
+		w.SendMessage( editebx.hred, w.EM_GETTEXTRANGE, 0, &find_range );
 		mov( hmem, esi );
 		str.cpyz( &findbuf, build_str );
+		dbg.put("pattern find :", build_str );
 		scan.pfind( build_str, window.find_mode.matchcase );
 		jnc retFalse;
 		
@@ -417,13 +420,13 @@ proc
 		push( ft.chrg.cpMin );
 		pop( ft.chrg.cpMax );
 		add( eax, ft.chrg.cpMax );
-		w.SendMessage( info.hred, w.EM_EXSETSEL, 0, &ft.chrg );
-		w.SendMessage( info.hred,w.EM_SCROLLCARET,0,0 );
+		w.SendMessage( editebx.hred, w.EM_EXSETSEL, 0, &ft.chrg );
+		w.SendMessage( editebx.hred,w.EM_SCROLLCARET,0,0 );
 		
 		jmp done;
 		
 		retFalse:
-			w.SendMessage( info.hred, w.EM_SETSEL, start_pos, end_pos );
+			w.SendMessage( editebx.hred, w.EM_SETSEL, start_pos, end_pos );
 			mov( 0, ft.chrg.cpMin );
 			mov( -1, fres );
 			
@@ -460,7 +463,8 @@ proc
 	begin Find;
 		pushabi;
 		dbg.put("find");
-		w.SendMessage(info.hred, w.EM_EXGETSEL,0, &ft.chrg);
+		mov( window.buffer_focus, ebx );
+		w.SendMessage(editebx.hred, w.EM_EXGETSEL,0, &ft.chrg);
 		
 		if( window.find_mode.down ) then
 			
@@ -538,7 +542,8 @@ proc
 			if we open any dialog while processing a key stroke
 			set ctrl_down to false since the key_up
 			message will be lost in the dialog's window proc)
-			
+		
+		mov( window.buffer_focus, ebx );
 		mov( uMsg, eax );
 		switch( eax )
 
@@ -592,9 +597,10 @@ proc
 					
 					case( w.VK_D )
 						if( ctrl_down ) then
-							inc( info.cursor.end_index );
-							w.SendMessage( info.hred, w.EM_EXSETSEL, 0, &info.cursor );
-							w.SendMessage( info.hred, w.EM_REPLACESEL,true, s_empty );
+							inc( editebx.cursor.end_index );
+							lea( eax, editebx.cursor );
+							w.SendMessage( editebx.hred, w.EM_EXSETSEL, 0, eax );
+							w.SendMessage( editebx.hred, w.EM_REPLACESEL,true, s_empty );
 							jmp skip_proc;
 						endif;
 					
@@ -611,7 +617,7 @@ proc
 					case( w.VK_E )
 						if( ctrl_down ) then
 							command_select_to_eol();
-							w.SendMessage( info.hred, w.EM_REPLACESEL,true, s_empty );
+							w.SendMessage( editebx.hred, w.EM_REPLACESEL,true, s_empty );
 							jmp skip_proc;
 						endif;
 					
@@ -744,7 +750,7 @@ proc
 						jmp skip_proc;
 
 					case( w.VK_F5 )
-						mov( false, info.mark );
+						mov( false, editebx.mark );
 						if( shift_down ) then
 							Msg_Command( window.hwnd, IDM_DATE, 0 );
 						elseif( ctrl_down ) then
@@ -783,7 +789,7 @@ proc
 							jmp skip_proc;
 						
 						elseif( config.readBool( s_settings, s_tabsasspace )) then
-							w.SendMessage( info.hred, w.EM_REPLACESEL,true, strtabs );
+							w.SendMessage( editebx.hred, w.EM_REPLACESEL, true, strtabs );
 							jmp skip_proc;
 							
 						else
@@ -808,11 +814,11 @@ proc
 						if( ctrl_down ) then
 							
 							// check to see if we are on line 1
-							if( info.line.number = 0 ) then
+							if( editebx.line.number = 0 ) then
 								command_move_to_bol();
 								xor( eax, eax );
 								clear_keystate();
-								w.CallWindowProc(info.old_proc, hWin, uMsg, w.VK_RETURN, lParam );
+								w.CallWindowProc(editebx.old_proc, hWin, uMsg, w.VK_RETURN, lParam );
 								xor( eax, eax );
 								command_cursor_up();
 								jmp skip_proc;								
@@ -821,7 +827,7 @@ proc
 								// open line above
 								xor( eax, eax );
 								command_cursor_up();
-								getInfo(info);
+								getInfo( window.buffer_focus );
 								jmp do_shift;
 							endif;
 						
@@ -831,8 +837,8 @@ proc
 							mov( false, shift_down );
 							//open line below
 							// if we are not at eol, then move to eol
-							mov( info.column_index, eax );
-							if( info.line.length != eax ) then
+							mov( editebx.column_index, eax );
+							if( editebx.line.length != eax ) then
 								command_move_to_eol();
 							endif;
 						endif;
@@ -850,7 +856,7 @@ proc
 						endif;
 						or( 1, eax );
 						clear_keystate();
-						w.CallWindowProc(info.old_proc, info.hred, w.WM_KEYDOWN, w.VK_END, 0 );
+						w.CallWindowProc(editebx.old_proc, editebx.hred, w.WM_KEYDOWN, w.VK_END, 0 );
 						jmp skip_proc;
 						
 					case( w.VK_HOME )
@@ -861,7 +867,7 @@ proc
 						endif;
 						or( 1, eax );
 						clear_keystate();
-						w.CallWindowProc(info.old_proc, info.hred, w.WM_KEYDOWN, w.VK_HOME, 0 );
+						w.CallWindowProc(editebx.old_proc, editebx.hred, w.WM_KEYDOWN, w.VK_HOME, 0 );
 						jmp skip_proc;
 					
 					case( w.VK_SPACE )
@@ -881,7 +887,7 @@ proc
 						//dbg.put("reached default");
 
 				endswitch;
-				mov( false, info.mark ); // any other key will clear the selection.
+				mov( false, editebx.mark ); // any other key will clear the selection.
 			
 			case( w.WM_KEYUP )
 				
@@ -902,10 +908,10 @@ proc
 						if( proc_return ) then
 							if( config.readBool( s_settings, s_autoindent ) ) then
 	
-								w.SendMessage( info.hred, w.EM_EXLINEFROMCHAR, 0, info.cursor.start_index);
+								w.SendMessage( editebx.hred, w.EM_EXLINEFROMCHAR, 0, editebx.cursor.start_index);
 								dec( eax );
 								mov( szLINEBUFFER-1, (type word buffer[0]));
-								w.SendMessage( info.hred, w.EM_GETLINE, eax, &buffer );
+								w.SendMessage( editebx.hred, w.EM_GETLINE, eax, &buffer );
 								if( eax ) then
 									xor( ecx, ecx );
 									while( eax ) do
@@ -934,8 +940,8 @@ proc
 											mov( dl, buffer[eax] );
 										endfor;
 										mov( 0, buffer[eax] );
-										w.SendMessage( info.hred, w.EM_REPLACESEL,true, &buffer );
-										w.SendMessage( info.hred, w.EM_SCROLLCARET,0,0);
+										w.SendMessage( editebx.hred, w.EM_REPLACESEL,true, &buffer );
+										w.SendMessage( editebx.hred, w.EM_SCROLLCARET,0,0);
 									endif;
 								endif;
 							endif;
@@ -955,7 +961,7 @@ proc
 		endswitch;
 			
 		// pass control to the default edit window proc
-		w.CallWindowProc(info.old_proc, hWin, uMsg, wParam, lParam );
+		w.CallWindowProc(editebx.old_proc, hWin, uMsg, wParam, lParam );
 		
 		skip_proc:
 			// jump here to prevent richedit processing the key press
@@ -971,7 +977,8 @@ proc
 
 	begin	Proc_FindDlg;
 		pushabi;
-		mov(uMsg,eax);
+		mov( uMsg, eax );
+		mov( window.buffer_focus, ebx );
 		if (eax = w.WM_INITDIALOG) then
 			mov	(hWin, eax);
 			mov	(eax,window.hfind);
@@ -1027,29 +1034,31 @@ proc
 						expand_codes( &replacebuf );
 					endif;
 					if( fres!=-1 ) then
-						w.SendMessage( info.hred, w.EM_EXGETSEL, 0, &ft.chrg );
-						w.SendMessage( info.hred, w.EM_REPLACESEL, true, &replacebuf );
+						w.SendMessage( editebx.hred, w.EM_EXGETSEL, 0, &ft.chrg );
+						w.SendMessage( editebx.hred, w.EM_REPLACESEL, true, &replacebuf );
 						zstr.len( &replacebuf );
 						add( eax, ft.chrg.cpMin );
 						mov( ft.chrg.cpMin, eax );
 						mov( eax, ft.chrg.cpMax );
-						w.SendMessage( info.hred, w.EM_EXSETSEL, 0, &ft.chrg );
+						w.SendMessage( editebx.hred, w.EM_EXSETSEL, 0, &ft.chrg );
 					endif;
 					Find( MINUS_ONE );
 					w.SetFocus( window.hfind );
 	
 				elseif( eax = IDC_BTN_REPLACEALL ) then
 					mov( true, window.find_mode.down );
-					push( info.cursor.start_index );
-					w.SendMessage( info.hred, w.EM_EXGETSEL, 0, &info.cursor );
-					w.SendMessage( info.hred, w.EM_SETSEL, info.cursor.start_index, info.cursor.start_index );
-					w.LockWindowUpdate( info.hred );
+					push( editebx.cursor.start_index );
+					//lea( eax, editebx.cursor );
+					//w.SendMessage( editebx.hred, w.EM_EXGETSEL, 0, eax );
+					w.LockWindowUpdate( editebx.hred );
+					//w.SendMessage( editebx.hred, w.EM_SETSEL, editebx.cursor.start_index, editebx.cursor.start_index );
+					w.SendMessage( editebx.hred, w.EM_SETSEL, 0, 0 );
 					Find( MINUS_ONE );
 					while (fres!=-1) do
 						w.SendMessage( hWin, w.WM_COMMAND, IDC_BTN_REPLACE, 0 );
 					endwhile;
-					pop( info.cursor.start_index );
-					w.SendMessage( info.hred, w.EM_SETSEL, info.cursor.start_index, info.cursor.start_index );
+					pop( editebx.cursor.start_index );
+					w.SendMessage( editebx.hred, w.EM_SETSEL, editebx.cursor.start_index, editebx.cursor.start_index );
 					w.LockWindowUpdate( NULL );
 					w.SetFocus( window.hfind );
 					
@@ -1059,22 +1068,22 @@ proc
 						expand_codes( &replacebuf );
 					endif;
 					mov( true, window.find_mode.down );
-					push( info.cursor.start_index );
+					push( editebx.cursor.start_index );
 					lea( esi, cursor );
-					w.SendMessage( info.hred, w.EM_EXGETSEL, 0, esi );
-					w.LockWindowUpdate( info.hred );
-					w.SendMessage( info.hred, w.EM_SETSEL, cursor.start_index, cursor.start_index );
+					w.SendMessage( editebx.hred, w.EM_EXGETSEL, 0, esi );
+					w.LockWindowUpdate( editebx.hred );
+					w.SendMessage( editebx.hred, w.EM_SETSEL, cursor.start_index, cursor.start_index );
 					Find( cursor.end_index );
 					while (fres!=-1) do
-						w.SendMessage( info.hred, w.EM_EXGETSEL, 0, &ft.chrg );
+						w.SendMessage( editebx.hred, w.EM_EXGETSEL, 0, &ft.chrg );
 						dbg.put("found, replacing with :");
 						dbg.putz( &replacebuf );
-						w.SendMessage( info.hred, w.EM_REPLACESEL, true, &replacebuf );
+						w.SendMessage( editebx.hred, w.EM_REPLACESEL, true, &replacebuf );
 						Find( cursor.end_index );
 					endwhile;
-					pop( info.cursor.start_index );
-					w.SendMessage( info.hred, w.EM_SETSEL, info.cursor.start_index, info.cursor.start_index );
-					w.SendMessage( info.hred, w.EM_SCROLLCARET, 0, 0 );
+					pop( editebx.cursor.start_index );
+					w.SendMessage( editebx.hred, w.EM_SETSEL, editebx.cursor.start_index, editebx.cursor.start_index );
+					w.SendMessage( editebx.hred, w.EM_SCROLLCARET, 0, 0 );
 					w.LockWindowUpdate( NULL );
 					w.SetFocus( window.hfind );
 					
@@ -1174,7 +1183,7 @@ proc
 		elseif (eax = w.WM_CLOSE) then
 			w.DestroyWindow(window.hfind);
 			mov	(0,window.hfind);
-			w.SetFocus(info.hred);
+			w.SetFocus(editebx.hred);
 		else
 			mov	(false, eax);
 			popabi;
@@ -1313,16 +1322,17 @@ proc
 				str.cpy( build_str, default_extension );
 			endif;
 			
-			if( info.hred ) then
+			mov( window.buffer_focus, ebx );
+			if( editebx.hred ) then
 				if( config.readBool( s_settings, "Active URL" )) then
-					w.SendMessage( info.hred, w.EM_AUTOURLDETECT, true, NULL);
-					w.SendMessage( info.hred, w.EM_SETEVENTMASK, 0, w.ENM_SELCHANGE | w.ENM_MOUSEEVENTS | w.ENM_LINK);
+					w.SendMessage( editebx.hred, w.EM_AUTOURLDETECT, true, NULL);
+					w.SendMessage( editebx.hred, w.EM_SETEVENTMASK, 0, w.ENM_SELCHANGE | w.ENM_MOUSEEVENTS | w.ENM_LINK);
 				else
-					w.SendMessage( info.hred, w.EM_AUTOURLDETECT, false, NULL);
-					w.SendMessage( info.hred, w.EM_SETEVENTMASK, 0, w.ENM_SELCHANGE | w.ENM_MOUSEEVENTS );
+					w.SendMessage( editebx.hred, w.EM_AUTOURLDETECT, false, NULL);
+					w.SendMessage( editebx.hred, w.EM_SETEVENTMASK, 0, w.ENM_SELCHANGE | w.ENM_MOUSEEVENTS );
 				endif;
 				
-				setFormat( info );
+				setFormat( window.buffer_focus );
 			endif;
 			
 		else
@@ -1391,19 +1401,19 @@ proc
 	begin updateStatus;
 		
 		mov( str.talloc( 1000 ), build_str );
-		getInfo( info );
-		
-		mov( info.line.number, eax );
+		getInfo( window.buffer_focus );
+		mov( window.buffer_focus, ebx );
+		mov( editebx.line.number, eax );
 		inc( eax );
-		mov( info.column_index, ecx );
+		mov( editebx.column_index, ecx );
 		inc( ecx );
-		mov( info.cursor.end_index, edx );
-		sub( info.cursor.start_index, edx );
+		mov( editebx.cursor.end_index, edx );
+		sub( editebx.cursor.start_index, edx );
 		if( (type int32 edx ) < 0 ) then
 			neg( edx );
 		endif;
-		str.put( build_str, "Line: ", (type uns32 eax ), " / ", info.lines,
-				 "    Col: ", (type uns32 ecx ), "    Pos: ", info.cursor.start_index,
+		str.put( build_str, "Line: ", (type uns32 eax ), " / ", editebx.lines,
+				 "    Col: ", (type uns32 ecx ), "    Pos: ", editebx.cursor.start_index,
 				 "    Sel: ", (type uns32 edx ) );
 				
 		w.SendMessage( window.hstatus, w.SB_SETTEXT, 0, build_str );
@@ -1415,7 +1425,7 @@ proc
 			w.SendMessage( window.hstatus, w.SB_SETTEXT, 1, s_b );
 		endif;
 				
-		if( info.mark ) then
+		if( editebx.mark ) then
 			w.SendMessage( window.hstatus, w.SB_SETTEXT, 2, s_mark );
 			
 		else
@@ -1425,7 +1435,7 @@ proc
 		config.readString( s_settings, "Line Break", build_str );
 		w.SendMessage( window.hstatus, w.SB_SETTEXT, 3, build_str );
 		
-		movzx( info.mode, eax );
+		movzx( editebx.mode, eax );
 		switch( eax )
 				
 			case( MODE_EDITINI )
@@ -1480,13 +1490,14 @@ proc
 		// returns 0 if no line is available
 		
 	begin getLineInfo;
-		USE (EBX);
+		USE( EBX, EDI );
 		mov( line, ebx );
-		w.SendMessage( info.hred, w.EM_LINEINDEX, (type LineInfo [ebx]).number, 0 );
+		mov( window.buffer_focus, edi );
+		w.SendMessage( editedi.hred, w.EM_LINEINDEX, (type LineInfo [ebx]).number, 0 );
 		if( (type int32 eax) >= 0 ) then
 			mov( eax, (type LineInfo[ebx]).index );
 
-			w.SendMessage( info.hred, w.EM_LINELENGTH, eax, 0 );
+			w.SendMessage( editedi.hred, w.EM_LINELENGTH, eax, 0 );
 			mov( eax, (type LineInfo[ebx]).length );
 		else
 			xor( eax, eax );
@@ -1494,7 +1505,7 @@ proc
 		ENDUSE;
 	end getLineInfo;
 
-	
+	NOTE( "now that we are using window.buffer_focus, do we really need to pass Edit_Node as an argument?" )
 	getInfo: procedure ( var inf:Edit_Node );
 	
 		// collects informaiton about the edit state
@@ -1508,7 +1519,8 @@ proc
 		mov( 0, index );
 		mov( inf, edi );
 		lea( esi, editedi.cursor );
-		w.SendMessage( info.hred, w.EM_EXGETSEL, 0, esi );
+		//mov( window.buffer_focus, ebx );
+		w.SendMessage( editedi.hred, w.EM_EXGETSEL, 0, esi );
 
 		// if mark is set, find the relative direction
 		if( editedi.mark ) then
@@ -1545,8 +1557,9 @@ proc
 	
 	begin clear_keystate;
 		push( eax );
+		mov( window.buffer_focus, ebx );
 		mem2.fillMem( &keystate, @elements( keystate ), 0 );
-		if( info.mark || shift_down ) then
+		if( editebx.mark || shift_down ) then
 			mov( -1, keystate[w.VK_SHIFT] );
 		endif;
 		pop( eax );
@@ -1560,6 +1573,7 @@ proc
 
 //bm=editcommands
 
+	NOTE( "now that we are using window.buffer_focus, do we really need to pass Edit_Node ?" )
 	command_selection_to_string	:procedure( var inf:Edit_Node );
 	
 		var
@@ -1592,21 +1606,22 @@ proc
 			end_index	:dword;
 	begin command_lowercase_selection;
 		pushad();
-		getInfo( info );
-		mov( info.cursor.start_index, eax );
+		getInfo( window.buffer_focus );
+		mov( window.buffer_focus, ebx );
+		mov( editebx.cursor.start_index, eax );
 		mov( eax, start_index );
-		mov( info.cursor.end_index, end_index );
+		mov( editebx.cursor.end_index, end_index );
 
-		if( eax = info.cursor.end_index ) then
-			inc( info.cursor.end_index );
-			w.SendMessage( info.hred, w.EM_SETSEL, info.cursor.start_index, info.cursor.end_index );	
+		if( eax = editebx.cursor.end_index ) then
+			inc( editebx.cursor.end_index );
+			w.SendMessage( editebx.hred, w.EM_SETSEL, editebx.cursor.start_index, editebx.cursor.end_index );	
 		endif;
-		command_selection_to_string( info );
+		command_selection_to_string( window.buffer_focus );
 		mov( eax, esi );
 		str.lower1( esi );
-		w.SendMessage( info.hred, w.EM_REPLACESEL, true, esi );
+		w.SendMessage( editebx.hred, w.EM_REPLACESEL, true, esi );
 		str.free( esi );
-		w.SendMessage( info.hred, w.EM_SETSEL, start_index, end_index );
+		w.SendMessage( editebx.hred, w.EM_SETSEL, start_index, end_index );
 		popad();
 	end command_lowercase_selection;
 
@@ -1614,22 +1629,24 @@ proc
 		var
 			start_index	:dword;
 			end_index	:dword;
+			
 	begin command_uppercase_selection;
 		pushad();
-		getInfo( info );
-		mov( info.cursor.start_index, eax );
+		getInfo( window.buffer_focus );
+		mov( window.buffer_focus, ebx );
+		mov( editebx.cursor.start_index, eax );
 		mov( eax, start_index );
-		mov( info.cursor.end_index, end_index );
-		if( eax = info.cursor.end_index ) then
-			inc( info.cursor.end_index );
-			w.SendMessage( info.hred, w.EM_SETSEL, info.cursor.start_index, info.cursor.end_index );	
+		mov( editebx.cursor.end_index, end_index );
+		if( eax = editebx.cursor.end_index ) then
+			inc( editebx.cursor.end_index );
+			w.SendMessage( editebx.hred, w.EM_SETSEL, editebx.cursor.start_index, editebx.cursor.end_index );	
 		endif;
-		command_selection_to_string( info );
+		command_selection_to_string( window.buffer_focus );
 		mov( eax, esi );
 		str.upper1( esi );
-		w.SendMessage( info.hred, w.EM_REPLACESEL, true, esi );
+		w.SendMessage( editebx.hred, w.EM_REPLACESEL, true, esi );
 		str.free( esi );
-		w.SendMessage( info.hred, w.EM_SETSEL, start_index, end_index );
+		w.SendMessage( editebx.hred, w.EM_SETSEL, start_index, end_index );
 		popad();
 	end command_uppercase_selection;
 
@@ -1646,19 +1663,23 @@ proc
 		
 	begin command_edit_ini;
 		
-		str.cpy( config.fileName, info.filepath );
+		TODO( "when multi buffers are implemented, this should open a new buffer" )
+		
+		USE( EBX );
+		mov( window.buffer_focus, ebx );
+		str.cpy( config.fileName, editebx.filepath );
 		str.rmvLastChar1( config.fileName );
 		str.put2( config.fileName, "~" );
 		config.writeFile();
 		str.rmvLastChar1( config.fileName );
 		str.put2( config.fileName, "i" );
 
-		str.cpy( config.fileName, info.filepath );
+		str.cpy( config.fileName, editebx.filepath );
 		
-		loadFile( info.filepath );
-		mov( MODE_EDITINI, info.mode );
+		loadFile( editebx.filepath );
+		mov( MODE_EDITINI, editebx.mode );
 		updateStatus();
-		
+		ENDUSE;
 	end command_edit_ini;
 
 	command_display_manual	:procedure { @noframe };
@@ -1672,14 +1693,16 @@ proc
 	begin command_display_manual;
 		
 		if( w.FindResource(window.hinst, val ID_SAVAGEED_MANUAL, val w.RT_RCDATA ) ) then
-
+			
+			TODO( "when multi buffers are implemented, this should open a new buffer" )
+			
 			if( w.LoadResource(window.hinst, eax ) ) then
-				
-				w.SendMessage( info.hred,w.WM_SETTEXT,0, eax );
-				str.cpy( s_document, info.filepath );
-				mov( MODE_VIEWDOCS, info.mode );
+				mov( window.buffer_focus, ebx );
+				w.SendMessage( editebx.hred, w.WM_SETTEXT, 0, eax );
+				str.cpy( s_document, editebx.filepath );
+				mov( MODE_VIEWDOCS, editebx.mode );
 				updateStatus();
-				w.SetFocus(info.hred);
+				w.SetFocus( editebx.hred );
 				
 			else
 				
@@ -1717,11 +1740,14 @@ proc
 		// in info.cursor.start_index and info.cursor.end_index
 	
 	begin command_get_word;
+		dbg.enters( "command_get_word" );
+		USE( EDX, EBX )
 		command_get_line( &buffer );
 		
 		// if we are sitting on a space, newline or tab char, don't do anything
 		mov( &buffer, edx );
-		add( info.column_index, edx );
+		mov( window.buffer_focus, ebx );
+		add( editebx.column_index, edx );
 		
 		if( (type byte[edx]) = ' ' || (type byte[edx]) = $09 ||
 		    (type byte[edx]) = $0a ) then
@@ -1743,12 +1769,12 @@ proc
 		
 		// change buffer coordinate to info.hred coordinate
 		sub( &buffer, edx );
-		add( info.line.index, edx );
-		mov( edx, info.cursor.start_index);
+		add( editebx.line.index, edx );
+		mov( edx, editebx.cursor.start_index);
 		
 		// find end index of word
 		mov( &buffer, edx );
-		add( info.column_index, edx );
+		add( editebx.column_index, edx );
 		forever
 			inc( edx );
 			breakif( (type byte[edx]) = 0 );
@@ -1762,13 +1788,16 @@ proc
 
 		// change buffer coordinate to info.hred coordinate
 		sub( &buffer, edx );
-		add( info.line.index, edx );
+		add( editebx.line.index, edx );
 		dbg.put("end index :", (type uns32 edx));
-		mov( edx, info.cursor.end_index );
+		mov( edx, editebx.cursor.end_index );
 		
 		or( 1, eax );
-		done: ret();
-
+				
+	done:
+		ENDUSE;
+		dbg.exits( "command_get_word" );
+		ret();
 	end command_get_word;
 
 	command_delete_word	:procedure {@noframe};
@@ -1776,9 +1805,11 @@ proc
 		// delete the word under the cursor
 		
 	begin command_delete_word;
+		mov( window.buffer_focus, ebx );
 		if( command_get_word() ) then
-			w.SendMessage( info.hred, w.EM_EXSETSEL, 0, &info.cursor );
-			w.SendMessage( info.hred, w.EM_REPLACESEL, true, s_empty );
+			lea( eax, editebx.cursor );
+			w.SendMessage( editebx.hred, w.EM_EXSETSEL, 0, eax );
+			w.SendMessage( editebx.hred, w.EM_REPLACESEL, true, s_empty );
 		endif;
 		ret();
 	end command_delete_word;
@@ -1786,29 +1817,35 @@ proc
 	command_copy_word :procedure {@noframe};
 	begin command_copy_word;
 		if( command_get_word() ) then
-			w.SendMessage( info.hred, w.EM_EXSETSEL, 0, &info.cursor );
-			w.SendMessage(info.hred, w.WM_COPY,0,0);			
+			mov( window.buffer_focus, ebx );
+			lea( eax, editebx.cursor );
+			w.SendMessage( editebx.hred, w.EM_EXSETSEL, 0, eax );
+			w.SendMessage(editebx.hred, w.WM_COPY,0,0);			
 		endif;
 		ret();
 	end command_copy_word;
 
 	command_select_all :procedure {@noframe};
 	begin command_select_all;
-		mov	(0, info.cursor.end_index);
-		mov	(-1,info.cursor.start_index);
-		w.SendMessage(info.hred,w.EM_EXSETSEL,0,&info.cursor);
+		mov( window.buffer_focus, ebx );
+		lea( eax, editebx.cursor );
+		mov	(0, editebx.cursor.end_index);
+		mov	(-1, editebx.cursor.start_index);
+		w.SendMessage( editebx.hred, w.EM_EXSETSEL, 0, eax );
 		ret();		
 	end command_select_all;
 
 	command_cut_line	:procedure {@noframe};
 	begin command_cut_line;
-		mov( info.line.index, eax );
-		mov( eax, info.cursor.start_index );
-		add( info.line.length, eax );
+		mov( window.buffer_focus, ebx );
+		mov( editebx.line.index, eax );
+		mov( eax, editebx.cursor.start_index );
+		add( editebx.line.length, eax );
 		inc( eax ); // consume carriage return
-		mov( eax, info.cursor.end_index );
-		w.SendMessage( info.hred, w.EM_EXSETSEL, 0, &info.cursor );
-		w.SendMessage(info.hred, w.WM_CUT,0,0);
+		mov( eax, editebx.cursor.end_index );
+		lea( eax, editebx.cursor );
+		w.SendMessage( editebx.hred, w.EM_EXSETSEL, 0, eax );
+		w.SendMessage(editebx.hred, w.WM_CUT,0,0);
 		ret();
 	end command_cut_line;
 
@@ -1816,9 +1853,10 @@ proc
 		// on entry, eax will contain desired state of control key
 		// 0 = up, 1 = down
 	begin command_cursor_up;
-		if( info.line.index > 0 ) then
+		mov( window.buffer_focus, ebx );
+		if( editebx.line.index > 0 ) then
 			clear_keystate();
-			w.CallWindowProc(info.old_proc, info.hred, w.WM_KEYDOWN, w.VK_UP, 0 );
+			w.CallWindowProc(editebx.old_proc, editebx.hred, w.WM_KEYDOWN, w.VK_UP, 0 );
 		endif;
 		ret();
 	end command_cursor_up;
@@ -1827,14 +1865,14 @@ proc
 		// on entry, eax will contain desired state of control key
 		// 0 = up, 1 = down
 	begin command_cursor_down;
-		
-		mov( info.line.number, ecx );
+		mov( window.buffer_focus, ebx );
+		mov( editebx.line.number, ecx );
 		inc( ecx );
-		if( ecx = info.lines ) then
+		if( ecx = editebx.lines ) then
 			jmp _done;
 		endif;
 		clear_keystate();
-		w.CallWindowProc(info.old_proc, info.hred, w.WM_KEYDOWN, w.VK_DOWN, 0 );
+		w.CallWindowProc(editebx.old_proc, editebx.hred, w.WM_KEYDOWN, w.VK_DOWN, 0 );
 		_done:
 		ret();
 	end command_cursor_down;
@@ -1843,15 +1881,15 @@ proc
 		// on entry, eax will contain desired state of control key
 		// 0 = up, 1 = down
 	begin command_cursor_left;
-		dbg.put("entry eax :", eax );
+		mov( window.buffer_focus, ebx );
 		mov( eax, ecx );
-		if( info.line.index = 0 && info.column_index = 0 ) then
+		if( editebx.line.index = 0 && editebx.column_index = 0 ) then
 			jmp _done;
 		endif;
 		mov( ecx, eax );
 		clear_keystate();
 
-		w.CallWindowProc(info.old_proc, info.hred, w.WM_KEYDOWN, w.VK_LEFT, 0 );
+		w.CallWindowProc( editebx.old_proc, editebx.hred, w.WM_KEYDOWN, w.VK_LEFT, 0 );
 		
 		_done:
 		ret();
@@ -1861,42 +1899,38 @@ proc
 		// on entry, eax will contain desired state of control key
 		// 0 = up, 1 = down
 	begin command_cursor_right;
-		
-		mov( info.line.number, ecx );
+		mov( window.buffer_focus, ebx );
+		mov( editebx.line.number, ecx );
 		inc( ecx );
-		mov( info.column_index, edx );
-		if( ecx = info.lines && edx = info.line.length ) then
+		mov( editebx.column_index, edx );
+		if( ecx = editebx.lines && edx = editebx.line.length ) then
 			jmp _done;
 		endif;
 		clear_keystate();
-		w.CallWindowProc(info.old_proc, info.hred, w.WM_KEYDOWN, w.VK_RIGHT, 0 );
+		w.CallWindowProc(editebx.old_proc, editebx.hred, w.WM_KEYDOWN, w.VK_RIGHT, 0 );
 		_done:
 		ret();
 	end command_cursor_right;
 
 	command_move_to_bol	:procedure {@noframe};
 	begin command_move_to_bol;
-		dbg.enters("command_move_to_bol");
-			dbg.put("line number :", info.line.number );
-			dbg.put("line index  :", info.line.index );
-			dbg.put("lines       :", info.lines );
-			dbg.put("col index   :", info.column_index );
-		mov( info.line.index, eax );
-		if( info.line.index = 0 && info.column_index = 0 ) then
+		mov( window.buffer_focus, ebx );
+		mov( editebx.line.index, eax );
+		if( editebx.line.index = 0 && editebx.column_index = 0 ) then
 			jmp done;
 		endif;
 
-		if( info.column_index = 0 ) then
+		if( editebx.column_index = 0 ) then
 			// we're at the beginning of line, go to the beginning of prev line.
 			command_cursor_left();
-			if( info.column_index > 0 ) then
+			if( editebx.column_index > 0 ) then
 				jmp _home;
 			endif;
 		else
 			_home:
 			xor( eax, eax );
 			clear_keystate();
-			w.CallWindowProc(info.old_proc, info.hred, w.WM_KEYDOWN, w.VK_HOME, 0 );
+			w.CallWindowProc(editebx.old_proc, editebx.hred, w.WM_KEYDOWN, w.VK_HOME, 0 );
 		endif;
 		done:
 		dbg.exits("command_move_to_bol");
@@ -1906,18 +1940,19 @@ proc
 	command_move_to_eol	:procedure;
 	begin command_move_to_eol;
 		dbg.enters("command_move_to_eol");
-		mov( info.column_index, eax );
-		if( eax = info.line.length || ! eax ) then
+		mov( window.buffer_focus, ebx );
+		mov( editebx.column_index, eax );
+		if( eax = editebx.line.length || ! eax ) then
 			command_cursor_right();
-			mov( info.line.length, eax );
-			if( eax && eax != info.column_index )then
+			mov( editebx.line.length, eax );
+			if( eax && eax != editebx.column_index )then
 				jmp _callit;
 			endif;
 		else
 			_callit:
 			xor( eax, eax );
 			clear_keystate();
-			w.CallWindowProc(info.old_proc, info.hred, w.WM_KEYDOWN, w.VK_END, 0 );
+			w.CallWindowProc( editebx.old_proc, editebx.hred, w.WM_KEYDOWN, w.VK_END, 0 );
 		endif;
 		dbg.exits("command_move_to_eol");
 	end command_move_to_eol;
@@ -1925,22 +1960,22 @@ proc
 	command_move_line_up :procedure {@noframe};
 	begin command_move_line_up;
 		dbg.enters( "command_move_line_up" );
-		
-		if( info.line.number > 0 ) then
-			push( info.column_index );
+		mov( window.buffer_focus, ebx );
+		if( editebx.line.number > 0 ) then
+			push( editebx.column_index );
 			command_get_line( &buffer );
-			mov( info.line.length, eax );
-			add( info.line.index, eax );
+			mov( editebx.line.length, eax );
+			add( editebx.line.index, eax );
 			inc( eax ); // get the line feed
-			w.SendMessage( info.hred, w.EM_SETSEL, info.line.index, eax );
-			w.SendMessage( info.hred, w.EM_REPLACESEL, true, s_empty );
+			w.SendMessage( editebx.hred, w.EM_SETSEL, editebx.line.index, eax );
+			w.SendMessage( editebx.hred, w.EM_REPLACESEL, true, s_empty );
 			command_move_to_bol();
-			w.SendMessage( info.hred, w.EM_REPLACESEL, true, &buffer );
-			getInfo( info );
+			w.SendMessage( editebx.hred, w.EM_REPLACESEL, true, &buffer );
+			getInfo( window.buffer_focus );
 			command_move_to_bol();
 			pop( eax );
-			add( info.line.index, eax );
-			w.SendMessage( info.hred, w.EM_SETSEL, eax, eax );
+			add( editebx.line.index, eax );
+			w.SendMessage( editebx.hred, w.EM_SETSEL, eax, eax );
 		endif;
 		
 		dbg.exits( "command_move_line_up" );
@@ -1950,22 +1985,23 @@ proc
 	command_move_line_down :procedure {@noframe};
 	begin command_move_line_down;
 		dbg.enters( "command_move_line_down" );
-		mov( info.lines, eax );
-		if( info.line.number < eax ) then
-			push( info.column_index );
+		mov( window.buffer_focus, ebx );
+		mov( editebx.lines, eax );
+		if( editebx.line.number < eax ) then
+			push( editebx.column_index );
 			command_get_line( &buffer );
-			mov( info.line.length, eax );
-			add( info.line.index, eax );
+			mov( editebx.line.length, eax );
+			add( editebx.line.index, eax );
 			inc( eax ); // get the line feed
-			w.SendMessage( info.hred, w.EM_SETSEL, info.line.index, eax );
-			w.SendMessage( info.hred, w.EM_REPLACESEL, true, s_empty );
+			w.SendMessage( editebx.hred, w.EM_SETSEL, editebx.line.index, eax );
+			w.SendMessage( editebx.hred, w.EM_REPLACESEL, true, s_empty );
 			command_cursor_down();
-			w.SendMessage( info.hred, w.EM_REPLACESEL, true, &buffer );
-			getInfo( info );
+			w.SendMessage( editebx.hred, w.EM_REPLACESEL, true, &buffer );
+			getInfo( window.buffer_focus );
 			command_move_to_bol();
 			pop( eax );
-			add( info.line.index, eax );
-			w.SendMessage( info.hred, w.EM_SETSEL, eax, eax );
+			add( editebx.line.index, eax );
+			w.SendMessage( editebx.hred, w.EM_SETSEL, eax, eax );
 		endif;
 		dbg.exits( "command_move_line_down" );
 		ret();
@@ -1973,29 +2009,29 @@ proc
 
 	command_select_to_eol :procedure {@noframe};
 	begin command_select_to_eol;
-
-		mov( info.line.length, eax );
-		add( info.line.index, eax );
-		w.SendMessage( info.hred, w.EM_SETSEL, info.cursor.start_index, eax );
+		USE( EBX );
+		mov( window.buffer_focus, ebx );
+		mov( editebx.line.length, eax );
+		add( editebx.line.index, eax );
+		w.SendMessage( editebx.hred, w.EM_SETSEL, editebx.cursor.start_index, eax );
+		ENDUSE;
 		ret();
 	end command_select_to_eol;
 
 	command_toggle_mark :procedure {@noframe};
 	begin command_toggle_mark;
-		
 		dbg.put("toggle_mark");
 		// toggle mark
-		if( info.mark ) then
-			mov( false, info.mark );
-			mov( 0, info.mark_point );
+		mov( window.buffer_focus, ebx );
+		if( editebx.mark ) then
+			mov( false, editebx.mark );
+			mov( 0, editebx.mark_point );
 		else
-			mov( true, info.mark );
-			mov( info.cursor.start_index, info.mark_point );
+			mov( true, editebx.mark );
+			mov( editebx.cursor.start_index, editebx.mark_point );
 		endif;
-		//xor( 1, info.mark );
 		updateStatus();
 		ret();
-
 	end command_toggle_mark;
 
 	command_increase_indent :procedure;
@@ -2014,15 +2050,15 @@ proc
 	begin command_increase_indent;
 		mov( str.talloc( 1000 ), build_str );
 		w.LockWindowUpdate(info.hred);
-		
-		push( info.column_index );
+		mov( window.buffer_focus, ebx );
+		push( editebx.column_index );
 		pop( char_index );
 		
-		push( info.line.number );
+		push( editebx.line.number );
 		pop( line.number );
 		getLineInfo( line );
 		
-		w.SendMessage( info.hred, w.EM_SETSEL, line.index, line.index );
+		w.SendMessage( editebx.hred, w.EM_SETSEL, line.index, line.index );
 		
 		if( config.readBool( s_settings, s_tabsasspace ) ) then
 			str.cpy( strtabs, build_str );
@@ -2032,11 +2068,11 @@ proc
 			mov( 1, n_tab );
 		endif;
 
-		w.SendMessage( info.hred, w.EM_REPLACESEL, true, build_str );
+		w.SendMessage( editebx.hred, w.EM_REPLACESEL, true, build_str );
 		mov( line.index, eax );
 		add( n_tab, eax );
 		add( char_index, eax );
-		w.SendMessage( info.hred, w.EM_SETSEL, eax, eax );
+		w.SendMessage( editebx.hred, w.EM_SETSEL, eax, eax );
 		w.LockWindowUpdate( NULL );
 
 	end command_increase_indent;
@@ -2055,11 +2091,11 @@ proc
 			
 	begin command_reduce_indent;
 		w.LockWindowUpdate(info.hred);
-		
-		push( info.line.number );
+		mov( window.buffer_focus, ebx );
+		push( editebx.line.number );
 		pop( line.number );
 		getLineInfo( line );
-		push( info.cursor.start_index );
+		push( editebx.cursor.start_index );
 		pop( cp_min );		
 		command_get_line(&buffer);
 		if( buffer[0] = $09 ) then
@@ -2077,8 +2113,8 @@ proc
 			push( ecx );
 			mov( line.index, eax );
 			add( eax, ecx );
-			w.SendMessage( info.hred, w.EM_SETSEL, eax, ecx );
-			w.SendMessage( info.hred, w.EM_REPLACESEL, true, s_empty );
+			w.SendMessage( editebx.hred, w.EM_SETSEL, eax, ecx );
+			w.SendMessage( editebx.hred, w.EM_REPLACESEL, true, s_empty );
 			pop( ecx );
 		endif;
 		
@@ -2094,7 +2130,7 @@ proc
 			endif;
 		endif;
 
-		w.SendMessage( info.hred, w.EM_SETSEL, eax, eax);
+		w.SendMessage( editebx.hred, w.EM_SETSEL, eax, eax);
 		w.LockWindowUpdate(NULL);
 		
 	end command_reduce_indent;
@@ -2113,20 +2149,21 @@ proc
 		mov	(wparam,eax);
 		and	($0ffff,eax);
 		
+		mov( window.buffer_focus, ebx );
 		switch( eax );
 		case( IDM_NEW )
 			
 			getConfirm();
 			if (!eax) then	
 				
-				w.SetWindowText( info.hred, 0 );		// clear edit window
-				str.cpy( s_untitled, info.filepath );
-				mov( MODE_INSERT, info.mode );
-				mov( false, info.mark );
+				w.SetWindowText( editebx.hred, 0 );		// clear edit window
+				str.cpy( s_untitled, editebx.filepath );
+				mov( MODE_INSERT, editebx.mode );
+				mov( false, editebx.mark );
 				updateStatus();
 				
 			endif;
-			w.SetFocus(info.hred);
+			w.SetFocus( editebx.hred );
 		
 		case( IDM_OPEN )
 		
@@ -2136,7 +2173,7 @@ proc
 				fileOpen(); 
 	
 			endif;	
-			w.SetFocus(info.hred);
+			w.SetFocus( editebx.hred );
 			
 		case( IDM_INST )
 			
@@ -2145,30 +2182,30 @@ proc
 		case( IDM_SAVE )
 		
 			checkSave();
-			w.SetFocus(info.hred);
+			w.SetFocus( editebx.hred );
 			
 		case( IDM_SAVEAS )
 		
 			SaveAs();
-			w.SetFocus(info.hred);
+			w.SetFocus( editebx.hred );
 			
 		case( IDM_SAVE_SELECTION_AS )
 		
 			SaveSelectionAs();
-			w.SetFocus(info.hred);
+			w.SetFocus( editebx.hred );
 			
 	   	case( IDM_CUT )
 		
-			w.SendMessage(info.hred, w.WM_CUT,0,0);
+			w.SendMessage( editebx.hred, w.WM_CUT, 0, 0 );
 			
 		case( IDM_COPY )
 		
-			w.SendMessage(info.hred, w.WM_COPY,0,0);
+			w.SendMessage( editebx.hred, w.WM_COPY, 0, 0 );
 			
 		case( IDM_PASTE )
 		
-			w.SendMessage(info.hred, w.WM_PASTE,0,0);
-			w.SendMessage(info.hred, w.EM_SETMODIFY, true,0); 	
+			w.SendMessage( editebx.hred, w.WM_PASTE, 0, 0 );
+			w.SendMessage( editebx.hred, w.EM_SETMODIFY, true, 0 ); 	
 			
 		case( IDM_SELECTALL )	
 			command_select_all();
@@ -2184,12 +2221,12 @@ proc
 			
 		case( IDM_UNDO )
 		
-			w.SendMessage(info.hred, w.EM_UNDO,0,0);
+			w.SendMessage( editebx.hred, w.EM_UNDO, 0, 0 );
 			
 		case( IDM_REDO )
 		
-			w.SendMessage(info.hred, w.EM_REDO,0,0);
-			
+			w.SendMessage( editebx.hred, w.EM_REDO, 0, 0 );
+						
 		case( IDM_FIND, IDM_REPLACE )
 			if (!window.hfind) then
 				GetSelText (&findbuf);
@@ -2236,9 +2273,9 @@ proc
 					//conv.strTou32( return, 0 );
 					conv.strTou32( input.return, 0 );
 					dec(eax);
-					w.SendMessage( info.hred, w.EM_LINEINDEX, eax, 0 );
-					w.SendMessage( info.hred, w.EM_SETSEL, eax, eax );
-					w.SendMessage( info.hred, w.EM_SCROLLCARET, 0, 0 );
+					w.SendMessage( editebx.hred, w.EM_LINEINDEX, eax, 0 );
+					w.SendMessage( editebx.hred, w.EM_SETSEL, eax, eax );
+					w.SendMessage( editebx.hred, w.EM_SCROLLCARET, 0, 0 );
 					
 				anyexception
 					
@@ -2263,25 +2300,25 @@ proc
 		case( IDM_FONT )
 		
 			selectFont();
-			w.SetFocus(info.hred);
+			w.SetFocus( editebx.hred );
 			
 		case( IDM_FOREGROUND )
 			
 			if( selectColor() )  then
 				move( return, window.textColor );
 				config.writeHex( s_text, s_text_color, window.textColor);
-				setFont( info );
+				setFont( window.buffer_focus );
 			endif; 
-			w.SetFocus(info.hred);
+			w.SetFocus( editebx.hred );
 			
 		case( IDM_BACKGROUND )
 	
 			if( selectColor() ) then
 				move( return, window.backColor );
 				config.writeHex( s_text, s_background_color, window.backColor);
-				w.SendMessage( info.hred, w.EM_SETBKGNDCOLOR, false, window.backColor);
+				w.SendMessage( editebx.hred, w.EM_SETBKGNDCOLOR, false, window.backColor);
 			endif;
-			w.SetFocus(info.hred);
+			w.SetFocus( editebx.hred );
 			
 		case(IDM_AUTO ) 
 			
@@ -2330,15 +2367,15 @@ proc
 			if( config.readBool( s_settings, "Active URL" )) then
 				w.CheckMenuItem( window.hmenu, IDM_ACTIVE_URL, w.MF_BYCOMMAND | w.MF_UNCHECKED );
 				config.writeBool( s_settings, "Active URL", false );
-				updateActiveURL( info );
+				updateActiveURL( window.buffer_focus );
 			else
 				getConfirm();
 				if( ! eax ) then
 					w.CheckMenuItem( window.hmenu, IDM_ACTIVE_URL, w.MF_BYCOMMAND | w.MF_CHECKED );
 					config.writeBool( s_settings, "Active URL", true );
-					saveFile( info.filepath, false );
-					updateActiveURL( info );
-					loadFile( info.filepath );
+					saveFile( editebx.filepath, false );
+					updateActiveURL( window.buffer_focus );
+					loadFile( editebx.filepath );
 				endif;
 			endif;
 			
@@ -2397,20 +2434,20 @@ proc
 			if( config.readBool( s_settings, s_wrap ) ) then
 
 				w.CheckMenuItem( window.hmenu, IDM_WRAP, w.MF_BYCOMMAND | w.MF_UNCHECKED );
-				mov( false, info.word_wrap );
+				mov( false, editebx.word_wrap );
 				
 			else
 				
 				w.CheckMenuItem( window.hmenu, IDM_WRAP, w.MF_BYCOMMAND | w.MF_CHECKED );
-				mov( true, info.word_wrap );
+				mov( true, editebx.word_wrap );
 				
 			endif;
 			
-			config.writeBool( s_settings, s_wrap, info.word_wrap );
-			if( info.word_wrap ) then
-				w.SendMessage( info.hred, w.EM_SETTARGETDEVICE, NULL, 0 );
+			config.writeBool( s_settings, s_wrap, editebx.word_wrap );
+			if( editebx.word_wrap ) then
+				w.SendMessage( editebx.hred, w.EM_SETTARGETDEVICE, NULL, 0 );
 			else
-				w.SendMessage( info.hred, w.EM_SETTARGETDEVICE, NULL, 1 );
+				w.SendMessage( editebx.hred, w.EM_SETTARGETDEVICE, NULL, 1 );
 			endif;
 			
 		case ( IDM_READONLY) 
@@ -2427,7 +2464,7 @@ proc
 				
 			endif;
 			config.writeBool( s_settings, s_readonly, al );
-			w.SendMessage( info.hred, w.EM_SETREADONLY, eax, 0 );
+			w.SendMessage( editebx.hred, w.EM_SETREADONLY, eax, 0 );
 			updateStatus();
 			
 		case ( IDM_CLEAREXIT) 
@@ -2509,7 +2546,7 @@ proc
 			
 			if( setTabWidth() ) then
 				config.writeUns( s_settings, s_tabs, eax );
-				setTabs( info );
+				setTabs( window.buffer_focus );
 			endif;
 			
 		case( IDM_TAB_AS_SPACE )
@@ -2589,8 +2626,9 @@ begin SavageEd;
 
 	initConfig();
 	initWindow();	
-
-	mov( MODE_INSERT, info.mode );
+	
+	mov( window.buffer_focus, ebx );
+	mov( MODE_INSERT, editebx.mode );
 	cmp( eax, 0 );
 	je _exit;
 	
@@ -2608,7 +2646,10 @@ begin SavageEd;
 	// tail free some resources
 	// unnecessary, but helpful to know what needs to be freed in case
 	// we decide to move things around later
-	w.DestroyWindow( info.hred );
+	
+	TODO( "not that it's important since we are exiting anyway, here is where we would clear all the list buffers" )
+	mov( window.buffer_focus, ebx );
+	w.DestroyWindow( editebx.hred );
 	w.DeleteObject( window.hfont );
 	w.FreeLibrary(window.hredDLL);
 	str.free( info.filepath );

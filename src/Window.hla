@@ -36,6 +36,7 @@ readonly
 	AppName		:string:= "SavageEd";
 	
 	RichEditDLL		:string := "riched32.dll";
+	//RichEditDLL		:string := "riched20.dll";
 	
 	// strings and error messages
 	s_recent	:string := "Recent Files";
@@ -590,6 +591,7 @@ proc
 			
 	begin saveFile;
 		
+		dbg.put("saving filename:", filename );
 		try
 			fileio.openNew( filename );
 			mov( eax,hfile );
@@ -1205,10 +1207,15 @@ proc
 			else
 				
 				// there is no file, create a new document with name passed on command line
-				filesys.gwd( info.filepath );
-				str.cat ("\", info.filepath);
+				
+				// this old way was not working if user enters a file path instead of just a file name.
+				//filesys.gwd( info.filepath );
+				//str.cat ("\", info.filepath);
+				//arg.v(1);
+				//str.catz (eax, info.filepath);
+				
 				arg.v(1);
-				str.catz (eax, info.filepath); 
+				str.cpyz (eax, info.filepath); 
 				jmp skipOpenRecent;
 			endif;
 		endif;
@@ -1296,9 +1303,10 @@ proc
 				w.ShellExecute( NULL, NULL, &buffer, NULL, NULL, 1 );  
 
 			endif;
-			
+		
 		elseif( eax = w.EN_MSGFILTER ) then
 			if( (type w.MSGFILTER[EDX]).msg = w.WM_LBUTTONDOWN ) then
+				
 				mov( shift_down, dl );
 				if( editebx.mark ) then
 					mov( true, shift_down );
@@ -1309,7 +1317,9 @@ proc
 				clear_keystate();
 				mov( dl, shift_down );
 				updateStatus();
+				
 			endif;
+		
 		endif;
 		
 		xor( eax, eax );

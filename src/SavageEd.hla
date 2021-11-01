@@ -7,7 +7,7 @@ program SavageEd;
 
 readonly
 
-	version			:string := "SavageEd v0.10.16";
+	version			:string := "SavageEd v0.10.18";
 
 storage
 	logfont			:w.LOGFONT;
@@ -349,7 +349,7 @@ proc
 		if(eax != -1) then
 	
 			w.SendMessage( editebx.hred, w.EM_EXSETSEL, 0, &ft.chrgText );
-			w.SendMessage( editebx.hred,w.EM_SCROLLCARET,0,0 );
+			//w.SendMessage( editebx.hred,w.EM_SCROLLCARET,0,0 );
 	
 		else
 
@@ -421,7 +421,7 @@ proc
 		pop( ft.chrg.cpMax );
 		add( eax, ft.chrg.cpMax );
 		w.SendMessage( editebx.hred, w.EM_EXSETSEL, 0, &ft.chrg );
-		w.SendMessage( editebx.hred,w.EM_SCROLLCARET,0,0 );
+		//w.SendMessage( editebx.hred,w.EM_SCROLLCARET,0,0 );
 		
 		jmp done;
 		
@@ -941,7 +941,7 @@ proc
 										endfor;
 										mov( 0, buffer[eax] );
 										w.SendMessage( editebx.hred, w.EM_REPLACESEL,true, &buffer );
-										w.SendMessage( editebx.hred, w.EM_SCROLLCARET,0,0);
+										//w.SendMessage( editebx.hred, w.EM_SCROLLCARET,0,0);
 									endif;
 								endif;
 							endif;
@@ -1083,7 +1083,7 @@ proc
 					endwhile;
 					pop( editebx.cursor.start_index );
 					w.SendMessage( editebx.hred, w.EM_SETSEL, editebx.cursor.start_index, editebx.cursor.start_index );
-					w.SendMessage( editebx.hred, w.EM_SCROLLCARET, 0, 0 );
+					//w.SendMessage( editebx.hred, w.EM_SCROLLCARET, 0, 0 );
 					w.LockWindowUpdate( NULL );
 					w.SetFocus( window.hfind );
 					
@@ -2275,7 +2275,7 @@ proc
 					dec(eax);
 					w.SendMessage( editebx.hred, w.EM_LINEINDEX, eax, 0 );
 					w.SendMessage( editebx.hred, w.EM_SETSEL, eax, eax );
-					w.SendMessage( editebx.hred, w.EM_SCROLLCARET, 0, 0 );
+					//w.SendMessage( editebx.hred, w.EM_SCROLLCARET, 0, 0 );
 					
 				anyexception
 					

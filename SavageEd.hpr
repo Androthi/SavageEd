@@ -24,7 +24,7 @@ console=false
 output=SavageEd.exe
 type=modular
 main=SavageEd.md
-debug=true
+debug=false
 
 [SavageEd.link]
 -heap:0xF4240,0xF4240

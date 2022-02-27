@@ -744,7 +744,7 @@ proc
 			w.SendMessage( info.hred,w.EM_SETSEL,-1,-1 );
 		endif;
 		w.SendMessage( info.hred, w.EM_REPLACESEL,true, s_nl );
-		command_insert_time();
+		command_insert_date_time();
 		w.SendMessage( info.hred, w.EM_REPLACESEL,true, s_nl );
 		ret();
 		
@@ -813,7 +813,7 @@ proc
 			mov	(hDlg, window.habout);
 			w.SetDlgItemText( window.habout,ID_ABOUTGRP,version ); 
 			w.SetFocus(window.habout);
-			
+
 		elseif (uMsg = w.WM_COMMAND) then
 			 if (wParam = w.IDOK || wParam= w.IDCANCEL) then				
 

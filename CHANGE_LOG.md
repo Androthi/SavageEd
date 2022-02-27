@@ -1,5 +1,10 @@
 # Change Log
 
+## 02/19/2022
+	0.10.18 Maintenence build
+			- fixed .LOG not inserting date/time properly
+			- update to about dialog .. got rid of obsolete information.
+
 ## 10/05/2021
 	0.10.05 Feature changes:
 			- Date/Time now has a submenu, with separate options to display only date, or only time.

@@ -7,7 +7,7 @@ program SavageEd;
 
 readonly
 
-	version			:string := "SavageEd v0.10.19";
+	version			:string := "SavageEd v0.10.20";
 
 storage
 	logfont			:w.LOGFONT;
@@ -75,7 +75,7 @@ proc
 			mov( eax, window.hfont );
 			push( choose_font.rgbColors );
 			pop( window.textColor );
-			setFont( window.buffer_focus );
+			setFont();
 			config.writeHex( s_text, s_background_color, window.backColor);
 			config.writeHex( s_text, s_text_color, window.textColor);
 
@@ -1332,7 +1332,7 @@ proc
 					w.SendMessage( editebx.hred, w.EM_SETEVENTMASK, 0, w.ENM_SELCHANGE | w.ENM_MOUSEEVENTS );
 				endif;
 				
-				setFormat( window.buffer_focus );
+				setFormat();
 			endif;
 			
 		else
@@ -2307,7 +2307,7 @@ proc
 			if( selectColor() )  then
 				move( return, window.textColor );
 				config.writeHex( s_text, s_text_color, window.textColor);
-				setFont( window.buffer_focus );
+				setFont();
 			endif; 
 			w.SetFocus( editebx.hred );
 			
@@ -2546,7 +2546,7 @@ proc
 			
 			if( setTabWidth() ) then
 				config.writeUns( s_settings, s_tabs, eax );
-				setTabs( window.buffer_focus );
+				setTabs();
 			endif;
 			
 		case( IDM_TAB_AS_SPACE )

@@ -10,7 +10,7 @@ readonly
 
 	
 
-	// main window message table
+// main window message table
 //bm=window_commands	
 	message_table	:MsgProcPtr_t; @nostorage;
 		MsgProcPtr_t	
@@ -1029,15 +1029,16 @@ proc
 	end Msg_Context;
 
 	NOTE( "now that we are using window.buffer_focus, do we really need to pass Edit_Node ?" )
-	setFont	:procedure( var inf	:Edit_Node );
+	setFont	:procedure;
 		
 		var
 			cf		:w.CHARFORMAT2;
 			modified	:dword;
 			
 	begin setFont;
+		
 		pushabi;
-		mov( inf, esi );
+		mov( window.buffer_focus, esi );
 		w.SendMessage( editesi.hred, w.EM_GETMODIFY, 0, 0 );
 		mov( eax, modified );
 		lea( eax, cf );
@@ -1060,13 +1061,14 @@ proc
 		lea( eax, cf );
 		w.SendMessage( editesi.hred, w.EM_SETCHARFORMAT, w.SCF_ALL, eax );
 		w.SendMessage( editesi.hred, w.EM_SETMODIFY, modified, 0 );
-		setTabs( inf );
+		setTabs();
 		popabi;
+		
 	end setFont;
 	
-	NOTE( "now that we are using window.buffer_focus, do we really need to pass Edit_Node ?" )
-	setTabs	:procedure (var inf:Edit_Node);
+	setTabs	:procedure;
 	begin setTabs;
+	
 		pushabi;
 		w.GetDialogBaseUnits();
 		movzx( ax, ecx );
@@ -1074,7 +1076,8 @@ proc
 		mul( ecx );
 		shr( 1, eax );
 		//dbg.put("tab distance :", (type uns32 eax));
-		mov( inf, esi );
+		//mov( inf, esi );
+		mov( window.buffer_focus, esi );
 		mov( eax, window.tabs );
 		// this is typically 4*the desired tab spaces
 		w.SendMessage(editesi.hred, w.EM_SETTABSTOPS, 1, &window.tabs );
@@ -1090,10 +1093,10 @@ proc
 		endwhile;
 		dbg.put("strtabs :", strtabs );
 		popabi;
+		
 	end setTabs;
 
-	NOTE( "now that we are using window.buffer_focus, do we really need to pass Edit_Node ?" )
-	setFormat :procedure( var inf :Edit_Node );
+	setFormat :procedure;
 		
 		// initializes a new edit buffer
 		// call function to set background and foreground colors, font and margins
@@ -1101,13 +1104,13 @@ proc
 			
 	begin setFormat;
 		
-		mov( inf, esi );
+		mov( window.buffer_focus, esi );
 		w.SendMessage( editesi.hred, w.EM_EXLIMITTEXT, 0, -1 );
 		
-		setFont( inf );
+		setFont();
 		w.SendMessage( editesi.hred, w.EM_SETBKGNDCOLOR, false, window.backColor);
 		
-		setTabs( inf );
+		setTabs();
 		w.SendMessage( editesi.hred, w.EM_SETMARGINS, w.EC_LEFTMARGIN | w.EC_RIGHTMARGIN, 5<<16 | 5 );
 	end setFormat;
 	
@@ -1123,7 +1126,7 @@ proc
 			w.SendMessage( editebx.hred, w.EM_AUTOURLDETECT, false, NULL);
 			w.SendMessage( editebx.hred, w.EM_SETEVENTMASK, 0, w.ENM_SELCHANGE | w.ENM_MOUSEEVENTS );
 		endif;
-		setFormat( inf );
+		setFormat();
 		popabi;
 	end updateActiveURL;
 	

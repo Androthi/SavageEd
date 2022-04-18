@@ -129,7 +129,7 @@ Further considerations:
 
 ### Special Codes
 Find dialog has a Special Codes checkbox. Activating this mode will deactivate
-incremental find. You can enter special codes with a backslach '\' followed by
+incremental find. You can enter special codes with a backslash '\' followed by
 a code in the find and replace fields.
 
 Codes:

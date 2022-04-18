@@ -362,13 +362,13 @@ proc
 	GetSelText :procedure( lpBuff:dword ); @external;
 	AboutDlgProc :procedure( lParam:dword; wParam:dword; uMsg:uns32; hDlg:dword); @external;
 	AddMenus :procedure; @external;
-	setFormat :procedure( var inf :Edit_Node ); @external;
+	setFormat :procedure; @external;
 	Proc_Edit	:procedure( lParam:dword; wParam:dword; uMsg:uns32; hWin:dword ); @external;
 	newInstance :procedure( filename:string ); @external;
 	openRecent :procedure(id:dword); @external;
 	Proc_Input :procedure( lParam:dword; wParam:dword; uMsg:uns32; hWin:dword ); @external;
-	setFont	:procedure( var inf	:Edit_Node ); @external;
-	setTabs	:procedure (var inf:Edit_Node); @external;
+	setFont	:procedure; @external;
+	setTabs	:procedure; @external;
 	command_select_to_eol :procedure; @external;
 	command_move_line_up :procedure; @external;
 	command_move_line_down :procedure; @external; 

@@ -7,7 +7,7 @@ program SavageEd;
 
 readonly
 
-	version			:string := "SavageEd v0.10.20";
+	version			:string := "SavageEd v0.10.23";
 
 storage
 	logfont			:w.LOGFONT;
@@ -827,7 +827,7 @@ proc
 								// open line above
 								xor( eax, eax );
 								command_cursor_up();
-								getInfo( window.buffer_focus );
+								getInfo();
 								jmp do_shift;
 							endif;
 						
@@ -1401,7 +1401,7 @@ proc
 	begin updateStatus;
 		
 		mov( str.talloc( 1000 ), build_str );
-		getInfo( window.buffer_focus );
+		getInfo();
 		mov( window.buffer_focus, ebx );
 		mov( editebx.line.number, eax );
 		inc( eax );
@@ -1506,7 +1506,7 @@ proc
 	end getLineInfo;
 
 	NOTE( "now that we are using window.buffer_focus, do we really need to pass Edit_Node as an argument?" )
-	getInfo: procedure ( var inf:Edit_Node );
+	getInfo: procedure;
 	
 		// collects informaiton about the edit state
 		// and stores it in the info structure
@@ -1517,9 +1517,8 @@ proc
 		push( edi );
 		push( esi );
 		mov( 0, index );
-		mov( inf, edi );
+		mov( window.buffer_focus, edi );
 		lea( esi, editedi.cursor );
-		//mov( window.buffer_focus, ebx );
 		w.SendMessage( editedi.hred, w.EM_EXGETSEL, 0, esi );
 
 		// if mark is set, find the relative direction
@@ -1574,7 +1573,7 @@ proc
 //bm=editcommands
 
 	NOTE( "now that we are using window.buffer_focus, do we really need to pass Edit_Node ?" )
-	command_selection_to_string	:procedure( var inf:Edit_Node );
+	command_selection_to_string	:procedure;
 	
 		var
 			sel_string	:string;
@@ -1583,10 +1582,10 @@ proc
 	begin command_selection_to_string;
 		
 		push( edi );
-		mov( inf, edi );
+		mov( window.buffer_focus, edi );
 		mov( editedi.cursor.end_index, eax );
 		sub( editedi.cursor.start_index, eax );
-		dbg.put("str size = ", eax );
+		//dbg.put("str size = ", eax );
 		str.alloc( eax );
 		mov( eax, sel_string );
 		push( (type str.strRec[eax]).maxlen );
@@ -1606,7 +1605,7 @@ proc
 			end_index	:dword;
 	begin command_lowercase_selection;
 		pushad();
-		getInfo( window.buffer_focus );
+		getInfo();
 		mov( window.buffer_focus, ebx );
 		mov( editebx.cursor.start_index, eax );
 		mov( eax, start_index );
@@ -1616,7 +1615,7 @@ proc
 			inc( editebx.cursor.end_index );
 			w.SendMessage( editebx.hred, w.EM_SETSEL, editebx.cursor.start_index, editebx.cursor.end_index );	
 		endif;
-		command_selection_to_string( window.buffer_focus );
+		command_selection_to_string();
 		mov( eax, esi );
 		str.lower1( esi );
 		w.SendMessage( editebx.hred, w.EM_REPLACESEL, true, esi );
@@ -1632,7 +1631,7 @@ proc
 			
 	begin command_uppercase_selection;
 		pushad();
-		getInfo( window.buffer_focus );
+		getInfo();
 		mov( window.buffer_focus, ebx );
 		mov( editebx.cursor.start_index, eax );
 		mov( eax, start_index );
@@ -1641,7 +1640,7 @@ proc
 			inc( editebx.cursor.end_index );
 			w.SendMessage( editebx.hred, w.EM_SETSEL, editebx.cursor.start_index, editebx.cursor.end_index );	
 		endif;
-		command_selection_to_string( window.buffer_focus );
+		command_selection_to_string();
 		mov( eax, esi );
 		str.upper1( esi );
 		w.SendMessage( editebx.hred, w.EM_REPLACESEL, true, esi );
@@ -1725,19 +1724,17 @@ proc
 		// copy the current line in the editor to buffer
 		
 	begin command_get_line;
-				
 		mov( line_buffer, eax );
 		mov( szLINEBUFFER, (type word [eax] ) );
-		w.SendMessage( info.hred, w.EM_GETLINE, info.line.number, eax );
-		
-		// returns number of length of line copied in eax
-		
+		mov( window.buffer_focus, esi );
+		w.SendMessage( editesi.hred, w.EM_GETLINE, editesi.line.number, eax );
+		// returns length of line copied in eax
 	end command_get_line;
 
 	command_get_word	:procedure {@noframe, @returns("EAX") };
 	
 		// returns the start and end of a word
-		// in info.cursor.start_index and info.cursor.end_index
+		// in buffer_focus.cursor.start_index and buffer_focus.cursor.end_index
 	
 	begin command_get_word;
 		dbg.enters( "command_get_word" );
@@ -1767,7 +1764,7 @@ proc
 			endfor;
 		endif;
 		
-		// change buffer coordinate to info.hred coordinate
+		// change buffer coordinate to buffer_focus.hred coordinate
 		sub( &buffer, edx );
 		add( editebx.line.index, edx );
 		mov( edx, editebx.cursor.start_index);
@@ -1786,7 +1783,7 @@ proc
 			endif;
 		endfor;
 
-		// change buffer coordinate to info.hred coordinate
+		// change buffer coordinate to buffer_focus.hred coordinate
 		sub( &buffer, edx );
 		add( editebx.line.index, edx );
 		dbg.put("end index :", (type uns32 edx));
@@ -1971,7 +1968,7 @@ proc
 			w.SendMessage( editebx.hred, w.EM_REPLACESEL, true, s_empty );
 			command_move_to_bol();
 			w.SendMessage( editebx.hred, w.EM_REPLACESEL, true, &buffer );
-			getInfo( window.buffer_focus );
+			getInfo();
 			command_move_to_bol();
 			pop( eax );
 			add( editebx.line.index, eax );
@@ -1997,7 +1994,7 @@ proc
 			w.SendMessage( editebx.hred, w.EM_REPLACESEL, true, s_empty );
 			command_cursor_down();
 			w.SendMessage( editebx.hred, w.EM_REPLACESEL, true, &buffer );
-			getInfo( window.buffer_focus );
+			getInfo();
 			command_move_to_bol();
 			pop( eax );
 			add( editebx.line.index, eax );
@@ -2049,17 +2046,18 @@ proc
 	
 	begin command_increase_indent;
 		mov( str.talloc( 1000 ), build_str );
-		w.LockWindowUpdate(info.hred);
-		mov( window.buffer_focus, ebx );
-		push( editebx.column_index );
+		mov( window.buffer_focus, esi );
+		w.LockWindowUpdate(editesi.hred);
+		push( editesi.column_index );
 		pop( char_index );
 		
-		push( editebx.line.number );
+		push( editesi.line.number );
 		pop( line.number );
 		getLineInfo( line );
 		
-		w.SendMessage( editebx.hred, w.EM_SETSEL, line.index, line.index );
+		w.SendMessage( editesi.hred, w.EM_SETSEL, line.index, line.index );
 		
+		push( esi );
 		if( config.readBool( s_settings, s_tabsasspace ) ) then
 			str.cpy( strtabs, build_str );
 			mov( str.length(strtabs), n_tab );
@@ -2067,14 +2065,14 @@ proc
 			str.cpy( "	", build_str );
 			mov( 1, n_tab );
 		endif;
+		pop( esi );
 
-		w.SendMessage( editebx.hred, w.EM_REPLACESEL, true, build_str );
+		w.SendMessage( editesi.hred, w.EM_REPLACESEL, true, build_str );
 		mov( line.index, eax );
 		add( n_tab, eax );
 		add( char_index, eax );
-		w.SendMessage( editebx.hred, w.EM_SETSEL, eax, eax );
+		w.SendMessage( editesi.hred, w.EM_SETSEL, eax, eax );
 		w.LockWindowUpdate( NULL );
-
 	end command_increase_indent;
 
 	command_reduce_indent :procedure;
@@ -2090,14 +2088,16 @@ proc
 			
 			
 	begin command_reduce_indent;
-		w.LockWindowUpdate(info.hred);
+		USE( EBX );
+		
 		mov( window.buffer_focus, ebx );
+		w.LockWindowUpdate( editebx.hred );
 		push( editebx.line.number );
 		pop( line.number );
 		getLineInfo( line );
 		push( editebx.cursor.start_index );
 		pop( cp_min );		
-		command_get_line(&buffer);
+		command_get_line( &buffer );
 		if( buffer[0] = $09 ) then
 			mov( 1, ecx );
 		elseif( buffer[0] = ' ' ) then
@@ -2133,6 +2133,7 @@ proc
 		w.SendMessage( editebx.hred, w.EM_SETSEL, eax, eax);
 		w.LockWindowUpdate(NULL);
 		
+		ENDUSE;
 	end command_reduce_indent;
 
 	
@@ -2367,14 +2368,14 @@ proc
 			if( config.readBool( s_settings, "Active URL" )) then
 				w.CheckMenuItem( window.hmenu, IDM_ACTIVE_URL, w.MF_BYCOMMAND | w.MF_UNCHECKED );
 				config.writeBool( s_settings, "Active URL", false );
-				updateActiveURL( window.buffer_focus );
+				updateActiveURL(); //!( window.buffer_focus );
 			else
 				getConfirm();
 				if( ! eax ) then
 					w.CheckMenuItem( window.hmenu, IDM_ACTIVE_URL, w.MF_BYCOMMAND | w.MF_CHECKED );
 					config.writeBool( s_settings, "Active URL", true );
 					saveFile( editebx.filepath, false );
-					updateActiveURL( window.buffer_focus );
+					updateActiveURL(); //!( window.buffer_focus );
 					loadFile( editebx.filepath );
 				endif;
 			endif;

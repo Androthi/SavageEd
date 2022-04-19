@@ -110,7 +110,8 @@ proc
 		
 		w.GetModuleHandle( NULL );
 		mov( eax, window.hinst );
-		mov( str.alloc( 1000 ), info.filepath );
+		mov( window.buffer_focus, esi );
+		mov( str.alloc( 1000 ), editesi.filepath );
 		
 		w.LoadLibrary( RichEditDLL );
 		if (eax = NULL ) then
@@ -122,7 +123,7 @@ proc
 		mov	(eax,window.hredDLL);
 		
 		w.InitCommonControls();
-		str.cpy( s_untitled, info.filepath );
+		str.cpy( s_untitled, editesi.filepath );
 
 		mov( 0, findbuf[0] );
 		mov( 0, replacebuf[0] );
@@ -250,8 +251,8 @@ proc
 			w.SendMessage( window.hstatus, w.WM_SIZE, 0, 0 );
 
 		endif;
-		
-		w.MoveWindow( info.hred, 0, rect.top, rect.right, height, true );
+		mov( window.buffer_focus, eax );
+		w.MoveWindow( editeax.hred, 0, rect.top, rect.right, height, true );
 		xor( eax, eax );
 	end Msg_Size;
 		
@@ -260,7 +261,8 @@ proc
 		// set window focus to active editor control
 	
 	begin Msg_SetFocus;
-		w.SetFocus( info.hred );
+		mov( window.buffer_focus, eax );
+		w.SetFocus( editeax.hred );
 		xor( eax, eax );
 	end Msg_SetFocus;
 
@@ -296,7 +298,8 @@ proc
 		config.writeUns( s_window, "height", window.height );
 		config.writeBin( s_text, s_find, &window.find_mode, @size( window.find_mode ) );
 		
-		config.writeUns( s_settings, "Start Position", info.cursor.start_index );
+		mov( window.buffer_focus, eax );
+		config.writeUns( s_settings, "Start Position", editeax.cursor.start_index );
 		
 		if( config.readBool( s_settings, s_clearexit ) ) then
 			
@@ -424,11 +427,12 @@ proc
 	begin setWindowTitle;
 		
 		mov( str.talloc(1000), title );
-		filesys.extractFilename( info.filepath, title );
+		mov( window.buffer_focus, esi );
+		filesys.extractFilename( editesi.filepath, title );
 		str.insert3( "SavageEd.exe - ", 0, title );
-		if(info.hred) then
-			if (w.SendMessage(info.hred, w.EM_GETMODIFY,0,0)) then
-				str.insert("*",0, title);
+		if( editesi.hred ) then
+			if (w.SendMessage( editesi.hred, w.EM_GETMODIFY,0,0 )) then
+				str.insert( "*", 0, title );
 			endif;
 		endif;
 		w.SetWindowText( window.hwnd, title );
@@ -464,8 +468,10 @@ proc
 		// checks for modified file, gets confirmation from user
 
 	begin getConfirm;
-		w.SendMessage(info.hred, w.EM_GETMODIFY,0,0);
-		if (eax) then
+		USE( ESI );
+		mov( window.buffer_focus, ebx );
+		w.SendMessage( editebx.hred, w.EM_GETMODIFY, 0, 0 );
+		if( eax ) then
 			if( config.readBool( s_settings, s_autosave ) ) then
 
 				checkSave();
@@ -473,7 +479,7 @@ proc
 			
 			else
 				
-				w.MessageBox(window.hwnd, info.filepath, s_savechanges, w.MB_YESNOCANCEL | w.MB_ICONQUESTION);
+				w.MessageBox( window.hwnd, editebx.filepath, s_savechanges, w.MB_YESNOCANCEL | w.MB_ICONQUESTION);
 				if( eax=w.IDYES ) then
 						
 					checkSave();
@@ -495,6 +501,7 @@ proc
 			xor( eax, eax );
 			
 		endif;
+		ENDUSE;
 		ret();
 	end getConfirm;
 
@@ -505,12 +512,13 @@ proc
 		// option is on.
 	
 	begin checkSave;
-		
-		if( str.ieq( info.filepath, s_untitled ) ) then
+		USE( EBX );
+		mov( window.buffer_focus, ebx );
+		if( str.ieq( editebx.filepath, s_untitled ) ) then
 			
 			if( config.readBool( s_settings, s_autosave ) ) then
 				
-				getTempName( s_untitled, s_txtext, info.filepath );
+				getTempName( s_untitled, s_txtext, editebx.filepath );
 				mov( 0, eax );
 			else
 				
@@ -524,9 +532,10 @@ proc
 		endif;
 		
 		if( ! eax  ) then
-			saveFile( info.filepath, false );
+			saveFile( editebx.filepath, false );
 		endif;
-		updateStatus();		
+		updateStatus();
+		ENDUSE;
 		ret();
 	end checkSave;
 
@@ -536,23 +545,25 @@ proc
 		// new name becomes default
 	
 	begin SaveAs;
+		USE( ESI );
 		
 		getFileName();
-		if(eax) then
-			str.cpyz( &buffer, info.filepath );
-			if( ! filesys.hasExtension(info.filepath) ) then
-				str.cat( default_extension, info.filepath);
+		if( eax ) then
+			mov( window.buffer_focus, esi );
+			str.cpyz( &buffer, editesi.filepath );
+			if( ! filesys.hasExtension( editesi.filepath )) then
+				str.cat( default_extension, editesi.filepath );
 			endif;
 			
-			saveFile( info.filepath, false );
+			saveFile( editesi.filepath, false );
 			if(eax) then
 			 	// reset FileName to untitled
-			 	str.cpy( s_untitled, info.filepath );
+			 	str.cpy( s_untitled, editesi.filepath );
 
 			endif; 
 			
-			mov( MODE_INSERT, info.mode );
-			dbg.put("mode to :", info.mode );
+			mov( MODE_INSERT, editesi.mode );
+			dbg.put("mode to :", editesi.mode );
 			xor( eax, eax );
 			
 		else
@@ -560,6 +571,8 @@ proc
 			mov(-1,eax);
 			
 		endif;
+		
+		ENDUSE;
 		ret();
 	end SaveAs;
 
@@ -590,7 +603,7 @@ proc
 			hfile	:dword;
 			
 	begin saveFile;
-		
+		USE( ESI );
 		dbg.put("saving filename:", filename );
 		try
 			fileio.openNew( filename );
@@ -601,12 +614,13 @@ proc
 			if( save_selection ) then
 				or( w.SFF_SELECTION, eax );
 			endif;
-			w.SendMessage( info.hred, w.EM_STREAMOUT, eax, &editstream );
+			mov( window.buffer_focus, esi );
+			w.SendMessage( editesi.hred, w.EM_STREAMOUT, eax, &editstream );
 			fileio.close( hfile );
-			w.SendMessage(info.hred, w.EM_SETMODIFY, false, 0);
+			w.SendMessage( editesi.hred, w.EM_SETMODIFY, false, 0 );
 			mov( false,eax );
 
-			if( info.mode = MODE_EDITINI ) then
+			if( editesi.mode = MODE_EDITINI ) then
 				initConfig();
 			endif;
 			
@@ -621,7 +635,7 @@ proc
 		updateStatus();
 		pop( eax );
 		done:
-		
+		ENDUSE;
 	end saveFile;
 
 	getFileName	:procedure;
@@ -633,6 +647,7 @@ proc
 			
 	
 	begin getFileName;
+		USE( ESI );
 		
 		mov( str.talloc(1000), build_str );
 		lea( ofn, eax );
@@ -643,11 +658,12 @@ proc
 		mov( &curdir, eax );
 		mov( eax, ofn.lpstrInitialDir );
 		
-		if( str.eq( info.filepath, s_untitled ) ) then
+		mov( window.buffer_focus, esi );
+		if( str.eq( editesi.filepath, s_untitled ) ) then
 			str.put( build_str, '*', default_extension );
 			zstr.cpy( (type zstring build_str ), &buffer );
 		else
-			zstr.cpy( (type zstring info.filepath ), &buffer );
+			zstr.cpy( (type zstring editesi.filepath ), &buffer );
 		endif;
 		mov( &buffer, eax );
 		mov( eax, ofn.lpstrFile );
@@ -658,6 +674,8 @@ proc
 		
 		dbg.put("ofn");
 		w.GetSaveFileName( ofn );
+		
+		ENDUSE;
 	end getFileName;
 
 
@@ -666,17 +684,19 @@ proc
 		// load a file into the buffer
 	
 	begin setText;
+		USE( ESI );
 		
-		w.SetWindowText( info.hred, 0 );
+		mov( window.buffer_focus, esi );
+		w.SetWindowText( editesi.hred, 0 );
 		w.GetFileSize( hfile, NULL );
 		if( eax > 0 ) then
 			mov( hfile, editstream.dwCookie );
 			mov( &StreamInProc, editstream.pfnCallback );
-			w.SendMessage( info.hred, w.EM_STREAMIN, w.SF_TEXT, &editstream );
-			w.SendMessage( info.hred, w.EM_SETMODIFY, false,0 );
-		else
-		
+			w.SendMessage( editesi.hred, w.EM_STREAMIN, w.SF_TEXT, &editstream );
+			w.SendMessage( editesi.hred, w.EM_SETMODIFY, false,0 );
 		endif;
+		
+		ENDUSE;
 	end setText;
 		
 	command_insert_time :procedure;
@@ -695,7 +715,8 @@ proc
 						format,
 						&buffer,
 						@size(buffer));
-		w.SendMessage(info.hred, w.EM_REPLACESEL, true, &buffer);		
+		mov( window.buffer_focus, eax );
+		w.SendMessage( editeax.hred, w.EM_REPLACESEL, true, &buffer );		
 	end command_insert_time;
 
 	command_insert_date :procedure;
@@ -714,7 +735,8 @@ proc
 						format,
 						&buffer,
 						@size(buffer));
-		w.SendMessage(info.hred, w.EM_REPLACESEL, true, &buffer);
+		mov( window.buffer_focus, eax );
+		w.SendMessage( editeax.hred, w.EM_REPLACESEL, true, &buffer );
 	end command_insert_date;
 	
 	command_insert_date_time :procedure;
@@ -736,18 +758,21 @@ proc
 		
 		{@noframe};
 	begin JumpLog;
-	
+		USE( ESI );
+		
+		mov( window.buffer_focus, esi );
 		if (al='<') then	// append at top
-			w.SendMessage( info.hred,w.EM_SETSEL,5,5 );
+			w.SendMessage( editesi.hred,w.EM_SETSEL, 5, 5 );
 			
 		else				// append at bottom
-			w.SendMessage( info.hred,w.EM_SETSEL,-1,-1 );
+			w.SendMessage( editesi.hred, w.EM_SETSEL,-1,-1 );
 		endif;
-		w.SendMessage( info.hred, w.EM_REPLACESEL,true, s_nl );
+		w.SendMessage( editesi.hred, w.EM_REPLACESEL,true, s_nl );
 		command_insert_date_time();
-		w.SendMessage( info.hred, w.EM_REPLACESEL,true, s_nl );
-		ret();
+		w.SendMessage( editesi.hred, w.EM_REPLACESEL,true, s_nl );
 		
+		ENDUSE;
+		ret();
 	end JumpLog;
 
 	Cmd_File_Quit :procedure( hwin:dword; wparam:dword; lparam:dword );
@@ -767,18 +792,23 @@ proc
 
 	begin checkLog;
 		//dbg.put ("CheckLog");
+		USE( ESI );
+		
 		mov( 0, find_range.chrg.cpMin );
 		mov( 5, find_range.chrg.cpMax );
 		mov( &buffer,find_range.lpstrText );
-		w.SendMessage( info.hred, w.EM_GETTEXTRANGE, 0, &find_range);
+		mov( window.buffer_focus, esi );
+		w.SendMessage( editesi.hred, w.EM_GETTEXTRANGE, 0, &find_range);
 		mov(&buffer,esi);
 		lodsd();
 		if ( eax = $474f4c2e ) then	// .LOG
 			// check direction
 			lodsb();
 			JumpLog();
-			w.SendMessage( info.hred, w.EM_SETMODIFY, false, 0 );
+			w.SendMessage( editesi.hred, w.EM_SETMODIFY, false, 0 );
 		endif;
+		
+		ENDUSE;
 		ret();
 	end checkLog;
 
@@ -788,19 +818,21 @@ proc
 		// with find
 	
 	begin GetSelText;
-	
+		USE( ESI );
+		
 		mov( lpBuff, eax );
 		mov( eax, find_range.lpstrText );
-		
-		w.SendMessage( info.hred, w.EM_EXGETSEL,0, &find_range.chrg );
+		mov( window.buffer_focus, esi );
+		w.SendMessage( editesi.hred, w.EM_EXGETSEL,0, &find_range.chrg );
 		mov( find_range.chrg.cpMax,eax );
 		sub( find_range.chrg.cpMin,eax );
 		if( eax >= @elements( findbuf ) ) then
 			mov( @elements( findbuf) -1, find_range.chrg.cpMax );
 		endif;
 		
-		w.SendMessage( info.hred, w.EM_GETTEXTRANGE,0,&find_range );
-	
+		w.SendMessage( editesi.hred, w.EM_GETTEXTRANGE,0,&find_range );
+		
+		ENDUSE;
 	end GetSelText;
 	
 	AboutDlgProc :procedure( lParam:dword; wParam:dword; uMsg:uns32; hDlg:dword);
@@ -810,31 +842,31 @@ proc
 	begin AboutDlgProc;
 		
 		if (uMsg = w.WM_INITDIALOG) then
-			mov	(hDlg, window.habout);
+			mov( hDlg, window.habout );
 			w.SetDlgItemText( window.habout,ID_ABOUTGRP,version ); 
-			w.SetFocus(window.habout);
+			w.SetFocus( window.habout );
 
-		elseif (uMsg = w.WM_COMMAND) then
-			 if (wParam = w.IDOK || wParam= w.IDCANCEL) then				
+		elseif( uMsg = w.WM_COMMAND ) then
+			 if( wParam = w.IDOK || wParam= w.IDCANCEL ) then				
 
-			 	w.SendMessage(hDlg, w.WM_CLOSE,NULL,NULL);
+			 	w.SendMessage( hDlg, w.WM_CLOSE, NULL, NULL );
 
 			 endif;
-		elseif (uMsg = w.WM_CLOSE) then
+		elseif( uMsg = w.WM_CLOSE ) then
 
-			w.DestroyWindow(window.habout);
-			mov	(0, window.habout);
-			w.SetFocus(info.hred);
+			w.DestroyWindow( window.habout );
+			mov( 0, window.habout );
+			mov( window.buffer_focus, eax );
+			w.SetFocus( editeax.hred );
 		
 		else
-			mov (false, eax);
+			mov( false, eax );
 			exit AboutDlgProc;
 		endif;
 	
-		mov (true, eax);	
+		mov( true, eax );	
 		
 	end AboutDlgProc;
-				
 
 	AddMenus :procedure;
 		
@@ -975,13 +1007,14 @@ proc
 	begin Msg_OpenDroppedFile;
 		mov( str.talloc( 1000 ), build_str );		
 		pushabi;
+		w.SetForegroundWindow( window.hwnd );
 		
-		w.SetForegroundWindow(window.hwnd);
-		w.SetFocus(info.hred);	
+		mov( window.buffer_focus, esi );
+		w.SetFocus( editesi.hred );
 	
 		getConfirm();
-		if (!eax) then	
-			w.SetWindowText( info.hred, 0 );		// clear edit window
+		if( !eax ) then	
+			w.SetWindowText( editesi.hred, 0 );		// clear edit window
 			w.DragQueryFile( wParam, 0, &buffer, @size(buffer) );
 			w.GetLongPathName( &buffer, &buffer, @size(buffer) );
 			str.cpyz( &buffer, build_str );
@@ -1003,6 +1036,7 @@ proc
 			pt	:w.POINT;
 		
 	begin Msg_Context;
+		USE( EBX );
 		mov (lParam, eax);
 		if (eax = -1) then
 			w.GetCaretPos (pt);
@@ -1017,18 +1051,18 @@ proc
 			mov (eax, pt.y);
 		endif;
 		
-		mov (wParam, eax);
-		if (eax = info.hred) then
-			w.GetMenu (hwnd);
-			w.GetSubMenu (eax, 1);	// edit menu, 2nd item
-			w.TrackPopupMenu(eax, w.TPM_LEFTALIGN | w.TPM_RIGHTBUTTON, pt.x,pt.y,0,hwnd,NULL);
+		mov( wParam, eax );
+		mov( window.buffer_focus, ebx );
+		if( eax = editebx.hred ) then
+			w.GetMenu( hwnd );
+			w.GetSubMenu( eax, 1 );	// edit menu, 2nd item
+			w.TrackPopupMenu( eax, w.TPM_LEFTALIGN | w.TPM_RIGHTBUTTON, pt.x, pt.y, 0, hwnd, NULL );
 		endif;
 		
+		ENDUSE;
 		xor( eax, eax );
-		
 	end Msg_Context;
 
-	NOTE( "now that we are using window.buffer_focus, do we really need to pass Edit_Node ?" )
 	setFont	:procedure;
 		
 		var
@@ -1114,11 +1148,12 @@ proc
 		w.SendMessage( editesi.hred, w.EM_SETMARGINS, w.EC_LEFTMARGIN | w.EC_RIGHTMARGIN, 5<<16 | 5 );
 	end setFormat;
 	
-	NOTE( "now that we are using window.buffer_focus, do we really need to pass Edit_Node ?" )
-	updateActiveURL :procedure( var inf :Edit_Node);
+	//!NOTE( "now that we are using window.buffer_focus, do we really need to pass Edit_Node ?" )
+	updateActiveURL :procedure; //!( var inf :Edit_Node);
 	begin updateActiveURL;
 		pushabi;
-		mov( inf, ebx );
+		//!mov( inf, ebx );
+		mov( window.buffer_focus, ebx );
 		if( config.readBool( s_settings, "Active URL" ) ) then
 			w.SendMessage( editebx.hred, w.EM_AUTOURLDETECT, true, NULL);
 			w.SendMessage( editebx.hred, w.EM_SETEVENTMASK, 0, w.ENM_SELCHANGE | w.ENM_MOUSEEVENTS | w.ENM_LINK );
@@ -1142,8 +1177,10 @@ proc
 			build_str	:string;
 		
 	begin Msg_Create;
+		pushabi;
 		
 		TODO( "this should create a new Edit_Node object and add it to the list" )
+		TODO( "i changed my mind, this should probalby be done in main begin section instead." )
 		mov( str.talloc( 1000 ), build_str );
 		mov( hwin, eax );
 		mov( eax, window.hwnd );
@@ -1173,14 +1210,15 @@ proc
 		w.CreateWindowEx( w.WS_EX_CLIENTEDGE, s_resedClass, NULL,
 					edit_style, 0, 0, 0, 0, window.hwnd,
 					window.hcontextmenu, window.hinst, NULL );
-		mov( eax, info.hred );
+		mov( window.buffer_focus, esi );
+		mov( eax, editesi.hred );
 				
 		// subclass the edit control
-		w.SetWindowLong(info.hred, w.GWL_WNDPROC, &Proc_Edit);
-		mov( eax, info.old_proc);
+		w.SetWindowLong( editesi.hred, w.GWL_WNDPROC, &Proc_Edit );
+		mov( eax, editesi.old_proc);
 		
-		updateActiveURL( info );
-		w.SetFocus( info.hred );
+		updateActiveURL(); //!( info );
+		w.SetFocus( editesi.hred );
 
 		// check for a filename passed as an argument and try to open that file.
 		// if file doesn't exist, start new document with that filename.
@@ -1201,8 +1239,11 @@ proc
 				if (eax) then
 					if( config.readBool( s_settings, s_rememberpos )) then
 						config.readUns( s_settings, "Start Position");
+						//lea( edi, editesi.cursor );
 						mov( eax, info.cursor.start_index );
 						mov( eax, info.cursor.end_index );
+						//mov( eax, charrangeedi.start_index );
+						//mov( eax, charrangeedi.end_index );
 						w.SendMessage( info.hred, w.EM_EXSETSEL, 0, &info.cursor );
 					endif;
 					jmp skipOpenRecent;
@@ -1218,7 +1259,7 @@ proc
 				//str.catz (eax, info.filepath);
 				
 				arg.v(1);
-				str.cpyz (eax, info.filepath); 
+				str.cpyz (eax, editesi.filepath); 
 				jmp skipOpenRecent;
 			endif;
 		endif;
@@ -1254,12 +1295,12 @@ proc
 			
 		endif;
 		skipOpenRecent:
-		getInfo( info );
+		getInfo();
 		updateMenu();
 		updateStatus();
 		
+		popabi;
 		xor( eax, eax );
-		
 	end Msg_Create;
 
 	Msg_Notify :procedure( hwin:dword; wparam:dword; lparam:dword );

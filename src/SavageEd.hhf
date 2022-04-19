@@ -7,9 +7,10 @@
 
 //bm=typeconsts
 const
-	typeConsts( edit, Edit_Node, edi, esi, ebx, edx)
-	typeConsts( charrange, range, esi )
+	typeConsts( edit, Edit_Node, eax, edi, esi, ebx, edx)
+	typeConsts( charrange, range, esi, edi )
 	typeConsts( config, tConfig, esi )
+	
 
 type
 	// Message and dispatch table related definitions:
@@ -318,7 +319,7 @@ proc
 	Msg_Command :procedure( hwin:dword; wparam:dword; lparam:dword ); @external;
 	loadFile :procedure( filename:string ); @external;
 	updateRecentLog :procedure; @external;
-	getInfo :procedure ( var inf:Edit_Node); @external;
+	getInfo :procedure; @external;
 	getConfigPath :procedure( s:string ); @external;
 	command_copy_word :procedure; @external;
 	command_delete_word :procedure; @external;
@@ -375,6 +376,6 @@ proc
 	command_uppercase_selection :procedure; @external;
 	command_lowercase_selection	:procedure; @external;
 	clear_keystate	:procedure; @external;
-	updateActiveURL :procedure( var inf :Edit_Node); @external;
+	updateActiveURL :procedure; @external; //!( var inf :Edit_Node); @external;
 
 	

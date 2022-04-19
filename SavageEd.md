@@ -294,6 +294,9 @@ at the top of the document, just below the .LOG< .  So the most
 recent updates will appear near the top of the document instead of
 the bottom.
 
+Caution: Using the "Remember Position" option with .LOG files can cause
+inconvenient behavior.
+
 ## View -> Status Bar
 Shows/hides the status bar
 The status bar shows the following information:

@@ -376,6 +376,6 @@ proc
 	command_uppercase_selection :procedure; @external;
 	command_lowercase_selection	:procedure; @external;
 	clear_keystate	:procedure; @external;
-	updateActiveURL :procedure; @external; //!( var inf :Edit_Node); @external;
+	updateActiveURL :procedure; @external;
 
 	

@@ -1148,11 +1148,9 @@ proc
 		w.SendMessage( editesi.hred, w.EM_SETMARGINS, w.EC_LEFTMARGIN | w.EC_RIGHTMARGIN, 5<<16 | 5 );
 	end setFormat;
 	
-	//!NOTE( "now that we are using window.buffer_focus, do we really need to pass Edit_Node ?" )
-	updateActiveURL :procedure; //!( var inf :Edit_Node);
+	updateActiveURL :procedure;
 	begin updateActiveURL;
 		pushabi;
-		//!mov( inf, ebx );
 		mov( window.buffer_focus, ebx );
 		if( config.readBool( s_settings, "Active URL" ) ) then
 			w.SendMessage( editebx.hred, w.EM_AUTOURLDETECT, true, NULL);
@@ -1217,7 +1215,7 @@ proc
 		w.SetWindowLong( editesi.hred, w.GWL_WNDPROC, &Proc_Edit );
 		mov( eax, editesi.old_proc);
 		
-		updateActiveURL(); //!( info );
+		updateActiveURL();
 		w.SetFocus( editesi.hred );
 
 		// check for a filename passed as an argument and try to open that file.
@@ -1239,12 +1237,11 @@ proc
 				if (eax) then
 					if( config.readBool( s_settings, s_rememberpos )) then
 						config.readUns( s_settings, "Start Position");
-						//lea( edi, editesi.cursor );
 						mov( eax, info.cursor.start_index );
 						mov( eax, info.cursor.end_index );
-						//mov( eax, charrangeedi.start_index );
-						//mov( eax, charrangeedi.end_index );
-						w.SendMessage( info.hred, w.EM_EXSETSEL, 0, &info.cursor );
+						mov( window.buffer_focus, esi );
+						lea( edi, editesi.cursor );
+						w.SendMessage( editesi.hred, w.EM_EXSETSEL, 0, edi );
 					endif;
 					jmp skipOpenRecent;
 				endif;
@@ -1288,7 +1285,9 @@ proc
 					config.readUns( s_settings, "Start Position");
 					mov( eax, info.cursor.start_index );
 					mov( eax, info.cursor.end_index );
-					w.SendMessage( info.hred, w.EM_EXSETSEL, 0, &info.cursor );
+					mov( window.buffer_focus, esi );
+					lea( edi, editesi.cursor );
+					w.SendMessage( editesi.hred, w.EM_EXSETSEL, 0, edi );
 				endif;
 				
 			endif;

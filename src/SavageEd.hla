@@ -2368,14 +2368,14 @@ proc
 			if( config.readBool( s_settings, "Active URL" )) then
 				w.CheckMenuItem( window.hmenu, IDM_ACTIVE_URL, w.MF_BYCOMMAND | w.MF_UNCHECKED );
 				config.writeBool( s_settings, "Active URL", false );
-				updateActiveURL(); //!( window.buffer_focus );
+				updateActiveURL();
 			else
 				getConfirm();
 				if( ! eax ) then
 					w.CheckMenuItem( window.hmenu, IDM_ACTIVE_URL, w.MF_BYCOMMAND | w.MF_CHECKED );
 					config.writeBool( s_settings, "Active URL", true );
 					saveFile( editebx.filepath, false );
-					updateActiveURL(); //!( window.buffer_focus );
+					updateActiveURL();
 					loadFile( editebx.filepath );
 				endif;
 			endif;
@@ -2653,7 +2653,10 @@ begin SavageEd;
 	w.DestroyWindow( editebx.hred );
 	w.DeleteObject( window.hfont );
 	w.FreeLibrary(window.hredDLL);
-	str.free( info.filepath );
+	
+	mov( window.buffer_focus, esi );
+	str.free( editesi.filepath );
+	
 	BufferList.destroy();
 
 	mov( window.msg.wParam, eax );

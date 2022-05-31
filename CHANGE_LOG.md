@@ -1,9 +1,14 @@
 # Change Log
 
+## 05/30/2022
+	0.10.30	fixed some internals
+			it is now possible to mail me from the About dialog.
+
 ## 02/19/2022
 	0.10.18 Maintenence build
 			- fixed .LOG not inserting date/time properly
 			- update to about dialog .. got rid of obsolete information.
+
 
 ## 10/05/2021
 	0.10.05 Feature changes:

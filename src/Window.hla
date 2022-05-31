@@ -82,7 +82,6 @@ readonly
 	s_savechanges	:string := "Save changes to ";
 	//s_savetitle		:string := "Save As: Extension Is Not Assumed";
 	s_savetitle		:string := "Save As:";
-	
 	curdir			:byte := '.';	// '.' = curdir
 
 storage
@@ -838,20 +837,29 @@ proc
 	AboutDlgProc :procedure( lParam:dword; wParam:dword; uMsg:uns32; hDlg:dword);
 	
 		// opens a window to display version number
+		var
+			tempstr	:string;
+			
 	
 	begin AboutDlgProc;
 		
+		mov( str.talloc(300), tempstr );
 		if (uMsg = w.WM_INITDIALOG) then
 			mov( hDlg, window.habout );
 			w.SetDlgItemText( window.habout,ID_ABOUTGRP,version ); 
 			w.SetFocus( window.habout );
 
 		elseif( uMsg = w.WM_COMMAND ) then
-			 if( wParam = w.IDOK || wParam= w.IDCANCEL ) then				
+			if( wParam = w.IDOK || wParam= w.IDCANCEL ) then				
 
-			 	w.SendMessage( hDlg, w.WM_CLOSE, NULL, NULL );
-
-			 endif;
+				w.SendMessage( hDlg, w.WM_CLOSE, NULL, NULL );
+			
+			elseif( wParam = IDC_MAILME ) then
+				
+				str.put( tempstr, "mailto:sevag.krikorian@gmail.com");
+				w.ShellExecute( NULL, NULL, tempstr, NULL, NULL, 1 );
+				
+			endif;
 		elseif( uMsg = w.WM_CLOSE ) then
 
 			w.DestroyWindow( window.habout );
@@ -1125,7 +1133,7 @@ proc
 			str.cat( " ", strtabs );
 			dec( eax ); 
 		endwhile;
-		dbg.put("strtabs :", strtabs );
+		//dbg.put("strtabs :", strtabs );
 		popabi;
 		
 	end setTabs;
@@ -1210,7 +1218,7 @@ proc
 					window.hcontextmenu, window.hinst, NULL );
 		mov( window.buffer_focus, esi );
 		mov( eax, editesi.hred );
-				
+		
 		// subclass the edit control
 		w.SetWindowLong( editesi.hred, w.GWL_WNDPROC, &Proc_Edit );
 		mov( eax, editesi.old_proc);
@@ -1230,6 +1238,7 @@ proc
 			w.GetLongPathName( eax, &buffer, @size(buffer) -1 );
 			if (eax) then
 				
+
 				// file path copied, try to open it.
 				
 				str.cpyz( &buffer, build_str );
@@ -1260,6 +1269,7 @@ proc
 				jmp skipOpenRecent;
 			endif;
 		endif;
+		
 		
 		// no file requested as an argument,
 		// check config to see if we want to open the most recent document
@@ -1342,7 +1352,7 @@ proc
 				mov( (type w.ENLINK[edx]).chrg.cpMin, text_range.chrg.cpMin );
 				mov( (type w.ENLINK[edx]).chrg.cpMax, text_range.chrg.cpMax );
 				lea( eax, text_range );
-				w.SendMessage( editebx.hred, w.EM_GETTEXTRANGE, 0, eax );
+				w.SendMessage( editebx.hred, w.EM_GETTEXTRANGE, 0, eax );				
 				w.ShellExecute( NULL, NULL, &buffer, NULL, NULL, 1 );  
 
 			endif;

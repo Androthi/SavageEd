@@ -205,6 +205,7 @@ const
 	ID_INPUT                := 3000;
 	IDC_EDT_INPUT           := 3001;
 	ID_SAVAGEED_MANUAL		:= 4000;
+	IDC_MAILME				:= 6001;
 
 	RECENT_MENU_START	:= 9000;
 	RECENT_MENU_END		:= 9019;	// It's over 9000!

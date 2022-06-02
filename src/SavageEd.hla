@@ -1739,7 +1739,7 @@ proc
 		dbg.enters( "command_get_word" );
 		USE( EDX, EBX )
 		command_get_line( &buffer );
-		
+		dbg.putz( &buffer);
 		// if we are sitting on a space, newline or tab char, don't do anything
 		mov( &buffer, edx );
 		mov( window.buffer_focus, ebx );
@@ -1756,7 +1756,8 @@ proc
 		if( edx > &buffer ) then
 			forever
 				dec( edx );
-				breakif( edx = &buffer );
+				breakif( edx < &buffer );
+				dbg.put("edx = ", (type char [edx]), ":", (type byte[edx]));
 				if( ((type byte [edx]) = ' ') ||
 					((type byte[edx]) = $09) ||
 					((type byte[edx]) = '"') ||

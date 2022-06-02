@@ -80,7 +80,6 @@ readonly
 	s_noopen		:string := "Unable to open file";
 	s_notemp		:string := "Unable to create temporary file";
 	s_savechanges	:string := "Save changes to ";
-	//s_savetitle		:string := "Save As: Extension Is Not Assumed";
 	s_savetitle		:string := "Save As:";
 	curdir			:byte := '.';	// '.' = curdir
 
@@ -90,8 +89,9 @@ storage
 static
 	default_date_format :string := "MM-dd-yyyy";
 	default_time_format :string := " hh:mm:tt";
-	default_extension	:str.strvar(w.MAX_PATH);	//.string := "";
+	default_extension	:str.strvar(w.MAX_PATH);
 	input	:InputInfo;
+	double_clicked	:boolean := false;
 	
 proc
 
@@ -1317,6 +1317,7 @@ proc
 		//	txt	:w.TEXTMETRIC;
 		//	hdc	:dword;
 			text_range	:w.TEXTRANGE;
+			sel_str		:string;
 			
 	begin Msg_Notify;
 
@@ -1338,12 +1339,44 @@ proc
 		//	dbg.put("width :", (type uns32 buffer[0]) );
 		//	dbg.separator;
 		//	dbg.dumpmem( &buffer, 16 );
-		//	w.GetTextMetrics( hdc, txt );
+		//	w.GetTextMetrics( h7dc, txt );
 		//	dbg.separator;
 		//	dbg.put("max char width :", txt.tmMaxCharWidth );
 		//	dbg.put("avg char width :", txt.tmAveCharWidth );
 		//	w.ReleaseDC( info.hred, hdc );
+		
+			if( double_clicked ) then
+				
+				// this is a hack of a richedit bug that selects
+				// the end quote of a single quote string after
+				// a double click. eg:
+				// 'hello'   double clicking on 'hello' will
+				// select the end quote, and all white spaces after it
+				// a fix is not possible without breaking something else,
+				// user will no longer be able to double click an end quote
+				// to select the end quote and any white space following it.
+				
+				
+				command_selection_to_string();
+				mov( eax, sel_str );
+				if( str.prefix2( sel_str, "'" ) ) then
+					
+					// we have a sincle quote selected.
+					// see if it's a quoted word and select it.
+					
+					if( editebx.column_index > 0 ) then
+						dec( editebx.column_index );
+						if( command_get_word() ) then
+							lea( eax, editebx.cursor );
+							w.SendMessage( editebx.hred, w.EM_EXSETSEL, 0, eax );
+						endif;
+					endif;
+				endif;
+
+				str.free( sel_str );
+			endif;
 			
+			mov( false, double_clicked );
 			updateStatus();
 		
 		elseif( eax = w.EN_LINK ) then
@@ -1352,9 +1385,13 @@ proc
 				mov( (type w.ENLINK[edx]).chrg.cpMin, text_range.chrg.cpMin );
 				mov( (type w.ENLINK[edx]).chrg.cpMax, text_range.chrg.cpMax );
 				lea( eax, text_range );
-				w.SendMessage( editebx.hred, w.EM_GETTEXTRANGE, 0, eax );				
-				w.ShellExecute( NULL, NULL, &buffer, NULL, NULL, 1 );  
-
+				w.SendMessage( editebx.hred, w.EM_GETTEXTRANGE, 0, eax ); 
+				if( (type char buffer[7]) = ']' ) then
+					// get rid of ']' that richedit sends when clicking on 
+					// a [mailto:]<link> address.
+					mov( ' ', (type char buffer[7]) );
+				endif;
+				w.ShellExecute( NULL, NULL, &buffer, NULL, NULL, 1 );
 			endif;
 		
 		elseif( eax = w.EN_MSGFILTER ) then
@@ -1371,6 +1408,9 @@ proc
 				mov( dl, shift_down );
 				updateStatus();
 				
+			elseif( (type w.MSGFILTER[EDX]).msg = w.WM_LBUTTONDBLCLK ) then
+				mov( true, double_clicked );
+				dbg.put( "dblclk");
 			endif;
 		
 		endif;

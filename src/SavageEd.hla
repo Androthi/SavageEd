@@ -7,7 +7,7 @@ program SavageEd;
 
 readonly
 
-	version			:string := "SavageEd v0.10.30";
+	version			:string := "SavageEd v0.10.35";
 
 storage
 	logfont			:w.LOGFONT;
@@ -1309,7 +1309,7 @@ proc
 			mov( eax, window.textColor );
 			
 			config.readString( s_settings, "Line Break", build_str );
-			if( str.eq( build_str, "LF" )) then
+			if( str.eq( build_str, s_lf )) then
 				mov( LF, window.line_break );
 			else
 				mov( CRLF, window.line_break );
@@ -1341,7 +1341,7 @@ proc
 			
 			config.create();
 			config.writeUns( s_settings, s_tabs, DEFAULT_TAB_STOP );
-			config.writeString( s_settings, "Line Break", "CRLF" );
+			config.writeString( s_settings, "Line Break", s_crlf );
 
 			config.writeBool( s_settings, "Active URL", false );
 			config.writeString( s_settings, "Date Format", default_date_format );
@@ -1431,7 +1431,8 @@ proc
 		else
 			w.SendMessage( window.hstatus, w.SB_SETTEXT, 2, s_b );
 		endif;
-
+		
+		str.cpy( s_b, build_str );
 		config.readString( s_settings, "Line Break", build_str );
 		w.SendMessage( window.hstatus, w.SB_SETTEXT, 3, build_str );
 		
@@ -1505,7 +1506,6 @@ proc
 		ENDUSE;
 	end getLineInfo;
 
-	NOTE( "now that we are using window.buffer_focus, do we really need to pass Edit_Node as an argument?" )
 	getInfo: procedure;
 	
 		// collects informaiton about the edit state
@@ -1572,7 +1572,6 @@ proc
 
 //bm=editcommands
 
-	NOTE( "now that we are using window.buffer_focus, do we really need to pass Edit_Node ?" )
 	command_selection_to_string	:procedure;
 	
 		var
@@ -1731,7 +1730,7 @@ proc
 		// returns length of line copied in eax
 	end command_get_line;
 
-	command_get_word	:procedure {@noframe, @returns("EAX") };
+	command_get_word	:procedure {@noframe };
 	
 		// returns the start and end of a word
 		// in buffer_focus.cursor.start_index and buffer_focus.cursor.end_index
@@ -1753,11 +1752,15 @@ proc
 		endif;
 		
 		// find start index of word
+		// any white space, single quotee or double quote marks word boundries 
 		if( edx > &buffer ) then
 			forever
 				dec( edx );
 				breakif( edx = &buffer );
-				if( ((type byte [edx]) = ' ') || ((type byte[edx]) = $09) ) then
+				if( ((type byte [edx]) = ' ') ||
+					((type byte[edx]) = $09) ||
+					((type byte[edx]) = '"') ||
+					((type byte[edx]) = '''' ) ) then
 					inc( edx );
 					break;
 				endif;
@@ -1775,12 +1778,13 @@ proc
 		forever
 			inc( edx );
 			breakif( (type byte[edx]) = 0 );
-			breakif( (type byte[edx]) = $0d || (type byte[edx]) = $0a );
-			if( ((type byte[edx]) = ' ') || ((type byte[edx]) = $09) ) then
-				// eat the white space.
-				inc( edx );
-				break;
-			endif;
+			breakif( (type byte[edx]) = $0d ||
+					 (type byte[edx]) = $0a ||
+					 (type byte[edx]) = '"' ||
+					 (type byte[edx]) = ''''||
+					 (type byte[edx]) = ' ' ||
+					 (type byte[edx]) = $09 );
+			
 		endfor;
 
 		// change buffer coordinate to buffer_focus.hred coordinate

@@ -1,5 +1,16 @@
 # Change Log
 
+## 06/01/2022
+	0.10.35	fixed dangling ']' in mailto:
+			fixed issue with double-click selection of single quoted string
+			this bug seems to be in richedit, and it's an imperfect
+			workaround. however, now clicking a single word encapsuled in
+			single quotes, eg: 'hello' will select the word hello instead
+			of the end quote and white spaces following it.
+			as a result of this "fix," a user will no longer be able to
+			bouble click on an end single quote to select the single
+			quote and following spaces under most circumstances.
+
 ## 05/30/2022
 	0.10.30	fixed some internals
 			it is now possible to mail me from the About dialog.

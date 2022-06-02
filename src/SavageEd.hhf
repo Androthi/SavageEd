@@ -361,6 +361,7 @@ proc
 	command_insert_date_time :procedure; @external;
 	command_insert_date :procedure; @external;
 	command_insert_time :procedure; @external;
+	command_selection_to_string :procedure; @external;
 	GetSelText :procedure( lpBuff:dword ); @external;
 	AboutDlgProc :procedure( lParam:dword; wParam:dword; uMsg:uns32; hDlg:dword); @external;
 	AddMenus :procedure; @external;
@@ -376,6 +377,8 @@ proc
 	command_move_line_down :procedure; @external; 
 	command_uppercase_selection :procedure; @external;
 	command_lowercase_selection	:procedure; @external;
+	command_get_line	:procedure( var line_buffer:dword ); @external;
+	command_get_word	:procedure {@returns("EAX")};  @external;
 	clear_keystate	:procedure; @external;
 	updateActiveURL :procedure; @external;
 

@@ -15,6 +15,7 @@
 #define ID_ABOUT 6000
 #define ID_ABOUTGRP 1001
 #define IDC_MAILME 6001
+#define IDC_GITHUB 6004
 #define ID_INPUT 3000
 #define IDC_EDT_INPUT 3001
 
@@ -45,16 +46,19 @@ BEGIN
   CONTROL "Special Codes",IDC_CHK_SPECIAL,"Button",0x50010003,12,102,60,9
 END
 
-ID_ABOUT DIALOGEX 6,6,163,70
+ID_ABOUT DIALOGEX -4,-19,163,139
 CAPTION "About SavageEd"
 FONT 8,"MS Sans Serif",0,0,0
 STYLE 0x10CF1000
 EXSTYLE 0x00000080
 BEGIN
-  CONTROL "SavageEd",ID_ABOUTGRP,"Button",0x50000007,3,3,153,65
-  CONTROL "OK",1,"Button",0x50010000,60,51,46,13
+  CONTROL "SavageEd",ID_ABOUTGRP,"Button",0x50000007,3,3,154,114
+  CONTROL "OK",1,"Button",0x50010000,57,120,46,13
   CONTROL "Created By Sevag Krikorian",0,"Static",0x50000000,33,18,102,9
   CONTROL "sevag.krikorian@gmail.com",IDC_MAILME,"Button",0x50008000,30,33,102,15
+  CONTROL "SavageEd is open sourced and released as-is into the Public Domain.",6002,"Static",0x50000000,9,60,141,21
+  CONTROL "Source code is hosted on Github.com",6003,"Static",0x50000000,9,84,144,15
+  CONTROL "SavageEd on Github.com",IDC_GITHUB,"Button",0x50008000,27,99,102,15
 END
 
 ID_INPUT DIALOGEX 6,5,220,24

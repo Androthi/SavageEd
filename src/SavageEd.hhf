@@ -77,6 +77,7 @@ type
 	
 	edit_mode	:enum {
 		MODE_INSERT,
+		MODE_OVER,
 		MODE_EDITINI,
 		MODE_VIEWDOCS
 
@@ -206,16 +207,18 @@ const
 	IDC_EDT_INPUT           := 3001;
 	ID_SAVAGEED_MANUAL		:= 4000;
 	IDC_MAILME				:= 6001;
+	IDC_GITHUB				:= 6004;
 
 	RECENT_MENU_START	:= 9000;
 	RECENT_MENU_END		:= 9019;	// It's over 9000!
 	IDC_SBAR			:= 9020;
 
 	STATUS_BAR_HEIGHT	:= 20;
-	STATUS_PARTS		:= 5;
+	STATUS_PARTS		:= 6;
 	POS_LINES			:=300;
 	POS_READONLY		:=POS_LINES+18;
-	POS_LINEBREAK		:=POS_READONLY+18;
+	POS_AUTO			:=POS_READONLY+18;
+	POS_LINEBREAK		:=POS_AUTO+18;
 	POS_MARK			:=POS_LINEBREAK+32;
 	POS_MODE			:=POS_MARK + 1800;
 	
@@ -281,6 +284,7 @@ readonly;
 	s_r			:string; @external;
 	s_b			:string; @external;
 	s_mark		:string; @external;
+	s_auto		:string; @external;
 	s_empty		:string; @external;
 	s_lf		:string; @external;
 	s_crlf		:string; @external;
@@ -333,7 +337,9 @@ proc
 	command_move_to_eol :procedure; @external;
 	command_reduce_indent :procedure; @external;
 	command_increase_indent :procedure; @external;	
-	command_toggle_mark :procedure; @external;	
+	command_toggle_mark :procedure; @external;
+	command_toggle_readonly :procedure; @external;
+	command_toggle_insert_mode :procedure; @external;
 	Msg_OpenDroppedFile :procedure( hwnd:dword; wParam:dword; lParam:dword ); @external;
 	Msg_SetFocus :procedure( hwin:dword; wparam:dword; lparam:dword ); @external;
 	Msg_Context :procedure( hwnd:dword; wParam:dword; lParam:dword ); @external;		
@@ -367,7 +373,7 @@ proc
 	AddMenus :procedure; @external;
 	setFormat :procedure; @external;
 	Proc_Edit	:procedure( lParam:dword; wParam:dword; uMsg:uns32; hWin:dword ); @external;
-	newInstance :procedure( filename:string ); @external;
+	command_new_instance :procedure( filename:string ); @external;
 	openRecent :procedure(id:dword); @external;
 	Proc_Input :procedure( lParam:dword; wParam:dword; uMsg:uns32; hWin:dword ); @external;
 	setFont	:procedure; @external;

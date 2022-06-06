@@ -67,6 +67,7 @@ readonly
 	s_r			:string := "R";
 	s_b			:string := " ";
 	s_mark		:string := "M";
+	s_auto		:string := "A";
 	s_empty		:string := "";
 	s_lf		:string := "LF";
 	s_crlf		:string := "CRLF";
@@ -858,7 +859,12 @@ proc
 				
 				str.put( tempstr, "mailto:sevag.krikorian@gmail.com");
 				w.ShellExecute( NULL, NULL, tempstr, NULL, NULL, 1 );
+			
+			elseif( wParam = IDC_GITHUB ) then
 				
+				str.put( tempstr, "https://github.com/Androthi/SavageEd");
+				w.ShellExecute( NULL, NULL, tempstr, NULL, NULL, 1 );
+			
 			endif;
 		elseif( uMsg = w.WM_CLOSE ) then
 
@@ -1171,6 +1177,9 @@ proc
 		popabi;
 	end updateActiveURL;
 	
+	
+	
+	
 	Msg_Create :procedure( hwin:dword; wParam:dword; lparam:dword );
 	
 		// create the main window
@@ -1226,87 +1235,9 @@ proc
 		updateActiveURL();
 		w.SetFocus( editesi.hred );
 
-		// check for a filename passed as an argument and try to open that file.
-		// if file doesn't exist, start new document with that filename.
-		arg.c();
-		if( eax > 1 ) then
-			
-			// get an argument, see if it is a file that exists,
-			// if so, open it.
-			
-			arg.v( 1 );
-			w.GetLongPathName( eax, &buffer, @size(buffer) -1 );
-			if (eax) then
-				
-
-				// file path copied, try to open it.
-				
-				str.cpyz( &buffer, build_str );
-				loadFile( build_str );
-				if (eax) then
-					if( config.readBool( s_settings, s_rememberpos )) then
-						config.readUns( s_settings, "Start Position");
-						mov( eax, info.cursor.start_index );
-						mov( eax, info.cursor.end_index );
-						mov( window.buffer_focus, esi );
-						lea( edi, editesi.cursor );
-						w.SendMessage( editesi.hred, w.EM_EXSETSEL, 0, edi );
-					endif;
-					jmp skipOpenRecent;
-				endif;
-			else
-				
-				// there is no file, create a new document with name passed on command line
-				
-				// this old way was not working if user enters a file path instead of just a file name.
-				//filesys.gwd( info.filepath );
-				//str.cat ("\", info.filepath);
-				//arg.v(1);
-				//str.catz (eax, info.filepath);
-				
-				arg.v(1);
-				str.cpyz (eax, editesi.filepath); 
-				jmp skipOpenRecent;
-			endif;
-		endif;
-		
-		
-		// no file requested as an argument,
-		// check config to see if we want to open the most recent document
-		
-		if( config.readBool( s_settings, s_openrecent ) ) then
-			
-			// we want to open the most recent file. do we have a recent file to open?
-			
-			if( config.isSectionDefined( s_recent )) then
-				
-				config.readItem( s_recent, 0, build_str );
-				loadFile( build_str );
-				if( ! eax ) then
-					
-					// the file we want to open doesn't exit anymore. remove it from our list.
-					config.deleteItem( s_recent, 0 );
-
-				endif;
-				
-				// do we want to move the cursor to the position it was when the file was closed?
-				
-				if( config.readBool( s_settings, s_rememberpos )) then
-					config.readUns( s_settings, "Start Position");
-					mov( eax, info.cursor.start_index );
-					mov( eax, info.cursor.end_index );
-					mov( window.buffer_focus, esi );
-					lea( edi, editesi.cursor );
-					w.SendMessage( editesi.hred, w.EM_EXSETSEL, 0, edi );
-				endif;
-				
-			endif;
-			
-		endif;
-		skipOpenRecent:
-		getInfo();
-		updateMenu();
-		updateStatus();
+//		getInfo();
+//		updateMenu();
+//		updateStatus();
 		
 		popabi;
 		xor( eax, eax );
@@ -1419,7 +1350,7 @@ proc
 
 	end Msg_Notify;
 	
-	newInstance :procedure( filename:string );
+	command_new_instance :procedure( filename:string );
 		
 		// opens a new instance of SavageEd
 		
@@ -1427,8 +1358,8 @@ proc
 			s	:string;
 			
 	
-	begin newInstance;
-		dbg.put("newInstance" );
+	begin command_new_instance;
+		dbg.put("command_new_instance" );
 		
 		move( str.talloc( 300 ), s );
 		add( 20,window.xPos );
@@ -1448,7 +1379,7 @@ proc
 		endif;
 		os.bkgnd( s );
 		
-	end newInstance;
+	end command_new_instance;
 
 	openRecent :procedure(id:dword);
 	
@@ -1469,7 +1400,7 @@ proc
 			
 			if( config.readBool( s_settings, s_recentnew )) then
 				
-				newInstance( s );
+				command_new_instance( s );
 				
 			else
 				

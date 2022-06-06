@@ -7,7 +7,7 @@ program SavageEd;
 
 readonly
 
-	version			:string := "SavageEd v0.10.35";
+	version			:string := "SavageEd v0.10.40";
 
 storage
 	logfont			:w.LOGFONT;
@@ -32,7 +32,15 @@ storage
 static
 	align(4);
 	info		:Edit_Node;
-	statusParts	:int32[STATUS_PARTS]:=[POS_LINES, POS_READONLY, POS_LINEBREAK, POS_MARK, POS_MODE];
+	statusParts	:int32[STATUS_PARTS]:=[
+				POS_LINES,
+				POS_READONLY,
+				POS_AUTO,
+				POS_LINEBREAK,
+				POS_MARK,
+				POS_MODE
+	];
+	
 	strtabs		:str.strvar( w.MAX_PATH ); // user specified tabs converted to spaces
 	
 	BufferList	:tBaseList;
@@ -584,7 +592,10 @@ proc
 						// we don't want the control key
 						// going to rich edit
 						jmp skip_proc;
-	
+					
+					case( w.VK_INSERT )
+						command_toggle_insert_mode();
+					
 					case( w.VK_W )
 						if( ctrl_down ) then
 							if( shift_down ) then
@@ -1426,35 +1437,39 @@ proc
 		endif;
 				
 		if( editebx.mark ) then
-			w.SendMessage( window.hstatus, w.SB_SETTEXT, 2, s_mark );
-			
+			w.SendMessage( window.hstatus, w.SB_SETTEXT, 2, s_mark );	
 		else
 			w.SendMessage( window.hstatus, w.SB_SETTEXT, 2, s_b );
 		endif;
 		
+
+		if( config.readBool( s_settings, s_autosave ) ) then
+			w.SendMessage( window.hstatus, w.SB_SETTEXT, 3, s_auto );
+		else
+				w.SendMessage( window.hstatus, w.SB_SETTEXT, 3, s_b );
+		endif;
+		
 		str.cpy( s_b, build_str );
 		config.readString( s_settings, "Line Break", build_str );
-		w.SendMessage( window.hstatus, w.SB_SETTEXT, 3, build_str );
+		w.SendMessage( window.hstatus, w.SB_SETTEXT, 4, build_str );
 		
 		movzx( editebx.mode, eax );
 		switch( eax )
 				
 			case( MODE_EDITINI )
 				str.put( build_str, "Mode :Edit Configuration" );
-				w.SendMessage( window.hstatus, w.SB_SETTEXT, 4, build_str );
 
 			case( MODE_VIEWDOCS )
 				str.put( build_str, "Mode :View Documentation" );
-				w.SendMessage( window.hstatus, w.SB_SETTEXT, 4, build_str );
-
-			default
 			
-				// default will be insert mode
+			case( MODE_INSERT )
 				str.put( build_str, "Mode :Insert" );
 
-				w.SendMessage( window.hstatus, w.SB_SETTEXT, 4, build_str);
+			case( MODE_OVER )
+				str.put( build_str, "Mode :Overwrite" );
+				
 		endswitch;
-		
+		w.SendMessage( window.hstatus, w.SB_SETTEXT, 5, build_str);
 		// window title may have changed somewhere along the line, update it
 		setWindowTitle();
 		
@@ -1548,6 +1563,19 @@ proc
 		pop( edi );
 		//dbg.exits("getInfo");
 	end getInfo;
+
+	command_toggle_insert_mode	:procedure {@noframe};
+	begin command_toggle_insert_mode;
+		mov( window.buffer_focus, ebx );
+		if( editebx.mode = MODE_INSERT ) then
+			mov( MODE_OVER, editebx.mode );
+		elseif( editebx.mode = MODE_OVER ) then
+			mov( MODE_INSERT, editebx.mode );
+		endif;
+		updateStatus();
+		ret();
+	end command_toggle_insert_mode;
+
 
 	clear_keystate	:procedure {@noframe};
 		
@@ -2036,6 +2064,29 @@ proc
 		ret();
 	end command_toggle_mark;
 
+	command_toggle_readonly :procedure {@noframe};
+	begin command_toggle_readonly;
+		push( ecx );
+		if( config.readBool( s_settings, s_readonly ) ) then
+
+			w.CheckMenuItem( window.hmenu, IDM_READONLY, w.MF_BYCOMMAND | w.MF_UNCHECKED );
+			mov( false, eax );
+			
+		else
+			
+			w.CheckMenuItem(window.hmenu, IDM_READONLY, w.MF_BYCOMMAND | w.MF_CHECKED);
+			mov( true, eax );
+			
+		endif;
+		config.writeBool( s_settings, s_readonly, al );
+		mov( window.buffer_focus, ebx );
+		w.SendMessage( editebx.hred, w.EM_SETREADONLY, eax, 0 );
+		updateStatus();
+		pop( ecx );
+		ret();
+	end command_toggle_readonly;
+
+
 	command_increase_indent :procedure;
 	
 		// increase indent by adding a tab at bol
@@ -2183,7 +2234,7 @@ proc
 			
 		case( IDM_INST )
 			
-			newInstance( NULL );
+			command_new_instance( NULL );
 			
 		case( IDM_SAVE )
 		
@@ -2458,20 +2509,7 @@ proc
 			
 		case ( IDM_READONLY) 
 			
-			if( config.readBool( s_settings, s_readonly ) ) then
-
-				w.CheckMenuItem( window.hmenu, IDM_READONLY, w.MF_BYCOMMAND | w.MF_UNCHECKED );
-				mov( false, eax );
-				
-			else
-				
-				w.CheckMenuItem(window.hmenu, IDM_READONLY, w.MF_BYCOMMAND | w.MF_CHECKED);
-				mov( true, eax );
-				
-			endif;
-			config.writeBool( s_settings, s_readonly, al );
-			w.SendMessage( editebx.hred, w.EM_SETREADONLY, eax, 0 );
-			updateStatus();
+			command_toggle_readonly();
 			
 		case ( IDM_CLEAREXIT) 
 
@@ -2595,8 +2633,8 @@ proc
 			
 			getConfirm();
 			if (!eax) then
-			
-				command_display_manual(); 
+				
+				command_new_instance( "-h" );
 	
 			endif;	
 	
@@ -2615,6 +2653,131 @@ proc
 
 	end Msg_Command;
 
+	// check for a filename passed as an argument and try to open that file.
+	// if file doesn't exist, start new document with that filename.
+	processCommandLine	:procedure;
+	
+		var
+			build_str		:string;
+			openfilename	:string;
+			argc			:uns8;
+				
+	begin processCommandLine;
+		
+		mov( str.talloc(1000), build_str );
+		mov( str.talloc(1000), openfilename );
+		arg.c();
+		mov( al, argc );
+		xor( ecx, ecx );
+		
+		while( argc > 1 ) do
+
+			inc( ecx );
+			arg.v( ecx );
+			dbg.put("v eax = ", (type string eax ));
+			mov( (type byte[eax]), dl );
+			if( dl = '-' || dl = '/' ) then
+				movzx( (type byte[eax+1]), edx );
+				chars.toLower( dl );
+				switch( edx );
+				case( 'r' )
+					config.writeBool( s_settings, s_readonly, true );
+
+				case( 'h' )
+					push( ecx );
+					command_display_manual();
+					pop( ecx );
+				case( 'e' )
+					command_edit_ini();
+					// if we open manual, nothing else needs to be done
+					jmp done;
+				endswitch;
+	
+			else
+
+				// we may support opening multiple file names
+				// once multi-buffers are addeed.
+				push( ecx );
+				str.cpy( (type string eax), openfilename );
+				w.GetLongPathName( eax, &buffer, @size(buffer) -1 );
+				if( eax ) then
+					str.cpyz( &buffer, openfilename );
+				endif;
+				pop( ecx );
+			endif;
+			dec( argc );
+		
+		endwhile;
+		
+		dbg.put("openfilename :", openfilename );
+		
+		// if openfilename has any content, open it or create new
+		// otherwise see if we need to open recent
+		if( str.length( openfilename ) > 0 ) then
+			
+			if( filesys.exists( openfilename )) then
+				loadFile( openfilename );
+				if (eax) then
+					if( config.readBool( s_settings, s_rememberpos )) then
+						config.readUns( s_settings, "Start Position");
+						mov( window.buffer_focus, esi );
+						mov( eax, editesi.cursor.start_index );
+						mov( eax, editesi.cursor.end_index );
+						lea( edi, editesi.cursor );
+						w.SendMessage( editesi.hred, w.EM_EXSETSEL, 0, edi );
+					endif;
+					//exit processCommandLine;
+				endif;
+			else
+				
+				// there is no file, create a new document with name passed on command line
+				mov( window.buffer_focus, esi );
+				str.cpy( openfilename, editesi.filepath );
+			endif;		
+		else
+		
+			// no file requested as an argument,
+			// check config to see if we want to open the most recent document
+	
+			if( config.readBool( s_settings, s_openrecent ) ) then
+				
+				// we want to open the most recent file. do we have a recent file to open?
+				
+				if( config.isSectionDefined( s_recent )) then
+					
+					config.readItem( s_recent, 0, build_str );
+					loadFile( build_str );
+					if( ! eax ) then
+						
+						// the file we want to open doesn't exit anymore. remove it from our list.
+						config.deleteItem( s_recent, 0 );
+	
+					endif;
+					
+					// do we want to move the cursor to the position it was when the file was closed?
+					
+					if( config.readBool( s_settings, s_rememberpos )) then
+						config.readUns( s_settings, "Start Position");
+						mov( window.buffer_focus, esi );
+						mov( eax, editesi.cursor.start_index );
+						mov( eax, editesi.cursor.end_index );
+						lea( edi, editesi.cursor );
+						w.SendMessage( editesi.hred, w.EM_EXSETSEL, 0, edi );
+					endif;
+					
+				endif;
+				
+			endif;
+		endif;
+		
+		
+		done:
+			getInfo();
+			updateMenu();
+			updateStatus();
+	end processCommandLine;
+
+
 begin SavageEd;
 
 	dbg.cls;
@@ -2624,19 +2787,17 @@ begin SavageEd;
 	// NOTE: This is the initial implementation of the buffer list. currently it holds
 	//	  only one buffer, which is identified as 'info'
 		
-	// TODO: migrate all cases where 'info' is used to use window.buffer_focus instead,
-	//	  window.buffer_focus will always contain the current buffer in focus.
 	BufferList.create();
 	BufferList.append( (type baseNode_t info) );
 	mov( &info, window.buffer_focus );
 
 	initConfig();
-	initWindow();	
+	initWindow();
+	processCommandLine();
 	
 	mov( window.buffer_focus, ebx );
 	mov( MODE_INSERT, editebx.mode );
-	cmp( eax, 0 );
-	je _exit;
+
 	
 	FOREVER
 		w.GetMessage(window.msg,NULL,0,0);
@@ -2669,11 +2830,3 @@ begin SavageEd;
 	_exit:
 
 end SavageEd;
-
-
-//			dbg.separator;
-//			dbg.put("line number :", info.line.number );
-//			dbg.put("line index  :", info.line.index );
-//			dbg.put("line length :", info.line.length );
-//			dbg.put("lines       :", info.lines );
-//			dbg.put("col index   :", info.column_index );

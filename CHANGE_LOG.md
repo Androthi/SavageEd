@@ -1,5 +1,18 @@
 # Change Log
 
+			added more information to About dialog
+			added Autosave indicator on Status Bar. Shows up as "A"
+			Help->Documents now opens a new window rather than
+			      replacing the current edit contents
+			added commandline arguments
+				-r opens in readonly mode
+				-h opens the documents
+				-e opens in edit configuration mode
+				
+				commands are lazy evaluated, declaring -h then a filename
+				on the commandline will open the filename rather than
+				displaying the documents.
+			
 ## 06/01/2022
 	0.10.35	fixed dangling ']' in mailto:
 			fixed issue with double-click selection of single quoted string

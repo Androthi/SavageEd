@@ -1,5 +1,14 @@
 # Change Log
-
+	
+## 07/20/2022
+	0.10.43
+			-reduced margin to 3 to prevent text disappearing into left margin
+			when restoring position.
+			-fixed Help->Documents opening the currently opened file instead of the
+			 documents when "open most recent" option is active.
+	
+	
+	0.10.40
 			added more information to About dialog
 			added Autosave indicator on Status Bar. Shows up as "A"
 			Help->Documents now opens a new window rather than
@@ -12,6 +21,8 @@
 				commands are lazy evaluated, declaring -h then a filename
 				on the commandline will open the filename rather than
 				displaying the documents.
+			formatted SavageEd.md to 80cols, added new features and
+			fixed some typos.
 			
 ## 06/01/2022
 	0.10.35	fixed dangling ']' in mailto:

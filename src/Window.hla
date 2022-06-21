@@ -33,6 +33,8 @@ readonly
 	
 	s_window 	:string := "Window";
 	ClassName	:string:= "SavageEDClass";
+	 
+	UtilClass	:string:= "SavageEDUtilClass";
 	AppName		:string:= "SavageEd";
 	
 	RichEditDLL		:string := "riched32.dll";
@@ -94,6 +96,11 @@ static
 	input	:InputInfo;
 	double_clicked	:boolean := false;
 	
+	//>
+	//hutil	:dword;
+	//hedit	:dword;
+
+	
 proc
 
 	initWindow	:procedure {@noframe};
@@ -150,7 +157,19 @@ proc
 			Error( "Unable to register Window Class", false);
 			ret();
 		endif;
-			
+		
+		/*
+		//>
+		// register a find/command/input window
+		mov( &UtilProc, wc.lpfnWndProc );
+		mov( UtilClass, wc.lpszClassName );
+		mov( w.COLOR_BTNFACE+2, wc.hbrBackground );
+		// register the utility class
+		if ( ! w.RegisterClassEx( wc )) then
+			Error( "Unable to register Utility Window Class", false);
+			ret();
+		endif;	
+		*/
 		// create the window
 		w.CreateWindowEx(
 				NULL,					// dwExStyle
@@ -170,7 +189,28 @@ proc
 			Error( "Unable to create window", false);
 			ret();
 		endif;
-		
+
+/*
+		//> create the utility window
+		w.CreateWindowEx(
+				w.WS_EX_CLIENTEDGE,					// dwExStyle
+				UtilClass,
+				NULL,
+				w.WS_CHILD | w.WS_CLIPSIBLINGS,
+				0,
+				0,
+				0,
+				0,
+				window.hwnd,					// hWndParent
+				NULL,					// hMenu
+				window.hinst,
+				NULL );					// lpParam
+
+		if( ! eax ) then
+			Error( "Unable to create utility window", false);
+			ret();
+		endif;
+*/		
 		w.ShowWindow( window.hwnd, w.SW_SHOWNORMAL );
 		w.UpdateWindow( window.hwnd );
 		ret();
@@ -204,6 +244,100 @@ proc
 		popabi;
 	end WndProc;
 
+/*
+	//>
+	UtilProc	:procedure( lparam:dword; wparam:dword; umsg:uns32; hwin:dword );
+	
+		static
+			rect	:w.RECT;
+	
+	begin UtilProc;
+		pushabi;
+		mov(umsg,eax);
+		dbg.put("umsg   :", umsg );
+		dbg.put("lparam:", lparam );
+		dbg.put("wparam:", wparam );
+		dbg.put("char  :", w.WM_CHAR );
+		dbg.put("command:", w.WM_COMMAND );
+		dbg.put("change :", w.EN_CHANGE );
+		dbg.separator;
+		
+		if( eax = w.WM_CREATE ) then
+			mov( hwin, hutil );
+			w.CreateWindowEx( 0,
+							  "EDIT", 
+                               NULL, 
+                               w.WS_CHILD | w.WS_VISIBLE | w.ES_LEFT | w.ES_MULTILINE | w.ES_WANTRETURN
+                               | w.ES_AUTOVSCROLL | w.ES_AUTOHSCROLL, 
+                               0, 0, 0, 0, 
+                               hutil, 
+                               NULL, 
+                               window.hinst, 
+                               NULL);
+			mov( eax, hedit );
+			w.SendMessage( hedit, w.EM_LIMITTEXT, 10000, 0 );
+			
+		elseif( eax = w.WM_SIZE ) then
+			w.GetClientRect( window.hwnd, rect );			
+			w.MoveWindow( hedit, 0, 0, rect.right, 25, true );
+		
+		elseif( eax = w.WM_COMMAND ) then
+			dbg.put("command");
+			mov( wparam, eax );
+			mov( eax, edx );
+			shr( 16, edx );
+			and	($ffff, eax );
+			
+			dbg.put(" eax = ", eax );
+			dbg.put(" edx = ", edx );
+			
+			if( edx = w.EN_CHANGE ) then
+				dbg.put("change");
+			
+			elseif( edx =- w.EN_UPDATE ) then
+				dbg.put("update");
+			endif;
+			
+			
+//				dbg.put("click", eax);
+//				if(eax = w.IDOK) then
+//				elseif( eax = w.IDCANCEL ) then
+//				endif;
+		
+		elseif( eax = 307 ) then
+		
+			dbg.put("************");	
+			mov( wparam, eax );
+			mov( eax, edx );
+			shr( 16, edx );
+			and	($ffff, eax );
+			
+			dbg.put(" eax = ", eax );
+			dbg.put(" edx = ", edx );
+			dbg.put("************");
+		
+		elseif( eax = w.WM_CHAR ) then
+			dbg.put("char");
+//			
+//			if( wparam = w.VK_RETURN ) then
+//				
+//				dbg.put("return");
+//				mov( window.buffer_focus, ebx );
+//				mov( MODE_INSERT, editebx.mode );
+//				w.SendMessage( window.hwnd, w.WM_SIZE, 0, 0 );
+//				popabi;
+//				or( 1, eax );
+//				exit UtilProc;
+//			endif;
+		
+		endif;
+		
+		popabi;
+		xor( eax, eax );
+		w.DefWindowProc( hwin, umsg, wparam, lparam );
+	end UtilProc;
+*/
+
 	Error :procedure( error_msg:string; warning:boolean );
 
 		// quick message box for critical errors and warnings reporting
@@ -230,6 +364,8 @@ proc
 	
 	end Error;
 
+//bm=size
+
 	Msg_Size :procedure( hwin:dword; wparam:dword; lparam:dword );
 		
 		// size the main window
@@ -251,8 +387,21 @@ proc
 			w.SendMessage( window.hstatus, w.WM_SIZE, 0, 0 );
 
 		endif;
-		mov( window.buffer_focus, eax );
-		w.MoveWindow( editeax.hred, 0, rect.top, rect.right, height, true );
+		
+		mov( window.buffer_focus, ebx );
+		
+		/*
+		if( editebx.mode = MODE_FIND ) then
+			sub( 25, height );
+			w.ShowWindow( hutil, true );
+			w.MoveWindow( hutil, 0, height, rect.right, 25, true );
+		else
+			w.ShowWindow( hutil, false );
+		endif;
+		*/
+		
+		w.MoveWindow( editebx.hred, 0, rect.top, rect.right, height, true );
+		//w.SendMessage( window.hwnd, w.EM_SETBKGNDCOLOR, false, window.backColor);
 		xor( eax, eax );
 	end Msg_Size;
 		
@@ -1152,14 +1301,15 @@ proc
 			
 	begin setFormat;
 		
+		//w.CreateSolidBrush(RGB(200, 100, 200));
+		
 		mov( window.buffer_focus, esi );
 		w.SendMessage( editesi.hred, w.EM_EXLIMITTEXT, 0, -1 );
 		
 		setFont();
 		w.SendMessage( editesi.hred, w.EM_SETBKGNDCOLOR, false, window.backColor);
-		
 		setTabs();
-		w.SendMessage( editesi.hred, w.EM_SETMARGINS, w.EC_LEFTMARGIN | w.EC_RIGHTMARGIN, 5<<16 | 5 );
+		w.SendMessage( editesi.hred, w.EM_SETMARGINS, w.EC_LEFTMARGIN | w.EC_RIGHTMARGIN, 3<<16 | 3 );
 	end setFormat;
 	
 	updateActiveURL :procedure;
@@ -1178,8 +1328,6 @@ proc
 	end updateActiveURL;
 	
 	
-	
-	
 	Msg_Create :procedure( hwin:dword; wParam:dword; lparam:dword );
 	
 		// create the main window
@@ -1194,8 +1342,6 @@ proc
 	begin Msg_Create;
 		pushabi;
 		
-		TODO( "this should create a new Edit_Node object and add it to the list" )
-		TODO( "i changed my mind, this should probalby be done in main begin section instead." )
 		mov( str.talloc( 1000 ), build_str );
 		mov( hwin, eax );
 		mov( eax, window.hwnd );

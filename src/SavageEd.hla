@@ -2,12 +2,12 @@ program SavageEd;
 
 	#include("SavageEd.hhf")
 
-	?@nodisplay :=true;
-	?@nostackalign := true;
+	?@nodisplay 	:=true;
+	?@nostackalign	:= true;
 
 readonly
 
-	version			:string := "SavageEd v0.10.40";
+	version			:string := "SavageEd v0.10.43";
 
 storage
 	logfont			:w.LOGFONT;
@@ -29,9 +29,10 @@ storage
 	proc_return		:boolean;	// hack needed to ignore a rogue WM_KEYUP being sent from the system after startup from commandline or by a keypress
 	align(4);
 
+
 static
 	align(4);
-	info		:Edit_Node;
+
 	statusParts	:int32[STATUS_PARTS]:=[
 				POS_LINES,
 				POS_READONLY,
@@ -54,6 +55,8 @@ static
 	alt_down	:boolean;
 	
 	align(4);
+	
+
 	
 proc
 
@@ -566,21 +569,30 @@ proc
 						
 					case( w.VK_UP )
 						command_move_line_up();
+						jmp skip_proc;
 						
 					case( w.VK_DOWN )
 						command_move_line_down();
+						jmp skip_proc;
+						
+					case( w.VK_A )
+						dbg.put("sys key + a :", w.VK_A);
+						xor( eax, eax );
+						jmp skip_proc;
 
 				endswitch;
 				
 			case( w.WM_SYSCHAR )
 				dbg.put("syschar =>", wParam );
-			
+				xor( eax, eax );
+				jmp skip_proc;
+				
 			case( w.WM_SYSKEYUP )
 				dbg.put("syskey up =>", wParam );
 				mov( false, alt_down );
 //bm=keycommands			
 			case( w.WM_KEYDOWN )
-				//dbg.put("key down =>", wParam );
+				dbg.put("key down =>", wParam );
 				mov( wParam, eax );
 				switch( eax )
 				
@@ -595,6 +607,12 @@ proc
 					
 					case( w.VK_INSERT )
 						command_toggle_insert_mode();
+					
+					//>
+					//case( w.VK_SLASH )
+					//	mov( MODE_FIND, editebx.mode );
+					//	Msg_Size( 0, 0, 0 );
+					//	w.SetFocus( hedit );
 					
 					case( w.VK_W )
 						if( ctrl_down ) then
@@ -1713,8 +1731,7 @@ proc
 		// load the SavageEd.md which is saved as a
 		// resource in SavageEd.exe
 	
-		// make sure we have already gotten confirmation to save any
-		// existing work before calling this function
+		// opens the manual in a new instance of SavageEd
 		
 	begin command_display_manual;
 		
@@ -2287,7 +2304,7 @@ proc
 		case( IDM_FIND, IDM_REPLACE )
 			if (!window.hfind) then
 				GetSelText (&findbuf);
-				w.CreateDialogParam(window.hinst,val ID_FINDDLG,hwin, &Proc_FindDlg,false);
+				w.CreateDialogParam(window.hinst,val ID_FINDDLG,window.hwnd, &Proc_FindDlg,false);
 			else
 				w.SetFocus(window.hfind);
 			endif;
@@ -2631,12 +2648,12 @@ proc
 	
 		case ( IDM_DOCUMENTS) 
 			
-			getConfirm();
-			if (!eax) then
+			//getConfirm();
+			//if (!eax) then
 				
 				command_new_instance( "-h" );
 	
-			endif;	
+			//endif;	
 	
 		case( IDM_QUIT ) 
 		
@@ -2687,6 +2704,7 @@ proc
 					push( ecx );
 					command_display_manual();
 					pop( ecx );
+					jmp done;
 				case( 'e' )
 					command_edit_ini();
 					// if we open manual, nothing else needs to be done
@@ -2788,8 +2806,9 @@ begin SavageEd;
 	//	  only one buffer, which is identified as 'info'
 		
 	BufferList.create();
-	BufferList.append( (type baseNode_t info) );
-	mov( &info, window.buffer_focus );
+	mem.alloc( @size( Edit_Node ));
+	mov( eax, window.buffer_focus );
+	BufferList.append( window.buffer_focus );
 
 	initConfig();
 	initWindow();

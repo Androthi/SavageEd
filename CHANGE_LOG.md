@@ -1,5 +1,18 @@
 # Change Log
 	
+## 07/22/2022
+	0.10.45
+			added a new blocking command line option:
+				-s SavageEd behaves as a display gui for
+				   standard input
+				   you can now pipe in output from another program and
+				   view it in SavageEd. eg:
+				   
+				    dir c: /A | start /b SavageEd.exe -s
+				   
+				   this will pipe the output of the "dir c: /A" command
+				   into SavageEd.
+	
 ## 07/20/2022
 	0.10.43
 			-reduced margin to 3 to prevent text disappearing into left margin

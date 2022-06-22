@@ -347,13 +347,15 @@ in an edit window, changing the mode to "View Documentation"
 SavageEd can open files from the command line.
 In addition, there are some command line options:
 
--r		opens in read only mode
--h		opens the SavageEd manual
--e		opens SavageEd.ini for editing
-
 These options are lazy evaluated, so the last one will override any
 entered before it, if there are conflicts (eg: opening a document
-and specifying -h)
+and specifying -h), these are considered blocking options.
+
+-r		opens in read only mode
+-h		opens the SavageEd manual (blocking)
+-e		opens SavageEd.ini for editing (blocking)
+-s		reads standard input into SavageEd (blocking)
+
 
 ## Kudos and Curses to:
 

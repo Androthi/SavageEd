@@ -7,7 +7,7 @@ program SavageEd;
 
 readonly
 
-	version			:string := "SavageEd v0.10.43";
+	version			:string := "SavageEd v0.10.45";
 
 storage
 	logfont			:w.LOGFONT;
@@ -592,7 +592,7 @@ proc
 				mov( false, alt_down );
 //bm=keycommands			
 			case( w.WM_KEYDOWN )
-				dbg.put("key down =>", wParam );
+				//dbg.put("key down =>", wParam );
 				mov( wParam, eax );
 				switch( eax )
 				
@@ -2670,6 +2670,15 @@ proc
 
 	end Msg_Command;
 
+	pipe_input	:procedure;
+	begin pipe_input;
+		dbg.put("piping");
+		if( stdin.handle() ) then
+			setText( eax );
+		endif;
+	end pipe_input;
+
+
 	// check for a filename passed as an argument and try to open that file.
 	// if file doesn't exist, start new document with that filename.
 	processCommandLine	:procedure;
@@ -2708,6 +2717,10 @@ proc
 				case( 'e' )
 					command_edit_ini();
 					// if we open manual, nothing else needs to be done
+					jmp done;
+					
+				case( 's' )
+					pipe_input();
 					jmp done;
 				endswitch;
 	

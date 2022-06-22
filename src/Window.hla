@@ -96,9 +96,6 @@ static
 	input	:InputInfo;
 	double_clicked	:boolean := false;
 	
-	//>
-	//hutil	:dword;
-	//hedit	:dword;
 
 	
 proc
@@ -377,6 +374,7 @@ proc
 	begin Msg_Size;
 		
 		w.GetClientRect( window.hwnd, rect );
+		
 		mov( rect.bottom, eax );
 		sub( rect.top, eax );
 		mov( eax, height );
@@ -389,19 +387,9 @@ proc
 		endif;
 		
 		mov( window.buffer_focus, ebx );
-		
-		/*
-		if( editebx.mode = MODE_FIND ) then
-			sub( 25, height );
-			w.ShowWindow( hutil, true );
-			w.MoveWindow( hutil, 0, height, rect.right, 25, true );
-		else
-			w.ShowWindow( hutil, false );
-		endif;
-		*/
-		
 		w.MoveWindow( editebx.hred, 0, rect.top, rect.right, height, true );
-		//w.SendMessage( window.hwnd, w.EM_SETBKGNDCOLOR, false, window.backColor);
+		
+		
 		xor( eax, eax );
 	end Msg_Size;
 		
@@ -1590,7 +1578,7 @@ proc
 	Proc_Input :procedure( lParam:dword; wParam:dword; uMsg:uns32; hWin:dword );
 	
 		// opens a text box to get text input
-	
+
 	begin Proc_Input;
 		pushabi;
 		
@@ -1620,7 +1608,7 @@ proc
 				endif;
 				
 			endif;
-	
+
 		elseif( eax = w.WM_CLOSE ) then
 			
 			w.SendMessage( hWin, w.WM_DESTROY, 0, 0 );

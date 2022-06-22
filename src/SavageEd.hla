@@ -7,7 +7,7 @@ program SavageEd;
 
 readonly
 
-	version			:string := "SavageEd v0.10.45";
+	version			:string := "SavageEd v0.10.46";
 
 storage
 	logfont			:w.LOGFONT;
@@ -607,13 +607,7 @@ proc
 					
 					case( w.VK_INSERT )
 						command_toggle_insert_mode();
-					
-					//>
-					//case( w.VK_SLASH )
-					//	mov( MODE_FIND, editebx.mode );
-					//	Msg_Size( 0, 0, 0 );
-					//	w.SetFocus( hedit );
-					
+										
 					case( w.VK_W )
 						if( ctrl_down ) then
 							if( shift_down ) then

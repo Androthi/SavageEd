@@ -80,8 +80,8 @@ type
 		MODE_INSERT,
 		MODE_OVER,
 		MODE_EDITINI,
-		MODE_VIEWDOCS
-//>		MODE_FIND
+		MODE_VIEWDOCS,
+		MODE_FIND
 	};
 
 	wnd_settings:
@@ -252,8 +252,6 @@ readonly;
 	
 	s_window 	:string;@external;
 	ClassName	:string; @external;
-	//>
-	//UtilClass	:string; @external;
 	AppName		:string; @external;
 	
 	RichEditDLL		:string; @external;
@@ -319,10 +317,6 @@ static
 	ctrl_down	:boolean; @external;
 	input		:InputInfo; @external;
 	
-	//>
-	//hutil		:dword; @external;
-	//hedit		:dword; @external;
-
 
 proc
 	// external declarations

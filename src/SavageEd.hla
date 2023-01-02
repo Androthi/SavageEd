@@ -7,7 +7,7 @@ program SavageEd;
 
 readonly
 
-	version			:string := "SavageEd v0.10.46";
+	version			:string := "SavageEd v0.10.50";
 
 storage
 	logfont			:w.LOGFONT;
@@ -1869,10 +1869,11 @@ proc
 	command_select_all :procedure {@noframe};
 	begin command_select_all;
 		mov( window.buffer_focus, ebx );
-		lea( eax, editebx.cursor );
-		mov	(0, editebx.cursor.end_index);
-		mov	(-1, editebx.cursor.start_index);
-		w.SendMessage( editebx.hred, w.EM_EXSETSEL, 0, eax );
+		//lea( eax, editebx.cursor );
+		//mov	(-1, editebx.cursor.end_index);
+		//mov	(0, editebx.cursor.start_index);
+		//w.SendMessage( editebx.hred, w.EM_EXSETSEL, 0, eax );
+		w.SendMessage( editebx.hred, w.EM_SETSEL, 0, -1 );
 		ret();		
 	end command_select_all;
 
@@ -2276,6 +2277,7 @@ proc
 			w.SendMessage( editebx.hred, w.EM_SETMODIFY, true, 0 ); 	
 			
 		case( IDM_SELECTALL )	
+			dbg.put ("selectall");
 			command_select_all();
 			
 		case( IDM_COPY_WORD )

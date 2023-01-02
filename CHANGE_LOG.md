@@ -1,5 +1,10 @@
 # Change Log
-	
+
+## 01/02/2023
+	0.10.50
+			Filename is now displayed before SavageEd on the titlebar
+			Fixed Select All from menu option
+		
 ## 07/22/2022
 	0.10.45
 			added a new blocking command line option:

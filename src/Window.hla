@@ -566,7 +566,8 @@ proc
 		mov( str.talloc(1000), title );
 		mov( window.buffer_focus, esi );
 		filesys.extractFilename( editesi.filepath, title );
-		str.insert3( "SavageEd.exe - ", 0, title );
+		//str.insert3( "SavageEd.exe - ", 0, title );
+		str.put2( title, "  -SavageEd" );
 		if( editesi.hred ) then
 			if (w.SendMessage( editesi.hred, w.EM_GETMODIFY,0,0 )) then
 				str.insert( "*", 0, title );

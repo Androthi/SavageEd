@@ -7,7 +7,7 @@ program SavageEd;
 
 readonly
 
-	version			:string := "SavageEd v0.10.50";
+	version			:string := "SavageEd v0.10.51";
 
 storage
 	logfont			:w.LOGFONT;
@@ -592,7 +592,7 @@ proc
 				mov( false, alt_down );
 //bm=keycommands			
 			case( w.WM_KEYDOWN )
-				//dbg.put("key down =>", wParam );
+				dbg.put("key down =>", wParam );
 				mov( wParam, eax );
 				switch( eax )
 				
@@ -643,7 +643,13 @@ proc
 							w.SendMessage( editebx.hred, w.EM_REPLACESEL,true, s_empty );
 							jmp skip_proc;
 						endif;
-					
+
+					case( $E2 )
+						if( ctrl_down ) then
+							command_cut_line();
+							jmp skip_proc;
+						endif;
+						
 					case( w.VK_BSLASH )
 						if( ctrl_down ) then
 							command_cut_line();
@@ -2393,6 +2399,7 @@ proc
 		case(IDM_AUTO ) 
 			
 			if( config.readBool( s_settings, s_autosave ) ) then
+
 			
 				w.CheckMenuItem( window.hmenu, IDM_AUTO, w.MF_BYCOMMAND | w.MF_UNCHECKED );
 				mov( false, eax );

@@ -1,5 +1,8 @@
 # Change Log
 
+## 01/03/2023
+			test of adding $E2 as an additional backslash key
+
 ## 01/02/2023
 	0.10.50
 			Filename is now displayed before SavageEd on the titlebar

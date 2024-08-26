@@ -96,6 +96,10 @@ static
 	input	:InputInfo;
 	double_clicked	:boolean := false;
 	
+	
+	//>
+	//hutil	:dword;
+	//hedit	:dword;
 
 	
 proc
@@ -155,18 +159,6 @@ proc
 			ret();
 		endif;
 		
-		/*
-		//>
-		// register a find/command/input window
-		mov( &UtilProc, wc.lpfnWndProc );
-		mov( UtilClass, wc.lpszClassName );
-		mov( w.COLOR_BTNFACE+2, wc.hbrBackground );
-		// register the utility class
-		if ( ! w.RegisterClassEx( wc )) then
-			Error( "Unable to register Utility Window Class", false);
-			ret();
-		endif;	
-		*/
 		// create the window
 		w.CreateWindowEx(
 				NULL,					// dwExStyle
@@ -187,7 +179,20 @@ proc
 			ret();
 		endif;
 
-/*
+
+		/*
+		//>
+		// register a find/command/input window
+		mov( &UtilProc, wc.lpfnWndProc );
+		mov( UtilClass, wc.lpszClassName );
+		mov( w.COLOR_BTNFACE+2, wc.hbrBackground );
+		// register the utility class
+		if ( ! w.RegisterClassEx( wc )) then
+			Error( "Unable to register Utility Window Class", false);
+			ret();
+		endif;	
+		
+
 		//> create the utility window
 		w.CreateWindowEx(
 				w.WS_EX_CLIENTEDGE,					// dwExStyle
@@ -207,7 +212,9 @@ proc
 			Error( "Unable to create utility window", false);
 			ret();
 		endif;
-*/		
+		
+		*/
+		
 		w.ShowWindow( window.hwnd, w.SW_SHOWNORMAL );
 		w.UpdateWindow( window.hwnd );
 		ret();

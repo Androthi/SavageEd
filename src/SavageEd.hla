@@ -7,7 +7,7 @@ program SavageEd;
 
 readonly
 
-	version			:string := "SavageEd v0.10.51";
+	version			:string := "SavageEd v0.10.52";
 
 storage
 	logfont			:w.LOGFONT;
@@ -595,6 +595,16 @@ proc
 				dbg.put("key down =>", wParam );
 				mov( wParam, eax );
 				switch( eax )
+					/*
+					//>
+					case( w.VK_SLASH )
+						dbg.put("vd slash");
+						if( ctrl_down ) then
+							dbg.put("ctrl util");
+							w.ShowWindow( hutil , true );
+							w.SetFocus( hedit );
+						endif;
+					*/
 				
 					case( w.VK_SHIFT )
 						mov( true, shift_down );

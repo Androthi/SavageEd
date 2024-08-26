@@ -1,5 +1,8 @@
 # Change Log
 
+## 08/26/2024
+	0.10.52	Maintenence release
+
 ## 01/03/2023
 			test of adding $E2 as an additional backslash key
 
